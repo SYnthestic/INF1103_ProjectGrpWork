@@ -4,6 +4,9 @@ import os
 import json
 
 from io_manager import retrieve_company_industry, retrieve_company_name, retrieve_total_revenue
+# from data_manager import 
+#  from ai_manager import
+# from logic_manager import
 
 # Code
 print(
@@ -68,6 +71,7 @@ while key!=0:
             print("Function U/C")
         case 5: #AI Processor
             print("Function U/C")
+            ai_manager_data = scheme_grant_records
         case 6: # For the Logic Manager
             print("Function U/C")
         case _:

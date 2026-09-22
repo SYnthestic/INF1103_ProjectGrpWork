@@ -1,0 +1,5 @@
+print("Welcome to SME Green Grant Eligibility & Scope Compliance Auditor!")
+print("This tool will help you determine if your company is eligible for the SME Green Grant and assess your compliance with the scope of the grant.")
+print()
+print("This tool is designed to safeguard your data safely and securely. Thank you!")
+print()
