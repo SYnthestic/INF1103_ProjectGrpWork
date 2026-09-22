@@ -65,8 +65,9 @@ while key!=0:
         case 2: #Save to JSON
             print("Function U/C")
             print(type(scheme_grant_records))
-            check_for_preexisting_save_file(jsonfile_name)
-            save_data_to_json(scheme_grant_records, jsonfile_name)
+            scheme_grants_records, jsonfile_name = check_for_preexisting_save_file(jsonfile_name)
+            jsonfile_name = save_data_to_json(scheme_grant_records, jsonfile_name)
+            print(jsonfile_name)
 
         case 3: #Pull from JSON
             print("Function U/C")
