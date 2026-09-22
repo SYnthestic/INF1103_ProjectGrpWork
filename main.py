@@ -4,7 +4,7 @@ import os
 import json
 
 from io_manager import retrieve_company_industry, retrieve_company_name, retrieve_total_revenue
-# from data_manager import 
+from data_manager import check_for_preexisting_save_file, save_data_to_json
 #  from ai_manager import
 # from logic_manager import
 
@@ -27,6 +27,7 @@ print(
 input("Press enter to continue ")
 scheme_grant_records = []
 ai_manager_data = []
+jsonfile_name = ""
 key = 1
 
 while key!=0:
@@ -64,6 +65,9 @@ while key!=0:
         case 2: #Save to JSON
             print("Function U/C")
             print(type(scheme_grant_records))
+            check_for_preexisting_save_file(jsonfile_name)
+            save_data_to_json(scheme_grant_records, jsonfile_name)
+
         case 3: #Pull from JSON
             print("Function U/C")
             # scheme_grant_records = json.loads(scheme_grant_records)
