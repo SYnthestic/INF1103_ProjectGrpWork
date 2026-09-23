@@ -4,7 +4,7 @@ import os
 import json
 
 from io_manager import retrieve_baseline_energy_expenditure, retrieve_company_industry, retrieve_company_name, retrieve_estimated_retrofit_cost, retrieve_local_equity, retrieve_total_employees, retrieve_total_revenue
-# from data_manager import 
+from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
 #  from ai_manager import
 # from logic_manager import
 
@@ -27,6 +27,7 @@ print(
 input("Press enter to continue ")
 scheme_grant_records = []
 ai_manager_data = []
+jsonfile_name = ""
 key = 1
 
 while key!=0:
@@ -76,10 +77,15 @@ while key!=0:
         case 2: #Save to JSON
             print("Function U/C")
             print(type(scheme_grant_records))
+            scheme_grants_records, jsonfile_name = check_for_preexisting_save_file(jsonfile_name)
+            jsonfile_name = save_data_to_json(scheme_grant_records, jsonfile_name)
+            print(jsonfile_name)
+
         case 3: #Pull from JSON
             print("Function U/C")
-            # scheme_grant_records = json.loads(scheme_grant_records)
-        case 4: #Display current scheme grant records
+            if check_overwrite(scheme_grant_records, jsonfile_name):
+                scheme_grant_records, jsonfile_name = load_data_from_json(jsonfile_name)
+        case 4: #Display current scheme grant records. Definitely I/O Manager's job
             print("Function U/C")
         case 5: #AI Processor
             print("Function U/C")
