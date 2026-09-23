@@ -3,7 +3,7 @@ import sys
 import os
 import json
 
-from io_manager import retrieve_baseline_energy_expenditure, retrieve_company_industry, retrieve_company_name, retrieve_estimated_retrofit_cost, retrieve_local_equity, retrieve_total_employees, retrieve_total_revenue
+from io_manager import display_applied_grants, retrieve_baseline_energy_expenditure, retrieve_company_industry, retrieve_company_name, retrieve_estimated_retrofit_cost, retrieve_local_equity, retrieve_total_employees, retrieve_total_revenue
 
 # Code
 print(
@@ -76,8 +76,10 @@ while key!=0:
         case 3: #Pull from JSON
             print("Function U/C")
             # scheme_grant_records = json.loads(scheme_grant_records)
-        case 4: #Display current scheme grant records
+        case 4: #Display current scheme grant records. Can try editing and deleting records too. 
+            #Display part is IO jpb. Editing and deleting them is Data Manager's job
             print("Function U/C")
+            display_applied_grants(scheme_grant_records)
         case 5: #AI Processor
             print("Function U/C")
         case 6: # For the Logic Manager
