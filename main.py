@@ -3,7 +3,7 @@ import sys
 import os
 import json
 
-from io_manager import retrieve_baseline_energy_expenditure, retrieve_company_industry, retrieve_company_name, retrieve_estimated_retrofit_cost, retrieve_local_equity, retrieve_total_employees, retrieve_total_revenue
+from io_manager import display_applied_grants, retrieve_baseline_energy_expenditure, retrieve_company_industry, retrieve_company_name, retrieve_estimated_retrofit_cost, retrieve_local_equity, retrieve_total_employees, retrieve_total_revenue
 from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
 #  from ai_manager import
 # from logic_manager import
@@ -85,8 +85,10 @@ while key!=0:
             print("Function U/C")
             if check_overwrite(scheme_grant_records, jsonfile_name):
                 scheme_grant_records, jsonfile_name = load_data_from_json(jsonfile_name)
-        case 4: #Display current scheme grant records. Definitely I/O Manager's job
+        case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
+            #Display part is IO jpb. Editing and deleting them is Data Manager's job
             print("Function U/C")
+            display_applied_grants(scheme_grant_records)
         case 5: #AI Processor
             print("Function U/C")
             ai_manager_data = scheme_grant_records

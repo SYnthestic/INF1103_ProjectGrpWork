@@ -147,4 +147,11 @@ if __name__ == "__main__":
     estimated_retrofit_cost = retrieve_estimated_retrofit_cost()
     print(f"Estimated Retrofit Cost entered: SGD {estimated_retrofit_cost:,.2f}")
 
+#For displaying list of grants already applied for by the company
+def display_applied_grants(scheme_grant_records):
+    print("List of Grants Already Applied For:")
+    for i, grant in enumerate(scheme_grant_records, start=1):
+        print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']}''')
+    return scheme_grant_records
+
 # Sustainability Grant
