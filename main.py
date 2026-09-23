@@ -4,7 +4,7 @@ import os
 import json
 
 from io_manager import retrieve_company_industry, retrieve_company_name, retrieve_total_revenue
-from data_manager import check_for_preexisting_save_file, save_data_to_json
+from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
 #  from ai_manager import
 # from logic_manager import
 
@@ -71,8 +71,9 @@ while key!=0:
 
         case 3: #Pull from JSON
             print("Function U/C")
-            # scheme_grant_records = json.loads(scheme_grant_records)
-        case 4: #Display current scheme grant records
+            if check_overwrite(scheme_grant_records, jsonfile_name):
+                scheme_grant_records, jsonfile_name = load_data_from_json(jsonfile_name)
+        case 4: #Display current scheme grant records. Definitely I/O Manager's job
             print("Function U/C")
         case 5: #AI Processor
             print("Function U/C")

@@ -7,6 +7,7 @@ print()
 print("This tool is designed to safeguard your data safely and securely. Thank you!")
 print()
 
+#Saving Part
 def check_for_preexisting_save_file(jsonfile_name):
     # Ensure filename ends with .json if provided
     if jsonfile_name and not jsonfile_name.endswith('.json'):
@@ -65,3 +66,51 @@ def save_data_to_json(data, jsonfile_name):
     except Exception as e:
         print(f"An error occurred while saving data to {jsonfile_name}: {e}")
         return jsonfile_name
+
+
+#Loading Part
+def check_overwrite(data, jsonfile_name):
+
+    # Nothing is currently loaded
+    if data == [] and jsonfile_name == "":
+        return True
+
+    # Something is already loaded
+    choice = input(
+        "Data is already loaded. Do you want to overwrite it? (y/n): "
+    ).strip().lower()
+
+    if choice == "y":
+        return True
+
+    print("Returning to main menu.")
+    return False
+
+def load_data_from_json(jsonfile_name):
+    # Keep asking until a valid, non-empty filename is provided
+    while not jsonfile_name:
+        jsonfile_name = input("Please provide a valid JSON file name to load the data from: ").strip()
+        if not jsonfile_name:
+            print("Filename cannot be blank.")
+            
+    # Automatically add .json extension if it's missing
+    # Check if jsonfile_name exists and is a string before checking the extension
+    if jsonfile_name and not str(jsonfile_name).endswith('.json'):
+        jsonfile_name = str(jsonfile_name) + '.json'
+
+    # Check whether the file exists
+    if not os.path.isfile(jsonfile_name):
+        print("This file does not exist.")
+        return [], jsonfile_name
+
+
+    try:
+        with open(jsonfile_name, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+
+        print(f"Data successfully loaded from {jsonfile_name}.")
+        return data, jsonfile_name
+    
+    except Exception as e:
+        print(f"An error occurred while loading data from {jsonfile_name}: {e}")
+        return [], jsonfile_name
