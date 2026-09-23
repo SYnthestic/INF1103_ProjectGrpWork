@@ -3,7 +3,7 @@ import sys
 import os
 import json
 
-from io_manager import retrieve_company_industry, retrieve_company_name, retrieve_total_revenue
+from io_manager import retrieve_baseline_energy_expenditure, retrieve_company_industry, retrieve_company_name, retrieve_estimated_retrofit_cost, retrieve_local_equity, retrieve_total_employees, retrieve_total_revenue
 
 # Code
 print(
@@ -48,13 +48,25 @@ while key!=0:
             company_name = retrieve_company_name()
             company_industry = retrieve_company_industry()
             get_total_revenue = retrieve_total_revenue()
+            total_employees = retrieve_total_employees()
+            get_local_equity = retrieve_local_equity()
+            baseline_energy_expensiture = retrieve_baseline_energy_expenditure()
+            retrofit_cost = retrieve_estimated_retrofit_cost()
             print(f"Company Name: {company_name}")
             print(f"Company Industry: {company_industry}")
             print(f"Company Total Revenue: {get_total_revenue}")
+            print(f"Total Employees: {total_employees}")
+            print(f"Local Equity: {get_local_equity}")
+            print(f"Baseline Energy Expenditure: {baseline_energy_expensiture}")
+            print(f"Estimated Retrofit Cost: {retrofit_cost}")
             scheme_grant_records.append({
                 "Company Name": company_name,
                 "Company Industry": company_industry,
-                "Company Total Revenue": get_total_revenue
+                "Company Total Revenue": get_total_revenue,
+                "Total Employees": total_employees,
+                "Local Equity": get_local_equity,
+                "Baseline Energy Expenditure": baseline_energy_expensiture,
+                "Estimated Retrofit Cost": retrofit_cost
             })
             print("Scheme Grant Records:", scheme_grant_records)
             print(type(scheme_grant_records))
