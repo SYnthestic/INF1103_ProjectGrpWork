@@ -2,10 +2,11 @@
 import sys
 import os
 import json
+import openai
 
 from io_manager import display_applied_grants, retrieve_baseline_energy_expenditure, retrieve_company_industry, retrieve_company_name, retrieve_estimated_retrofit_cost, retrieve_local_equity, retrieve_total_employees, retrieve_total_revenue
 from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
-#  from ai_manager import
+from ai_manager import get_ai_response
 # from logic_manager import
 
 # Code
@@ -92,6 +93,8 @@ while key!=0:
         case 5: #AI Processor
             print("Function U/C")
             ai_manager_data = scheme_grant_records
+            print("AI Manager Data:", ai_manager_data)
+            print(get_ai_response())
         case 6: # For the Logic Manager
             print("Function U/C")
         case _:
