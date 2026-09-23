@@ -1,5 +1,5 @@
-print("Welcome to SME Green Grant Eligibility & Scope Compliance Auditor!")
-print("This tool will help you determine if your company is eligible for the SME Green Grant and assess your compliance with the scope of the grant.")
+print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
+print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
 print()
 print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
 print()
@@ -39,7 +39,7 @@ def get_valid_other_industry():
         other_industry = input("Please specify your Company's Industry Sector: ").strip().title()
         if other_industry == "":
             print("Industry Sector cannot be empty. Please try again.")
-        elif not other_industry.isalpha():
+        elif not other_industry.replace(" ", "").isalpha():
             print("Invalid. Please provide a valid Industry Sector containing only alphabetic characters.")
         else:
             return other_industry
@@ -65,3 +65,86 @@ def retrieve_total_revenue():
 if __name__ == "__main__":
     total_revenue = retrieve_total_revenue()
     print(f"Company's Total Revenue entered: SGD {total_revenue:,.2f}")
+
+# input of Company's Total Number of Employees
+def retrieve_total_employees():
+    while True:
+        try:
+            total_employees = int(input("Enter your Company's Total Number of Employees: "))
+            if total_employees < 0:
+                print("Total Number of Employees cannot be negative. Please try again.")
+            elif total_employees == 0:
+                print("Total Number of Employees cannot be zero. Please try again.")
+            else:
+                return total_employees
+        except ValueError:
+            print("Invalid input. Please enter a numeric value for total number of employees.")
+
+if __name__ == "__main__":
+    total_employees = retrieve_total_employees()
+    print(f"Company's Total Number of Employees entered: {total_employees}")
+
+# input of Company's Local Equity
+def retrieve_local_equity():
+    while True:
+        raw_value = input("Enter equity % owned by Singapore Citizens/PRs: ").strip()
+        if raw_value == "":
+            print("Equity % cannot be empty. Please try again.")
+            continue
+        try:
+            local_equity = float(raw_value)
+            if local_equity <= 0 or local_equity > 100:
+                print("Equity % must be a value between 0 and 100. Please try again.")
+                continue
+            else:
+                return local_equity
+        except ValueError:
+            print("Invalid input. Please enter a numeric value for your local equity.")
+
+if __name__ == "__main__":
+    local_equity = retrieve_local_equity()
+    print(f"Local Equity entered: {local_equity}%")
+
+# Input of Baseline Annual Energy Expenditure
+def retrieve_baseline_energy_expenditure():
+    while True:
+            raw_value = input("Enter baseline annual energy expenditure (in SGD): ").strip()
+            if raw_value == "":
+                print("Baseline annual energy expenditure cannot be empty. Please try again.")
+                continue
+            try:
+                baseline_energy_expenditure = float(raw_value)
+                if baseline_energy_expenditure < 0:
+                    print("Baseline annual energy expenditure cannot be negative. Please try again.")
+                    continue
+                else:
+                    return baseline_energy_expenditure
+            except ValueError:
+                print("Invalid input. Please enter a numeric value for baseline annual energy expenditure.")
+
+if __name__ == "__main__":
+    baseline_energy_expenditure = retrieve_baseline_energy_expenditure()
+    print(f"Baseline Annual Energy Expenditure entered: SGD {baseline_energy_expenditure:,.2f}")
+
+# Input of Estimated Retrofit Cost
+def retrieve_estimated_retrofit_cost():
+    while True:
+            raw_value = input("Enter estimated retrofit cost (in SGD): ").strip()
+            if raw_value == "":
+                print("Estimated retrofit cost cannot be empty. Please try again.")
+                continue
+            try:
+                estimated_retrofit_cost = float(raw_value)
+                if estimated_retrofit_cost < 0:
+                    print("Estimated retrofit cost cannot be negative. Please try again.")
+                    continue
+                else:
+                    return estimated_retrofit_cost
+            except ValueError:
+                print("Invalid input. Please enter a numeric value for estimated retrofit cost.")
+
+if __name__ == "__main__":
+    estimated_retrofit_cost = retrieve_estimated_retrofit_cost()
+    print(f"Estimated Retrofit Cost entered: SGD {estimated_retrofit_cost:,.2f}")
+
+# Sustainability Grant
