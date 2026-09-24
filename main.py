@@ -2,7 +2,7 @@
 import sys
 import os
 import json
-import openai
+from openai import OpenAI
 
 from io_manager import display_applied_grants, retrieve_baseline_energy_expenditure, retrieve_company_industry, retrieve_company_name, retrieve_estimated_retrofit_cost, retrieve_local_equity, retrieve_total_employees, retrieve_total_revenue
 from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
