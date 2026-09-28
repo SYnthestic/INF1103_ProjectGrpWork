@@ -14,7 +14,6 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 INVALID_FILENAME_CHARS = '/\\:*?"<>|'
 
-
 def normalise_filename(jsonfile_name):
     """Strips whitespace and makes sure the name ends with .json."""
     jsonfile_name = str(jsonfile_name).strip()
