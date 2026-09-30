@@ -32,9 +32,10 @@ from io_manager import (
 from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
 from ai_manager import get_ai_response
 from logic_manager import evaluate_grant_application
+from art_feature.art_stuff import print_hello, woman_says_hi, print_wrong_sign_red
 
 # Code
-print(text2art("Hello"))
+print_hello()
 print(
 '''
 ****************************************************
@@ -59,14 +60,15 @@ key = 1
 while key!=0:
     keyverify = False
     while keyverify == False:
-        key = input('''Please select your choice (0,1,2,3,4,5,6)\n 
-0. Exit\n 
-1. Start\n 
-2. Save to JSON\n 
-3. Pull from JSON\n 
-4. Display Current Records\n 
-5. AI Processor\n 
-6. Logic Manager\n''')
+        woman_says_hi()
+        key = input('''Please select your choice (0,1,2,3,4,5,6) 
+0. Exit
+1. Start
+2. Save to JSON 
+3. Pull from JSON 
+4. Display Current Records 
+5. AI Processor 
+6. Logic Manager''')
         if len(key) == 0:
             print("Empty Response!")
         elif key.isnumeric() == False:
@@ -79,8 +81,7 @@ while key!=0:
 
     match key:
         case 0:
-            goodbye = art("woman",number=10)
-            print(goodbye)
+            tprint("Goodbye","rnd-xlarge")
             print("Exiting the program.")
         case 1: # Start checks
             company_name = retrieve_company_name()
@@ -144,6 +145,8 @@ while key!=0:
                 jsonfile_name = save_data_to_json(scheme_grant_records, jsonfile_name)
                 print(jsonfile_name)
         case 2: #Save to JSON
+            Art = text2art("SAVE", font='block', chr_ignore=True)
+            print(Art)
             existing_records, jsonfile_name = check_for_preexisting_save_file(jsonfile_name)
             scheme_grant_records = existing_records + scheme_grant_records
             jsonfile_name = save_data_to_json(scheme_grant_records, jsonfile_name)
@@ -174,4 +177,5 @@ while key!=0:
                 result = evaluate_grant_application(user_profile, ai_audit_data)
                 display_grant_decision(result)
         case _:
+            print_wrong_sign_red()
             print("Error! Unrecognised number option")
