@@ -10,7 +10,7 @@ print()
 # All save files live in a "data" folder next to this file, regardless of
 # which directory the program is launched from. (In Docker this resolves
 # to /app/data, which matches the -v "$(pwd)/data:/app/data" volume mount.)
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)))
 
 INVALID_FILENAME_CHARS = '/\\:*?"<>|'
 
