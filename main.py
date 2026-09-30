@@ -2,6 +2,7 @@ import sys
 import os
 import json
 from openai import OpenAI
+from art import *
 
 # Load OPENROUTER_API_KEY from a local .env file when running outside
 # Docker. Inside Docker the variable is injected via --env-file instead.
@@ -33,6 +34,7 @@ from ai_manager import get_ai_response
 from logic_manager import evaluate_grant_application
 
 # Code
+print(text2art("Hello"))
 print(
 '''
 ****************************************************
@@ -57,7 +59,14 @@ key = 1
 while key!=0:
     keyverify = False
     while keyverify == False:
-        key = input("Please select your choice (0,1,2,3,4,5,6)\n 0. Exit\n 1. Start\n 2. Save to JSON\n 3. Pull from JSON\n 4. Display Current Records\n 5. AI Processor\n 6. Logic Manager\n")
+        key = input('''Please select your choice (0,1,2,3,4,5,6)\n 
+0. Exit\n 
+1. Start\n 
+2. Save to JSON\n 
+3. Pull from JSON\n 
+4. Display Current Records\n 
+5. AI Processor\n 
+6. Logic Manager\n''')
         if len(key) == 0:
             print("Empty Response!")
         elif key.isnumeric() == False:
@@ -70,6 +79,8 @@ while key!=0:
 
     match key:
         case 0:
+            goodbye = art("woman",number=10)
+            print(goodbye)
             print("Exiting the program.")
         case 1: # Start checks
             company_name = retrieve_company_name()

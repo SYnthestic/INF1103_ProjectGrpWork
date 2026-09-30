@@ -173,9 +173,12 @@ def retrieve_reporting_advisory_fee():
 
 # For displaying list of grants already applied for by the company
 def display_applied_grants(scheme_grant_records):
-    print("List of Grants Already Applied For:")
-    for i, grant in enumerate(scheme_grant_records, start=1):
-        print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
+    if len(scheme_grant_records) == 0:
+        input("You do not have any grants applied. Press any key to return to main menu")
+    else:
+        print("List of Grants Already Applied For:")
+        for i, grant in enumerate(scheme_grant_records, start=1):
+            print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
     return scheme_grant_records
 
 # Bridges main.py's case-1 record format (capitalised, display-oriented
