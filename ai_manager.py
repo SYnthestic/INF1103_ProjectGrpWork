@@ -8,7 +8,7 @@ def setup_ai_client():
         base_url="https://openrouter.ai/api/v1",
         api_key=os.environ["OPENROUTER_API_KEY"],
         max_retries=0,
-        timeout=60
+        timeout=60 # Otherwise, say AI not responding
     )
     return client
 
@@ -62,7 +62,7 @@ def get_ai_response(proposal_narrative):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": proposal_narrative}
             ],
-            timeout=60
+            timeout=60 #60 seconds
         )
         raw_content = response.choices[0].message.content
     except Exception as error:
