@@ -95,10 +95,10 @@ def retrieve_proposal_type():
     }
 
     while True:
-        print("What type of proposal is this?")
-        print("  1. Equipment / Energy Upgrade (e.g. fleet electrification, HVAC retrofit, lighting)")
-        print("  2. ESG Reporting / Advisory (e.g. inaugural sustainability report, external assurance)")
-        choice = input("Enter 1 or 2: ").strip()
+        choice = input('''What type of proposal is this?\n
+                1. Equipment / Energy Upgrade (e.g. fleet electrification, HVAC retrofit, lighting)\n
+                2. ESG Reporting / Advisory (e.g. inaugural sustainability report, external assurance)\n
+                    Enter 1 or 2: ''').strip()
 
         if choice in valid_types:
             return valid_types[choice]
