@@ -1,5 +1,6 @@
 from art import *
 import random
+import sys
 
 def print_wrong_sign_red():
     # # \033[91m sets color to bright red, \033[0m resets it to normal
@@ -26,3 +27,56 @@ def woman_says_hi():
 
 def print_hello():
     print(text2art("Hello", font='block', chr_ignore=True))
+
+def print_goodbye():
+    tprint("Goodbye","rnd-xlarge")
+
+def press_enter_key():
+    # Terminal colors: \033[93m = Bright Yellow/Gold, \033[90m = Grey Shadow, \033[0m = Reset
+    gold = "\033[93m"
+    shadow = "\033[90m"
+    reset = "\033[0m"
+    
+    # Hide the blinking terminal cursor so the key looks static and clean
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
+
+    # The 3D Keycap Art Matrix
+    key_art = f"""
+     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+    █  {gold}┌──────────────────────────┐{reset}  █
+    █  {gold}│⮞ PRESS ENTER TO CONTINUE │{reset}  █▀▄
+    █  {gold}└──────────────────────────┘{reset}  █ █
+    ▀████████████████████████████████▀  █
+      {shadow}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}
+    """
+    
+    print(key_art, end="", flush=True)
+
+    # Standard built-in input mechanism waiting for the Enter keypress
+    input()
+
+    # Restore the terminal cursor to normal behavior
+    sys.stdout.write("\033[?25h")
+    sys.stdout.flush()
+    print("\n") # Clean line break after click
+
+def print_save_disk_block_deep_blue():
+    # Terminal Color Codes
+    blue = "\033[34m"   # Deep classic blue
+    white = "\033[97m"  # Crisp white for contrast
+    reset = "\033[0m"   # Reset formatting
+
+    disk_art = f"""
+  {blue}█████████████████████████▀▄{reset}
+  {blue}█████████████████████████ █{reset}
+  {blue}██{reset}  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀ {blue}██ █{reset}
+  {blue}██{reset}  █████████████████  {blue}██ █{reset}
+  {blue}██{reset}  █████████████████  {blue}██ █{reset}
+  {blue}██                     ██ █{reset}
+  {blue}██       {white}███████{blue}       ██ █{reset}
+  {blue}██       {white}██   ██{blue}       ██ █{reset}
+  {blue}█████████████████████████▀{reset} 
+   {blue}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}  
+"""
+    print(disk_art)

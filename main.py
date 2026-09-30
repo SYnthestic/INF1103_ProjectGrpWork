@@ -32,7 +32,7 @@ from io_manager import (
 from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
 from ai_manager import get_ai_response
 from logic_manager import evaluate_grant_application
-from art_feature.art_stuff import print_hello, woman_says_hi, print_wrong_sign_red
+from art_feature.art_stuff import *
 
 # Code
 print_hello()
@@ -51,7 +51,8 @@ print(
 *                                                  *
 ****************************************************
 ''')
-input("Press enter to continue ")
+# Run the prompt
+press_enter_key()
 scheme_grant_records = []
 ai_audit_data = {}
 jsonfile_name = ""
@@ -68,7 +69,7 @@ while key!=0:
 3. Pull from JSON 
 4. Display Current Records 
 5. AI Processor 
-6. Logic Manager''')
+6. Logic Manager\n''')
         if len(key) == 0:
             print("Empty Response!")
         elif key.isnumeric() == False:
@@ -81,8 +82,7 @@ while key!=0:
 
     match key:
         case 0:
-            tprint("Goodbye","rnd-xlarge")
-            print("Exiting the program.")
+            print_goodbye()
         case 1: # Start checks
             company_name = retrieve_company_name()
             company_industry = retrieve_company_industry()
@@ -144,14 +144,13 @@ while key!=0:
                 scheme_grant_records = existing_records + scheme_grant_records
                 jsonfile_name = save_data_to_json(scheme_grant_records, jsonfile_name)
                 print(jsonfile_name)
+                print_save_disk_block_deep_blue()
         case 2: #Save to JSON
-            Art = text2art("SAVE", font='block', chr_ignore=True)
-            print(Art)
             existing_records, jsonfile_name = check_for_preexisting_save_file(jsonfile_name)
             scheme_grant_records = existing_records + scheme_grant_records
             jsonfile_name = save_data_to_json(scheme_grant_records, jsonfile_name)
             print(jsonfile_name)
-
+            print_save_disk_block_deep_blue()
         case 3: #Pull from JSON
             if check_overwrite(scheme_grant_records, jsonfile_name):
                 scheme_grant_records, jsonfile_name = load_data_from_json(jsonfile_name)
