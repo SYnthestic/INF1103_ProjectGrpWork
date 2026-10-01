@@ -36,21 +36,9 @@ from art_feature.art_stuff import *
 
 # Code
 print_hello()
-print(
-'''
-****************************************************
-*                                                  *
-*                   Welcome to:                    *
-*                                                  *
-* ~  SME Green Sutainability Eligibility Scheme  ~ *
--------------------------------------------------- *
-*                                                  *
-*    For the purposes of determining eligibility   *
-*  to the SME Green Grant and assessing compliance *
-*  WARNING! THIS APP IS PRIMITIVE AND MAY NOT WORK *
-*                                                  *
-****************************************************
-''')
+woman_says_hi()
+print_sustainability_banner()
+woman_says_hi()
 # Run the prompt
 press_enter_key()
 scheme_grant_records = []
@@ -61,15 +49,8 @@ key = 1
 while key!=0:
     keyverify = False
     while keyverify == False:
-        woman_says_hi()
-        key = input('''Please select your choice (0,1,2,3,4,5,6) 
-0. Exit
-1. Start
-2. Save to JSON 
-3. Pull from JSON 
-4. Display Current Records 
-5. AI Processor 
-6. Logic Manager\n''')
+        print_boxed_menu()
+        key = input("➔ ")
         if len(key) == 0:
             print("Empty Response!")
         elif key.isnumeric() == False:

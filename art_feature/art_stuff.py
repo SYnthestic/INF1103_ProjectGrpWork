@@ -80,3 +80,45 @@ def print_save_disk_block_deep_blue():
    {blue}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}  
 """
     print(disk_art)
+
+def print_boxed_menu():
+    border = "▓⚗_⚗▓ " * 10
+    
+    # Each row is padded to match the exact length of the border line (59 characters wide)
+    print(border)
+    print("▓                                                         ▓")
+    print("▓    Please select your choice (0,1,2,3,4,5,6)            ▓")
+    print("▓                                                         ▓")
+    print("▓    0. Exit                                              ▓")
+    print("▓    1. Start                                             ▓")
+    print("▓    2. Save to JSON                                      ▓")
+    print("▓    3. Pull from JSON                                    ▓")
+    print("▓    4. Display Current Records                           ▓")
+    print("▓    5. AI Processor                                      ▓")
+    print("▓    6. Logic Manager                                     ▓")
+    print("▓                                                         ▓")
+    print(border)
+
+def print_sustainability_banner():
+    # Terminal Colors: \033[92m = Eco Green, \033[91m = Warning Red, \033[90m = Grey, \033[0m = Reset
+    green = "\033[92m"
+    red = "\033[91m"
+    grey = "\033[90m"
+    reset = "\033[0m"
+
+    banner = f"""
+    ┌──────────────────────────────────────────────────┐
+    │                                                  │
+    │                   {green}Welcome to:                    {reset}│
+    │                                                  │
+    │{green}🌱 SME Green Sustainability Eligibility Scheme 🌱{reset} │
+    ├──────────────────────────────────────────────────┤
+    │                                                  │
+    │   For the purposes of determining eligibility    │
+    │  to the SME Green Grant and assessing compliance.│
+    │                                                  │
+    │   {red}⚠️ WARNING: This application is experimental.   {reset}│
+    │                                                  │
+    └──────────────────────────────────────────────────┘
+    """
+    print(banner)
