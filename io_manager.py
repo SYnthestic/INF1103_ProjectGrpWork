@@ -1,3 +1,5 @@
+from art_feature.art_stuff import print_return_keycap
+
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
 print()
@@ -173,12 +175,18 @@ def retrieve_reporting_advisory_fee():
 
 # For displaying list of grants already applied for by the company
 def display_applied_grants(scheme_grant_records):
+    red = "\033[91m"
+    reset = "\033[0m"
     if len(scheme_grant_records) == 0:
-        input("You do not have any grants applied. Press any key to return to main menu")
+        print(f"\n {red}⚠️  SYSTEM NOTICE: You do not have any grants applied.{reset}\n")
+        # Now this will execute perfectly without a NameError!
+        print_return_keycap()
+        return
     else:
         print("List of Grants Already Applied For:")
         for i, grant in enumerate(scheme_grant_records, start=1):
             print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
+    print_return_keycap()
     return scheme_grant_records
 
 # Bridges main.py's case-1 record format (capitalised, display-oriented

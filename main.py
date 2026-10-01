@@ -39,8 +39,8 @@ print_hello()
 woman_says_hi()
 print_sustainability_banner()
 woman_says_hi()
-# Run the prompt
-press_enter_key()
+# Test the fixed engine
+press_enter_to_continue()
 scheme_grant_records = []
 ai_audit_data = {}
 jsonfile_name = ""
