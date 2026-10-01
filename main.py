@@ -1,4 +1,5 @@
 import sys
+import time
 import os
 import json
 from openai import OpenAI
@@ -28,11 +29,13 @@ from io_manager import (
     confirm_save_to_json,
     display_ai_audit,
     display_grant_decision,
+    display_no_records_message,
+    display_no_ai_audit
 )
 from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
 from ai_manager import get_ai_response
 from logic_manager import evaluate_grant_application
-from art_feature.art_stuff import *
+from sme_interface_stores.sme_interface_gui import *
 
 # Code
 print_hello()
@@ -112,7 +115,6 @@ while key!=0:
             # Automatically run the AI Manager and Logic Manager on the
             # record just collected, instead of requiring the user to
             # separately select options 5 and 6.
-            print("Analysing your proposal with the AI Manager, please wait...")
             ai_audit_data = get_ai_response(proposal_narrative)
             display_ai_audit(ai_audit_data)
 
@@ -140,7 +142,8 @@ while key!=0:
             display_applied_grants(scheme_grant_records)
         case 5: #AI Processor
             if len(scheme_grant_records) == 0:
-                print("No records yet. Please select option 1 first.")
+                display_no_records_message()
+                print_return_keycap()
             else:
                 current_record = scheme_grant_records[-1]
                 narrative = current_record.get("Proposal Narrative", "")
@@ -148,9 +151,11 @@ while key!=0:
                 display_ai_audit(ai_audit_data)
         case 6: # For the Logic Manager
             if len(scheme_grant_records) == 0:
-                print("No records yet. Please select option 1 first.")
+                display_no_records_message()
+                print_return_keycap()
             elif not ai_audit_data:
-                print("No AI audit yet. Please run option 5 first.")
+                display_no_ai_audit()
+                print_return_keycap()
             else:
                 current_record = scheme_grant_records[-1]
                 user_profile = convert_record_to_profile(current_record)

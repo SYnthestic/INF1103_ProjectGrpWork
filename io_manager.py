@@ -1,4 +1,4 @@
-from art_feature.art_stuff import print_return_keycap
+from sme_interface_stores.sme_interface_gui import print_return_keycap
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
@@ -298,6 +298,12 @@ def build_user_profile():
     }
 
     return user_profile
+
+def display_no_records_message():
+    print("No records yet. Please select option 1 first.")
+
+def display_no_ai_audit():
+    print("No AI audit yet. Please run option 5 first.")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from art import *
 import random
 import sys
 import os
+import time
 
 # Set up clean cross-platform input capturing
 is_windows = os.name == 'nt'
@@ -220,3 +221,34 @@ def print_sustainability_banner():
     └──────────────────────────────────────────────────┘
     """
     print(banner)
+
+# Runs whenever AI Manager is using the get_ai_response() function. It gives one bar for every second passed
+def run_ai_analysis_bar(stop_event, timeout_seconds=60):
+    """
+    Animates the progress bar. Stops instantly if stop_event is flagged 
+    or when it hits the maximum timeout.
+    """
+    cyan = "\033[96m"
+    reset = "\033[0m"
+    
+    print("\nAnalysing your proposal with the AI Manager, please wait...\n")
+    sys.stdout.write("\033[?25l")  # Hide text cursor
+    sys.stdout.flush()
+    
+    try:
+        # Loop for the maximum allowed duration
+        for i in range(1, timeout_seconds + 1):
+            # Check if the API background thread has finished and flagged us to stop
+            if stop_event.is_set():
+                break
+                
+            percent = int((i / timeout_seconds) * 100)
+            progress_bar = f"\r   Time Taken: [{cyan}{'█' * i}{' ' * (timeout_seconds - i)}{reset}] {percent}% ({i}/{timeout_seconds}s)"
+            
+            sys.stdout.write(progress_bar)
+            sys.stdout.flush()
+            time.sleep(1)
+    finally:
+        # Restore terminal text cursor
+        sys.stdout.write("\033[?25h\n\n")
+        sys.stdout.flush()

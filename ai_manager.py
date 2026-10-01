@@ -1,6 +1,10 @@
 import os
 import json
+import sys
+import time
+import threading
 from openai import OpenAI
+from sme_interface_stores.sme_interface_gui import run_ai_analysis_bar
 
 
 def setup_ai_client():
@@ -48,24 +52,47 @@ def get_ai_response(proposal_narrative):
     """
     Sends the proposal narrative to the LLM and returns a validated
     ai_audit dict matching the schema logic_manager.py expects.
-
-    Falls back to safe defaults (routing to manual review) if the API
-    call fails or the response can't be parsed, so a Logic Manager
-    consumer never has to handle AI failures itself.
+    
+    Runs a thread-safe ASCII animation bar concurrently with the API call.
     """
+    # Create an event flag to signal when the API process completes
+    api_done_event = threading.Event()
+    
+    # Storage container for thread safe return values / errors
+    thread_results = {"output": None, "error": None}
 
-    try:
-        client = setup_ai_client()
-        response = client.chat.completions.create(
-            model="openrouter/free",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": proposal_narrative}
-            ],
-            timeout=60 #60 seconds
-        )
-        raw_content = response.choices[0].message.content
-    except Exception as error:
+    def worker_api_call():
+        """Background thread worker to execute the blocking network call."""
+        try:
+            client = setup_ai_client()
+            response = client.chat.completions.create(
+                model="openrouter/free",
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": proposal_narrative}
+                ],
+                timeout=60
+            )
+            thread_results["output"] = response.choices[0].message.content
+        except Exception as error:
+            thread_results["error"] = error
+        finally:
+            # Tell the animation thread to immediately stop tracking
+            api_done_event.set()
+
+    # 1. Spawn and start the background API network thread
+    api_thread = threading.Thread(target=worker_api_call)
+    api_thread.start()
+
+    # 2. Run the ASCII progress bar on the main UI thread immediately
+    run_ai_analysis_bar(api_done_event, timeout_seconds=60)
+
+    # 3. Ensure background thread wraps up completely before processing results
+    api_thread.join()
+
+    # 4. Handle Fallbacks if an error was caught inside the background worker
+    if thread_results["error"] is not None:
+        error = thread_results["error"]
         fallback = dict(DEFAULT_AI_AUDIT)
         fallback["ai_reasoning_summary"] = (
             f"AI call failed ({type(error).__name__}: {error}); "
@@ -73,6 +100,8 @@ def get_ai_response(proposal_narrative):
         )
         return fallback
 
+    # 5. Extract and parse standard response text
+    raw_content = thread_results["output"]
     return parse_ai_audit(raw_content)
 
 
