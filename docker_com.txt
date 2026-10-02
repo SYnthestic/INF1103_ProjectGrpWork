@@ -1,0 +1,2 @@
+Docker Build: docker build -t inf1103-grant-auditor .
+Docker Run: docker run --rm -it --env-file .env inf1103-grant-auditor
