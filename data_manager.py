@@ -1,11 +1,68 @@
 import json
 import os
+from datetime import datetime
 
 print("Welcome to SME Green Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Green Grant and assess your compliance with the scope of the grant.")
 print()
 print("This tool is designed to safeguard your data safely and securely. Thank you!")
 print()
+
+# Audit Record management:
+# Generate a unique ID for a new audit record
+def generate_audit_id(records):
+    if not records:
+        return 1
+    
+    highest_id = 0
+
+    for record in records:
+        audit_id = record.get("audit_id", 0)
+
+        if isinstance(audit_id, int) and audit_id > highest_id:
+            highest_id = audit_id
+
+    return highest_id + 1
+
+# Create Audit record in JSON format
+def create_audit_record(
+    audit_id,
+    user_profile,
+    proposal,
+    ai_audit,
+    evaluation
+):
+    """Combine all assessment information into one audit record."""
+
+    audit_record = {
+        "audit_id": audit_id,
+        "created_at": datetime.now().isoformat(),
+
+        "company_profile": user_profile,
+
+        "proposal": {
+            "raw_narrative": proposal
+        },
+
+        "ai_audit": ai_audit,
+
+        "evaluation": evaluation
+    }
+
+    return audit_record
+
+# Add audit record to the current record list
+def add_audit_record(records, audit_record):
+    """Add a completed audit record to the current record list."""
+
+    if not isinstance(records, list):
+        records = []
+
+    records.append(audit_record)
+
+    return records
+
+# End
 
 #Saving Part
 def check_for_preexisting_save_file(jsonfile_name):
@@ -110,6 +167,7 @@ def load_data_from_json(jsonfile_name):
 
         print(f"Data successfully loaded from {jsonfile_name}.")
         return data, jsonfile_name
+    
     
     except Exception as e:
         print(f"An error occurred while loading data from {jsonfile_name}: {e}")
