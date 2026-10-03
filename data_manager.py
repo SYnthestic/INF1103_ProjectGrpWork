@@ -2,11 +2,22 @@ import json
 import os
 from datetime import datetime
 
-print("Welcome to SME Green Grant Eligibility & Scope Compliance Auditor!")
-print("This tool will help you determine if your company is eligible for the SME Green Grant and assess your compliance with the scope of the grant.")
-print()
-print("This tool is designed to safeguard your data safely and securely. Thank you!")
-print()
+# Invalid characters for filenames
+INVALID_FILENAME_CHARS = '/\\:*?"<>|'
+
+# Data save will be stored in JSON format. The following functions help manage the data files.
+def normalise_filename(jsonfile_name):
+    """Strips whitespace and makes sure the name ends with .json."""
+    jsonfile_name = str(jsonfile_name).strip()
+    if jsonfile_name and not jsonfile_name.endswith('.json'):
+        jsonfile_name += '.json'
+    return jsonfile_name
+
+# Check if the filename is valid (no folders or special characters)
+def is_valid_filename(jsonfile_name):
+    """A bare filename only: no folders or special characters."""
+    return not any(char in jsonfile_name for char in INVALID_FILENAME_CHARS)
+
 
 # Audit Record management:
 # Generate a unique ID for a new audit record
@@ -102,28 +113,40 @@ def check_for_preexisting_save_file(jsonfile_name):
         print(f"No existing save file found with the name '{jsonfile_name}'. Starting fresh.")
         return [], jsonfile_name
 
+# Save data to JSON and do filename validation
 def save_data_to_json(data, jsonfile_name):
     # Keep asking until a valid, non-empty filename is provided
     while not jsonfile_name:
         jsonfile_name = input("Please provide a valid JSON file name to save the data: ").strip()
+
         if not jsonfile_name:
             print("Filename cannot be blank.")
-            
-    # Automatically add .json extension if it's missing
-    # Check if jsonfile_name exists and is a string before checking the extension
-    if jsonfile_name and not str(jsonfile_name).endswith('.json'):
-        jsonfile_name = str(jsonfile_name) + '.json'
 
+    jsonfile_name = normalise_filename(jsonfile_name)
 
+    if not is_valid_filename(jsonfile_name):
+        print("Invalid filename. Please avoid special characters.")
+        return None
+    
     try:
         with open(jsonfile_name, 'w', encoding='utf-8') as file:
-            json.dump(data, file, indent=4, ensure_ascii=False)
-            print(f"Data successfully saved to {jsonfile_name}.")
-            return jsonfile_name
-    except Exception as e:
-        print(f"An error occurred while saving data to {jsonfile_name}: {e}")
+            json.dump(
+                data,
+                file,
+                indent=4,
+                ensure_ascii=False
+            )
+        print(f"Data successfully saved to {jsonfile_name}.")
         return jsonfile_name
+    
+    except OSError as error:
+        print(
+            f"An error occurred while saving data "
+            f"to {jsonfile_name}: {error}"
+        )
 
+        return None
+            
 
 #Loading Part
 def check_overwrite(data, jsonfile_name):
