@@ -166,32 +166,56 @@ def check_overwrite(data, jsonfile_name):
     print("Returning to main menu.")
     return False
 
+# load data from JSON and do filename validation
 def load_data_from_json(jsonfile_name):
     # Keep asking until a valid, non-empty filename is provided
     while not jsonfile_name:
         jsonfile_name = input("Please provide a valid JSON file name to load the data from: ").strip()
         if not jsonfile_name:
             print("Filename cannot be blank.")
-            
-    # Automatically add .json extension if it's missing
-    # Check if jsonfile_name exists and is a string before checking the extension
-    if jsonfile_name and not str(jsonfile_name).endswith('.json'):
-        jsonfile_name = str(jsonfile_name) + '.json'
+
+    jsonfile_name = normalise_filename(jsonfile_name)
+
+    if not is_valid_filename(jsonfile_name):
+        print("Invalid filename. Please avoid special characters.")
+        return [], jsonfile_name
 
     # Check whether the file exists
     if not os.path.isfile(jsonfile_name):
-        print("This file does not exist.")
+        print(f"The file '{jsonfile_name}' does not exist.")
         return [], jsonfile_name
-
 
     try:
-        with open(jsonfile_name, 'r', encoding='utf-8') as file:
+        with open(
+            jsonfile_name,
+            'r',
+            encoding='utf-8'
+        ) as file:
+
             data = json.load(file)
 
-        print(f"Data successfully loaded from {jsonfile_name}.")
+        # Make sure the loaded data is a list
+        if not isinstance(data, list):
+            data = [data]
+
+        print(
+            f"Data successfully loaded from {jsonfile_name}."
+        )
+
         return data, jsonfile_name
-    
-    
-    except Exception as e:
-        print(f"An error occurred while loading data from {jsonfile_name}: {e}")
+
+    except json.JSONDecodeError:
+        print(
+            f"The file '{jsonfile_name}' contains invalid JSON."
+        )
+
         return [], jsonfile_name
+
+    except OSError as error:
+        print(
+            f"An error occurred while loading "
+            f"{jsonfile_name}: {error}"
+        )
+
+        return [], jsonfile_name
+            
