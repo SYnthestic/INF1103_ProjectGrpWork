@@ -22,7 +22,7 @@ def is_valid_filename(jsonfile_name):
 # Audit Record management:
 # Generate a unique ID for a new audit record
 def generate_audit_id(records):
-    if not records:
+    if not isinstance(records, list) or not records:
         return 1
     
     highest_id = 0
@@ -77,15 +77,19 @@ def add_audit_record(records, audit_record):
 
 #Saving Part
 def check_for_preexisting_save_file(jsonfile_name):
-    # Ensure filename ends with .json if provided
-    if jsonfile_name and not jsonfile_name.endswith('.json'):
-        jsonfile_name += '.json'
+    # Normalise the filename and add .json if needed
+    jsonfile_name = normalise_filename(jsonfile_name)
 
-    # If the user didn't provide a name, treat it as starting completely fresh
+    # Check filename for invalid characters
+    if jsonfile_name and not is_valid_filename(jsonfile_name):
+        print("Invalid filename. Please avoid special characters.")
+        return [], ""
+
+    # If the user didn't provide a name, start fresh
     if not jsonfile_name:
         print("No filename provided. Starting fresh with a new list.")
         return [], ""
-
+    
     # Check if the file actually exists on the computer
     if os.path.exists(jsonfile_name):
         while True:
@@ -147,7 +151,6 @@ def save_data_to_json(data, jsonfile_name):
 
         return None
             
-
 #Loading Part
 def check_overwrite(data, jsonfile_name):
 
