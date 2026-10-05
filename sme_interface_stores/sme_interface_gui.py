@@ -152,13 +152,13 @@ def print_wrong_sign_red():
 
 def woman_says_hi():
     a = art("woman",number=10)
-    print(a)
+    return a
 
 def print_hello():
-    print(text2art("Hello", font='block', chr_ignore=True))
+    return text2art("Hello", font='block', chr_ignore=True)
 
 def print_goodbye():
-    tprint("Goodbye","rnd-xlarge")
+    return tprint("Goodbye","rnd-xlarge")
 
 
 def print_save_disk_block_deep_blue():
@@ -221,7 +221,7 @@ def print_sustainability_banner():
     │                                                  │
     └──────────────────────────────────────────────────┘
     """
-    print(banner)
+    return banner
 
 # Runs whenever AI Manager is using the get_ai_response() function. It gives one bar for every second passed
 def run_ai_analysis_bar(stop_event, timeout_seconds=60):

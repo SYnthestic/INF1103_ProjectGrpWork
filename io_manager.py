@@ -1,4 +1,5 @@
-from sme_interface_stores.sme_interface_gui import print_return_keycap
+from sme_interface_stores.sme_interface_gui import print_return_keycap, print_hello, print_sustainability_banner, woman_says_hi
+import sme_interface_stores.sme_interface_gui as gui
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
@@ -17,6 +18,12 @@ def key_verifier(key):
         return None
 
     return int(key)
+
+def show_welcome_sequence():
+    print(print_hello())
+    print(woman_says_hi())
+    print(print_sustainability_banner())
+    print(woman_says_hi())
 
 def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
     print(f"Company Name: {company_name}")

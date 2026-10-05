@@ -15,6 +15,7 @@ except ImportError:
 
 from io_manager import (
     key_verifier,
+    show_welcome_sequence,
     display_company_profile,
     display_applied_grants,
     retrieve_baseline_energy_expenditure,
@@ -40,16 +41,12 @@ from logic_manager import evaluate_grant_application
 from sme_interface_stores.sme_interface_gui import *
 
 # Code
-print_hello()
-woman_says_hi()
-print_sustainability_banner()
-woman_says_hi()
+show_welcome_sequence()
 # Test the fixed engine
 press_enter_to_continue()
 scheme_grant_records = []
 ai_audit_data = {}
 jsonfile_name = ""
-key = 1
 
 key = None
 while key != 0:
