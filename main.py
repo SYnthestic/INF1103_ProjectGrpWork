@@ -15,6 +15,7 @@ except ImportError:
 
 from io_manager import (
     key_verifier,
+    get_menu_choice,
     print_jsonfilename,
     print_save_disk_block_deep_blue,
     show_welcome_sequence,
@@ -54,10 +55,7 @@ jsonfile_name = ""
 
 key = None
 while key != 0:
-    key = None
-    while key is None:
-        print_boxed_menu()
-        key = key_verifier(input("➔ "))
+    key = get_menu_choice()
 
     match key:
         case 0:

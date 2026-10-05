@@ -1,5 +1,8 @@
-from sme_interface_stores.sme_interface_gui import print_return_keycap, hello, sustainability_banner, woman_says_hi, save_disk_block_deep_blue, wrong_sign_red, goodbye_art
-
+from sme_interface_stores import sme_interface_gui as gui
+import random
+import sys
+import os
+import time
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
@@ -9,10 +12,10 @@ print()
 
 # Shows welcome sequence with ASCII art and sustainability banner
 def show_welcome_sequence():
-    print(hello())
-    print(woman_says_hi())
-    print(sustainability_banner())
-    print(woman_says_hi())
+    print(gui.hello())
+    print(gui.woman_says_hi())
+    print(gui.sustainability_banner())
+    print(gui.woman_says_hi())
 
 # Verifies that the input is a valid integer key for the menu options.
 def key_verifier(key):
@@ -26,6 +29,13 @@ def key_verifier(key):
         return None
 
     return int(key)
+
+def get_menu_choice():
+    key = None
+    while key is None:
+        print(gui.boxed_menu())
+        key = key_verifier(input("➔   "))
+    return key
 
 
 def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
@@ -213,13 +223,13 @@ def display_applied_grants(scheme_grant_records):
     if len(scheme_grant_records) == 0:
         print(f"\n {red}⚠️  SYSTEM NOTICE: You do not have any grants applied.{reset}\n")
         # Now this will execute perfectly without a NameError!
-        print_return_keycap()
+        gui.print_return_keycap()
         return
     else:
         print("List of Grants Already Applied For:")
         for i, grant in enumerate(scheme_grant_records, start=1):
             print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
-    print_return_keycap()
+    gui.print_return_keycap()
     return scheme_grant_records
 
 # Bridges main.py's case-1 record format (capitalised, display-oriented
@@ -260,7 +270,7 @@ def print_jsonfilename(jsonfile_name):
 
 # Just an icon to let you know the save was successful, without having to print the full path every time.
 def print_save_disk_block_deep_blue():
-    print(save_disk_block_deep_blue())
+    print(gui.save_disk_block_deep_blue())
 
 # Renders the AI Manager's structured output for the CLI. All console
 # print statements in the codebase belong in io_manager.py per the
@@ -271,6 +281,37 @@ def display_ai_audit(ai_audit):
     print("AI Audit Result:")
     for key, value in ai_audit.items():
         print(f"  {key}: {value}")
+
+# Runs whenever AI Manager is using the get_ai_response() function. It gives one bar for every second passed
+def run_ai_analysis_bar(stop_event, timeout_seconds=60):
+    """
+    Animates the progress bar. Stops instantly if stop_event is flagged 
+    or when it hits the maximum timeout.
+    """
+    cyan = "\033[96m"
+    reset = "\033[0m"
+    
+    print("\nAnalysing your proposal with the AI Manager, please wait...\n")
+    sys.stdout.write("\033[?25l")  # Hide text cursor
+    sys.stdout.flush()
+    
+    try:
+        # Loop for the maximum allowed duration
+        for i in range(1, timeout_seconds + 1):
+            # Check if the API background thread has finished and flagged us to stop
+            if stop_event.is_set():
+                break
+                
+            percent = int((i / timeout_seconds) * 100)
+            progress_bar = f"\r   Time Taken: [{cyan}{'█' * i}{' ' * (timeout_seconds - i)}{reset}] {percent}% ({i}/{timeout_seconds}s)"
+            
+            sys.stdout.write(progress_bar)
+            sys.stdout.flush()
+            time.sleep(1)
+    finally:
+        # Restore terminal text cursor
+        sys.stdout.write("\033[?25h\n\n")
+        sys.stdout.flush()
 
 
 # Renders the Logic Manager's decision for the CLI.
@@ -341,21 +382,21 @@ def build_user_profile():
 
 def display_no_records_message():
     print("No records yet. Please select option 1 first.")
-    print_return_keycap()
+    gui.print_return_keycap()
 
 def display_no_ai_audit():
     print("No AI audit yet. Please run option 5 first.")
-    print_return_keycap()
+    gui.print_return_keycap()
 
 # ASCII related
 # io_manager.py
 def show_wrong_option_error():
-    print(wrong_sign_red())
-    print_return_keycap()
+    print(gui.wrong_sign_red())
+    gui.print_return_keycap()
 
 # 
 def show_goodbye():
-    print(goodbye_art())
+    print(gui.goodbye_art())
 
 
 if __name__ == "__main__":

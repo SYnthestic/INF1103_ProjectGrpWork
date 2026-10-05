@@ -177,23 +177,30 @@ def save_disk_block_deep_blue():
 """
     return disk_art
 
-def print_boxed_menu():
+# sme_interface_gui.py
+def boxed_menu():
     border = "▓⚗_⚗▓ " * 10
-    
-    # Each row is padded to match the exact length of the border line (59 characters wide)
-    print(border)
-    print("▓                                                         ▓")
-    print("▓    Please select your choice (0,1,2,3,4,5,6)            ▓")
-    print("▓                                                         ▓")
-    print("▓    0. Exit                                              ▓")
-    print("▓    1. Start                                             ▓")
-    print("▓    2. Save to JSON                                      ▓")
-    print("▓    3. Pull from JSON                                    ▓")
-    print("▓    4. Display Current Records                           ▓")
-    print("▓    5. AI Processor                                      ▓")
-    print("▓    6. Logic Manager                                     ▓")
-    print("▓                                                         ▓")
-    print(border)
+    blank = "▓" + " " * 57 + "▓"
+
+    def row(text):
+        return "▓" + text.ljust(57) + "▓"
+
+    lines = [
+        border,
+        blank,
+        row("    Please select your choice (0,1,2,3,4,5,6)"),
+        blank,
+        row("    0. Exit"),
+        row("    1. Start"),
+        row("    2. Save to JSON"),
+        row("    3. Pull from JSON"),
+        row("    4. Display Current Records"),
+        row("    5. AI Processor"),
+        row("    6. Logic Manager"),
+        blank,
+        border,
+    ]
+    return "\n".join(lines)
 
 def sustainability_banner():
     # Terminal Colors: \033[92m = Eco Green, \033[91m = Warning Red, \033[90m = Grey, \033[0m = Reset
@@ -219,33 +226,3 @@ def sustainability_banner():
     """
     return banner
 
-# Runs whenever AI Manager is using the get_ai_response() function. It gives one bar for every second passed
-def run_ai_analysis_bar(stop_event, timeout_seconds=60):
-    """
-    Animates the progress bar. Stops instantly if stop_event is flagged 
-    or when it hits the maximum timeout.
-    """
-    cyan = "\033[96m"
-    reset = "\033[0m"
-    
-    print("\nAnalysing your proposal with the AI Manager, please wait...\n")
-    sys.stdout.write("\033[?25l")  # Hide text cursor
-    sys.stdout.flush()
-    
-    try:
-        # Loop for the maximum allowed duration
-        for i in range(1, timeout_seconds + 1):
-            # Check if the API background thread has finished and flagged us to stop
-            if stop_event.is_set():
-                break
-                
-            percent = int((i / timeout_seconds) * 100)
-            progress_bar = f"\r   Time Taken: [{cyan}{'█' * i}{' ' * (timeout_seconds - i)}{reset}] {percent}% ({i}/{timeout_seconds}s)"
-            
-            sys.stdout.write(progress_bar)
-            sys.stdout.flush()
-            time.sleep(1)
-    finally:
-        # Restore terminal text cursor
-        sys.stdout.write("\033[?25h\n\n")
-        sys.stdout.flush()
