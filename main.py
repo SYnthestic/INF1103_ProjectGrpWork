@@ -14,6 +14,8 @@ except ImportError:
     pass
 
 from io_manager import (
+    key_verifier,
+    display_company_profile,
     display_applied_grants,
     retrieve_baseline_energy_expenditure,
     retrieve_company_industry,
@@ -30,7 +32,7 @@ from io_manager import (
     display_ai_audit,
     display_grant_decision,
     display_no_records_message,
-    display_no_ai_audit
+    display_no_ai_audit,
 )
 from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
 from ai_manager import get_ai_response
@@ -49,20 +51,12 @@ ai_audit_data = {}
 jsonfile_name = ""
 key = 1
 
-while key!=0:
-    keyverify = False
-    while keyverify == False:
+key = None
+while key != 0:
+    key = None
+    while key is None:
         print_boxed_menu()
-        key = input("➔ ")
-        if len(key) == 0:
-            print("Empty Response!")
-        elif key.isnumeric() == False:
-            print("Error! Letters detected!!")
-        elif key.isspace():
-            print("Error! Space only answer not allowed")
-        else:
-            keyverify = True
-            key = int(key)
+        key = key_verifier(input("➔ "))
 
     match key:
         case 0:
@@ -88,15 +82,7 @@ while key!=0:
                 retrofit_cost = 0.0
                 reporting_advisory_fee = retrieve_reporting_advisory_fee()
 
-            print(f"Company Name: {company_name}")
-            print(f"Company Industry: {company_industry}")
-            print(f"Company Total Revenue: {get_total_revenue}")
-            print(f"Total Employees: {total_employees}")
-            print(f"Local Equity: {get_local_equity}")
-            print(f"Proposal Type: {proposal_type}")
-            print(f"Baseline Energy Expenditure: {baseline_energy_expensiture}")
-            print(f"Estimated Retrofit Cost: {retrofit_cost}")
-            print(f"Reporting Advisory Fee: {reporting_advisory_fee}")
+            display_company_profile(company_name, company_industry, get_total_revenue, total_employees, get_local_equity, proposal_type, baseline_energy_expensiture, retrofit_cost, reporting_advisory_fee)
             scheme_grant_records.append({
                 "Company Name": company_name,
                 "Company Industry": company_industry,
@@ -163,4 +149,4 @@ while key!=0:
                 display_grant_decision(result)
         case _:
             print_wrong_sign_red()
-            print("Error! Unrecognised number option")
+            print_return_keycap()

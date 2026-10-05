@@ -6,6 +6,29 @@ print()
 print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
 print()
 
+def key_verifier(key):
+    key = key.strip()
+
+    if not key:
+        print("Empty Response!")
+        return None
+    if not (key.isascii() and key.isdigit()):
+        print("Error! Please enter a number.")
+        return None
+
+    return int(key)
+
+def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
+    print(f"Company Name: {company_name}")
+    print(f"Company Industry: {company_industry}")
+    print(f"Company Total Revenue: {total_revenue}")
+    print(f"Total Employees: {total_employees}")
+    print(f"Local Equity: {local_equity}")
+    print(f"Proposal Type: {proposal_type}")
+    print(f"Baseline Energy Expenditure: {baseline_energy_expenditure}")
+    print(f"Estimated Retrofit Cost: {estimated_retrofit_cost}")
+    print(f"Reporting Advisory Fee: {reporting_advisory_fee}")
+
 # input of Company's name
 def retrieve_company_name():
     while True:

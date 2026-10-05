@@ -147,6 +147,7 @@ def print_wrong_sign_red():
     """
                         
     print(red_start + x_art + color_reset)
+    print("Error! Unrecognised number option")
     # print(x_art)
 
 def woman_says_hi():
