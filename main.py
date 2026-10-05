@@ -15,6 +15,7 @@ except ImportError:
 
 from io_manager import (
     key_verifier,
+    print_jsonfilename,
     print_save_disk_block_deep_blue,
     show_welcome_sequence,
     display_company_profile,
@@ -35,6 +36,8 @@ from io_manager import (
     display_grant_decision,
     display_no_records_message,
     display_no_ai_audit,
+    show_wrong_option_error,
+    show_goodbye
 )
 from data_manager import check_for_preexisting_save_file, load_data_from_json, save_data_to_json, check_overwrite
 from ai_manager import get_ai_response
@@ -58,7 +61,7 @@ while key != 0:
 
     match key:
         case 0:
-            print_goodbye()
+            show_goodbye()
         case 1: # Start checks
             company_name = retrieve_company_name()
             company_industry = retrieve_company_industry()
@@ -116,18 +119,17 @@ while key != 0:
             existing_records, jsonfile_name = check_for_preexisting_save_file(jsonfile_name)
             scheme_grant_records = existing_records + scheme_grant_records
             jsonfile_name = save_data_to_json(scheme_grant_records, jsonfile_name)
-            print(jsonfile_name)
+            print_jsonfilename(jsonfile_name)
             print_save_disk_block_deep_blue()
         case 3: #Pull from JSON
             if check_overwrite(scheme_grant_records, jsonfile_name):
                 scheme_grant_records, jsonfile_name = load_data_from_json(jsonfile_name)
         case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
-            #Display part is IO jpb. Editing and deleting them is Data Manager's job
+            #Display part is IO job. Editing and deleting them is Data Manager's job
             display_applied_grants(scheme_grant_records)
         case 5: #AI Processor
             if len(scheme_grant_records) == 0:
-                display_no_records_message()
-                print_return_keycap()
+                display_no_records_message() 
             else:
                 current_record = scheme_grant_records[-1]
                 narrative = current_record.get("Proposal Narrative", "")
@@ -136,15 +138,12 @@ while key != 0:
         case 6: # For the Logic Manager
             if len(scheme_grant_records) == 0:
                 display_no_records_message()
-                print_return_keycap()
             elif not ai_audit_data:
                 display_no_ai_audit()
-                print_return_keycap()
             else:
                 current_record = scheme_grant_records[-1]
                 user_profile = convert_record_to_profile(current_record)
                 result = evaluate_grant_application(user_profile, ai_audit_data)
                 display_grant_decision(result)
         case _:
-            print_wrong_sign_red()
-            print_return_keycap()
+            show_wrong_option_error()

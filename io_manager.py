@@ -1,4 +1,4 @@
-from sme_interface_stores.sme_interface_gui import print_return_keycap, hello, sustainability_banner, woman_says_hi, save_disk_block_deep_blue
+from sme_interface_stores.sme_interface_gui import print_return_keycap, hello, sustainability_banner, woman_says_hi, save_disk_block_deep_blue, wrong_sign_red, goodbye_art
 
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
@@ -7,6 +7,14 @@ print()
 print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
 print()
 
+# Shows welcome sequence with ASCII art and sustainability banner
+def show_welcome_sequence():
+    print(hello())
+    print(woman_says_hi())
+    print(sustainability_banner())
+    print(woman_says_hi())
+
+# Verifies that the input is a valid integer key for the menu options.
 def key_verifier(key):
     key = key.strip()
 
@@ -19,14 +27,6 @@ def key_verifier(key):
 
     return int(key)
 
-def show_welcome_sequence():
-    print(hello())
-    print(woman_says_hi())
-    print(sustainability_banner())
-    print(woman_says_hi())
-
-def print_save_disk_block_deep_blue():
-    print(save_disk_block_deep_blue())
 
 def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
     print(f"Company Name: {company_name}")
@@ -254,6 +254,13 @@ def confirm_save_to_json():
         else:
             print("Invalid input. Please enter 'y' or 'n'.")
 
+# Prints the JSON filename to the console after saving, so main.py doesn't have to know the details of how io_manager.py handles the display.
+def print_jsonfilename(jsonfile_name):
+    print(f"Data successfully saved to {jsonfile_name}.")
+
+# Just an icon to let you know the save was successful, without having to print the full path every time.
+def print_save_disk_block_deep_blue():
+    print(save_disk_block_deep_blue())
 
 # Renders the AI Manager's structured output for the CLI. All console
 # print statements in the codebase belong in io_manager.py per the
@@ -334,9 +341,21 @@ def build_user_profile():
 
 def display_no_records_message():
     print("No records yet. Please select option 1 first.")
+    print_return_keycap()
 
 def display_no_ai_audit():
     print("No AI audit yet. Please run option 5 first.")
+    print_return_keycap()
+
+# ASCII related
+# io_manager.py
+def show_wrong_option_error():
+    print(wrong_sign_red())
+    print_return_keycap()
+
+# 
+def show_goodbye():
+    print(goodbye_art())
 
 
 if __name__ == "__main__":

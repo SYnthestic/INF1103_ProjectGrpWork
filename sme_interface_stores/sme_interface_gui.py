@@ -130,25 +130,21 @@ def print_return_keycap():
     execute_button_interaction(art, min_x=5, max_x=35)
     
 
-def print_wrong_sign_red():
-    # # \033[91m sets color to bright red, \033[0m resets it to normal
+def wrong_sign_red():
     red_start = "\033[91m"
     color_reset = "\033[0m"
-    
+
     x_art = r"""
       ____    ____
       \   \  /   /
-       \   \/   / 
-        \      /  
-        /      \  
-       /   /\   \ 
+       \   \/   /
+        \      /
+        /      \
+       /   /\   \
       /___/  \___\
-                  
     """
-                        
-    print(red_start + x_art + color_reset)
-    print("Error! Unrecognised number option")
-    # print(x_art)
+
+    return red_start + x_art + color_reset + "Error! Unrecognised number option"
 
 def woman_says_hi():
     a = art("woman",number=10)
@@ -157,8 +153,8 @@ def woman_says_hi():
 def hello():
     return text2art("Hello", font='block', chr_ignore=True)
 
-def print_goodbye():
-    return tprint("Goodbye","rnd-xlarge")
+def goodbye_art():
+    return text2art("Goodbye", font="rnd-xlarge")
 
 
 def save_disk_block_deep_blue():
