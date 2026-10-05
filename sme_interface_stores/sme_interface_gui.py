@@ -154,14 +154,14 @@ def woman_says_hi():
     a = art("woman",number=10)
     return a
 
-def print_hello():
+def hello():
     return text2art("Hello", font='block', chr_ignore=True)
 
 def print_goodbye():
     return tprint("Goodbye","rnd-xlarge")
 
 
-def print_save_disk_block_deep_blue():
+def save_disk_block_deep_blue():
     # Terminal Color Codes
     blue = "\033[34m"   # Deep classic blue
     white = "\033[97m"  # Crisp white for contrast
@@ -179,7 +179,7 @@ def print_save_disk_block_deep_blue():
   {blue}█████████████████████████▀{reset} 
    {blue}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}  
 """
-    print(disk_art)
+    return disk_art
 
 def print_boxed_menu():
     border = "▓⚗_⚗▓ " * 10
@@ -199,7 +199,7 @@ def print_boxed_menu():
     print("▓                                                         ▓")
     print(border)
 
-def print_sustainability_banner():
+def sustainability_banner():
     # Terminal Colors: \033[92m = Eco Green, \033[91m = Warning Red, \033[90m = Grey, \033[0m = Reset
     green = "\033[92m"
     red = "\033[91m"
