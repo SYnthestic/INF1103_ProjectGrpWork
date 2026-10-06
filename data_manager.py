@@ -50,7 +50,7 @@ def check_for_preexisting_save_file(jsonfile_name):
 
             if choicer == 'save':
                 try:
-                    with open(filepath, 'r', encoding='utf-8') as file:
+                    with open(filepath, 'w+', encoding='utf-8') as file:
                         data = json.load(file)
                         # Ensure the loaded data is a list so we can append to it later
                         if not isinstance(data, list):

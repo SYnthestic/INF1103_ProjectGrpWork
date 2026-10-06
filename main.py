@@ -69,8 +69,8 @@ while key != 0:
                 "Estimated Retrofit Cost": retrofit_cost,
                 "Reporting Advisory Fee": reporting_advisory_fee
             })
-            print("Scheme Grant Records:", scheme_grant_records)
-            print(type(scheme_grant_records))
+            in_and_out.display_applied_grants(scheme_grant_records, key)
+            
 
             # Automatically run the AI Manager and Logic Manager on the
             # record just collected, instead of requiring the user to
@@ -86,7 +86,7 @@ while key != 0:
                 existing_records, jsonfile_name = dm.check_for_preexisting_save_file(jsonfile_name)
                 scheme_grant_records = existing_records + scheme_grant_records
                 jsonfile_name = dm.save_data_to_json(scheme_grant_records, jsonfile_name)
-                print(jsonfile_name)
+                in_and_out.print_jsonfilename(jsonfile_name)
                 in_and_out.print_save_disk_block_deep_blue()
         case 2: #Save to JSON
             existing_records, jsonfile_name = dm.check_for_preexisting_save_file(jsonfile_name)
@@ -99,7 +99,7 @@ while key != 0:
                 scheme_grant_records, jsonfile_name = dm.load_data_from_json(jsonfile_name)
         case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
             #Display part is IO job. Editing and deleting them is Data Manager's job
-            in_and_out.display_applied_grants(scheme_grant_records)
+            in_and_out.display_applied_grants(scheme_grant_records, key)
         case 5: #AI Processor
             if len(scheme_grant_records) == 0:
                 in_and_out.display_no_records_message() 

@@ -4,6 +4,7 @@ import sys
 import os
 import time
 
+BUTTON_BOUNDS = (5, 35)
 # Set up clean cross-platform input capturing
 is_windows = os.name == 'nt'
 
@@ -128,6 +129,22 @@ def print_return_keycap():
     """
     # Uses the exact same engine loop!
     execute_button_interaction(art, min_x=5, max_x=35)
+    
+def ai_button_art():
+    green = "\033[92m"
+    shadow = "\033[90m"
+    reset = "\033[0m"
+
+    label = "⮞ START AI ANALYSIS"
+
+    return f"""
+     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+    █  {green}┌──────────────────────────┐{reset}  █
+    █  {green}│{label:<26}│{reset}  █▀▄
+    █  {green}└──────────────────────────┘{reset}  █ █
+    ▀████████████████████████████████▀  █
+      {shadow}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}
+    """
     
 
 def wrong_sign_red():

@@ -217,7 +217,7 @@ def retrieve_reporting_advisory_fee():
             print("Invalid input. Please enter a numeric value for the reporting/advisory fee.")
 
 # For displaying list of grants already applied for by the company
-def display_applied_grants(scheme_grant_records):
+def display_applied_grants(scheme_grant_records, key):
     red = "\033[91m"
     reset = "\033[0m"
     if len(scheme_grant_records) == 0:
@@ -225,11 +225,17 @@ def display_applied_grants(scheme_grant_records):
         # Now this will execute perfectly without a NameError!
         gui.print_return_keycap()
         return
+    elif key == 1:
+        print("Scheme Grant Records:")
+        for i, grant in enumerate(scheme_grant_records, start=1):
+            print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
+        print(type(scheme_grant_records))
+        gui.ai_button_art()
     else:
         print("List of Grants Already Applied For:")
         for i, grant in enumerate(scheme_grant_records, start=1):
             print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
-    gui.print_return_keycap()
+        gui.print_return_keycap()
     return scheme_grant_records
 
 # Bridges main.py's case-1 record format (capitalised, display-oriented

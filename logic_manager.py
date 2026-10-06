@@ -1,10 +1,16 @@
-print('''This is the Logic Manager module. \n 
-It is responsible for handling the core logic of the application, \n
- including data processing, calculations, and decision-making based on user inputs and stored data.\n
-The Logic Manager interacts with other modules such as the IO Manager for input/output operations, \n
-carries out arithmetic and logic operations after the AI Manager has handed over data to it \n
-And then pumps down the data to the Data Manager to store and the IO Manager to output
-''')
+def module_description():
+    return (
+        "This is the Logic Manager module.\n"
+        "It is responsible for handling the core logic of the application, "
+        "including data processing, calculations, and decision-making based "
+        "on user inputs and stored data.\n"
+        "The Logic Manager interacts with other modules such as the IO Manager "
+        "for input/output operations, carries out arithmetic and logic "
+        "operations after the AI Manager has handed over data to it, "
+        "and then passes the data on to the Data Manager to store and the "
+        "IO Manager to output."
+    )
+
 
 VALID_SCOPES = ["Scope-1", "Scope-2", "Scope-3"]
 
