@@ -97,7 +97,7 @@ def execute_button_interaction(button_art, min_x=5, max_x=35):
 # 🎨 INDIVIDUAL BUTTON ART ASSETS (Calls the engine)
 # ========================================================
 
-def press_enter_to_continue():
+def continue_button():
     gold = "\033[93m"
     shadow = "\033[90m"
     reset = "\033[0m"
@@ -114,7 +114,7 @@ def press_enter_to_continue():
     execute_button_interaction(art, min_x=5, max_x=35)
 
 
-def print_return_keycap():
+def return_button():
     cyan = "\033[96m"
     shadow = "\033[90m"
     reset = "\033[0m"
@@ -130,7 +130,7 @@ def print_return_keycap():
     # Uses the exact same engine loop!
     execute_button_interaction(art, min_x=5, max_x=35)
     
-def ai_button_art():
+def ai_button():
     green = "\033[92m"
     shadow = "\033[90m"
     reset = "\033[0m"

@@ -23,7 +23,7 @@ from sme_interface_stores.sme_interface_gui import *
 # Code
 in_and_out.show_welcome_sequence()
 # Test the fixed engine
-press_enter_to_continue()
+continue_button()
 scheme_grant_records = []
 ai_audit_data = {}
 jsonfile_name = ""

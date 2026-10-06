@@ -226,19 +226,19 @@ def display_applied_grants(scheme_grant_records, key):
     if len(scheme_grant_records) == 0:
         print(f"\n {red}⚠️  SYSTEM NOTICE: You do not have any grants applied.{reset}\n")
         # Now this will execute perfectly without a NameError!
-        gui.print_return_keycap()
+        gui.return_button()
         return
     elif key == 1:
         print("Scheme Grant Records:")
         for i, grant in enumerate(scheme_grant_records, start=1):
             print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Proposal Narrative: {grant.get('Proposal Narrative', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
         print(type(scheme_grant_records))
-        gui.ai_button_art()
+        gui.ai_button()
     else:
         print("List of Grants Already Applied For:")
         for i, grant in enumerate(scheme_grant_records, start=1):
             print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Proposal Narrative: {grant.get('Proposal Narrative', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
-        gui.print_return_keycap()
+        gui.return_button()
     return scheme_grant_records
 
 # Bridges main.py's case-1 record format (capitalised, display-oriented
@@ -392,18 +392,18 @@ def build_user_profile():
 # When there is no records
 def display_no_records_message():
     print("No records yet. Please select option 1 first.")
-    gui.print_return_keycap()
+    gui.return_button()
 
 # When AI hasn't yet audited the machine. The AI will audit right after finishing the input for the company grant so it only activates in practice when no data exists
 def display_no_ai_audit():
     print("No AI audit yet. Please run option 5 first.")
-    gui.print_return_keycap()
+    gui.return_button()
 
 # ASCII related
 # io_manager.py
 def show_wrong_option_error():
     print(gui.wrong_sign_red())
-    gui.print_return_keycap()
+    gui.return_button()
 
 # 
 def show_goodbye():
