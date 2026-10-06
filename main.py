@@ -56,7 +56,7 @@ while key != 0:
                 retrofit_cost = 0.0
                 reporting_advisory_fee = in_and_out.retrieve_reporting_advisory_fee()
 
-            in_and_out.display_company_profile(company_name, company_industry, get_total_revenue, total_employees, get_local_equity, proposal_type, baseline_energy_expensiture, retrofit_cost, reporting_advisory_fee)
+            in_and_out.display_company_profile(company_name, company_industry, get_total_revenue, total_employees, get_local_equity, proposal_type, proposal_narrative, baseline_energy_expensiture, retrofit_cost, reporting_advisory_fee)
             scheme_grant_records.append({
                 "Company Name": company_name,
                 "Company Industry": company_industry,

@@ -137,7 +137,7 @@ def ai_button_art():
 
     label = "⮞ START AI ANALYSIS"
 
-    return f"""
+    art = f"""
      ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
     █  {green}┌──────────────────────────┐{reset}  █
     █  {green}│{label:<26}│{reset}  █▀▄
@@ -145,6 +145,8 @@ def ai_button_art():
     ▀████████████████████████████████▀  █
       {shadow}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}
     """
+# Uses the exact same engine loop!
+    execute_button_interaction(art, min_x=5, max_x=35)
     
 
 def wrong_sign_red():
