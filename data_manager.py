@@ -1,11 +1,39 @@
+"""
+Data Manager: system memory across runs (JSON only).
+
+Rules followed (per team project spec):
+- Functions only, no class definitions.
+- Nothing is printed and nothing is asked of the user here. All prompts and
+  messages live in io_manager.py. Every function RETURNS a status string
+  (documented on each function) so io_manager can show the right message.
+- Missing or corrupt files never crash the program.
+"""
+
 import json
+import logging
 import os
 from datetime import datetime
+
+# Stay silent unless someone configures logging (otherwise Python's default
+# handler would write warnings straight to the terminal).
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # Invalid characters for filenames
 INVALID_FILENAME_CHARS = '/\\:*?"<>|'
 
-# Data save will be stored in JSON format. The following functions help manage the data files.
+# Where save files live. Override with the DATA_DIR environment variable
+# (e.g. point it at a mounted volume when running in Docker).
+DATA_DIR = os.environ.get("DATA_DIR", ".")
+
+# File loaded automatically on startup.
+DEFAULT_SAVE_FILE = "audit_records.json"
+
+
+# ---------------------------------------------------------------------------
+# Filename helpers
+# ---------------------------------------------------------------------------
+
 def normalise_filename(jsonfile_name):
     """Strips whitespace and makes sure the name ends with .json."""
     jsonfile_name = str(jsonfile_name).strip()
@@ -13,212 +41,173 @@ def normalise_filename(jsonfile_name):
         jsonfile_name += '.json'
     return jsonfile_name
 
-# Check if the filename is valid (no folders or special characters)
+
 def is_valid_filename(jsonfile_name):
     """A bare filename only: no folders or special characters."""
     return not any(char in jsonfile_name for char in INVALID_FILENAME_CHARS)
 
 
-# Audit Record management:
-# Generate a unique ID for a new audit record
+def _full_path(jsonfile_name):
+    return os.path.join(DATA_DIR, jsonfile_name)
+
+
+# ---------------------------------------------------------------------------
+# Audit record management
+# ---------------------------------------------------------------------------
+
 def generate_audit_id(records):
+    """Next unique integer ID for a new audit record."""
     if not isinstance(records, list) or not records:
         return 1
-    
-    highest_id = 0
 
+    highest_id = 0
     for record in records:
         audit_id = record.get("audit_id", 0)
-
         if isinstance(audit_id, int) and audit_id > highest_id:
             highest_id = audit_id
 
     return highest_id + 1
 
-# Create Audit record in JSON format
-def create_audit_record(
-    audit_id,
-    user_profile,
-    proposal,
-    ai_audit,
-    evaluation
-):
-    """Combine all assessment information into one audit record."""
 
-    audit_record = {
+def create_audit_record(audit_id, user_profile, proposal, ai_audit, evaluation):
+    """Combine all assessment information into one audit record."""
+    return {
         "audit_id": audit_id,
         "created_at": datetime.now().isoformat(),
-
         "company_profile": user_profile,
-
         "proposal": {
             "raw_narrative": proposal
         },
-
         "ai_audit": ai_audit,
-
         "evaluation": evaluation
     }
 
-    return audit_record
 
-# Add audit record to the current record list
 def add_audit_record(records, audit_record):
     """Add a completed audit record to the current record list."""
-
     if not isinstance(records, list):
         records = []
-
     records.append(audit_record)
-
     return records
 
-# End
 
-#Saving Part
-def check_for_preexisting_save_file(jsonfile_name):
-    # Normalise the filename and add .json if needed
-    jsonfile_name = normalise_filename(jsonfile_name)
+# ---------------------------------------------------------------------------
+# Loading
+# ---------------------------------------------------------------------------
 
-    # Check filename for invalid characters
-    if jsonfile_name and not is_valid_filename(jsonfile_name):
-        print("Invalid filename. Please avoid special characters.")
-        return [], ""
+def inspect_save_file(jsonfile_name):
+    """
+    Checks a filename WITHOUT reading the file.
 
-    # If the user didn't provide a name, start fresh
-    if not jsonfile_name:
-        print("No filename provided. Starting fresh with a new list.")
-        return [], ""
-    
-    # Check if the file actually exists on the computer
-    if os.path.exists(jsonfile_name):
-        while True:
-            choicer = input(f"A save file named '{jsonfile_name}' already exists. Do you want to load/append data to this file or create a brand new one? (save/new): ").strip().lower()
-            
-            if choicer == 'save':
-                try:
-                    with open(jsonfile_name, 'r', encoding='utf-8') as file:
-                        data = json.load(file)
-                        # Ensure the loaded data is a list so we can append to it later
-                        if not isinstance(data, list):
-                            data = [data]
-                        print(f"Data successfully loaded from {jsonfile_name}.")
-                        return data, jsonfile_name
-                except (json.JSONDecodeError, FileNotFoundError):
-                    print(f"File {jsonfile_name} is corrupted or empty. Starting fresh with this filename.")
-                    return [], jsonfile_name
-                    
-            elif choicer == 'new':
-                print("Starting a brand new session. You will be prompted for a new filename when saving.")
-                return [], ""  # Return empty data and clear filename so save_data_to_json prompts them
-            else:
-                print("Invalid input. Please enter 'save' or 'new'.")
-    else:
-        print(f"No existing save file found with the name '{jsonfile_name}'. Starting fresh.")
-        return [], jsonfile_name
+    Returns (clean_name, status) where status is one of:
+        "no_name"       nothing was given          (clean_name is "")
+        "invalid_name"  has illegal characters     (clean_name is "")
+        "exists"        a save file is already there
+        "not_found"     no such file yet           (clean_name is still usable)
+    """
+    name = normalise_filename(jsonfile_name)
+    if not name:
+        return "", "no_name"
+    if not is_valid_filename(name):
+        return "", "invalid_name"
+    if os.path.isfile(_full_path(name)):
+        return name, "exists"
+    return name, "not_found"
 
-# Save data to JSON and do filename validation
-def save_data_to_json(data, jsonfile_name):
-    # Keep asking until a valid, non-empty filename is provided
-    while not jsonfile_name:
-        jsonfile_name = input("Please provide a valid JSON file name to save the data: ").strip()
 
-        if not jsonfile_name:
-            print("Filename cannot be blank.")
-
-    jsonfile_name = normalise_filename(jsonfile_name)
-
-    if not is_valid_filename(jsonfile_name):
-        print("Invalid filename. Please avoid special characters.")
-        return None
-    
+def _backup_corrupt_file(path):
+    """Moves a bad file aside so a later save cannot silently destroy it."""
     try:
-        with open(jsonfile_name, 'w', encoding='utf-8') as file:
-            json.dump(
-                data,
-                file,
-                indent=4,
-                ensure_ascii=False
-            )
-        print(f"Data successfully saved to {jsonfile_name}.")
-        return jsonfile_name
-    
-    except OSError as error:
-        print(
-            f"An error occurred while saving data "
-            f"to {jsonfile_name}: {error}"
-        )
+        os.replace(path, path + ".corrupt")
+    except OSError as err:
+        logger.error("Could not back up corrupt file %s: %s", path, err)
 
-        return None
-            
-#Loading Part
-def check_overwrite(data, jsonfile_name):
 
-    # Nothing is currently loaded
-    if data == [] and jsonfile_name == "":
-        return True
-
-    # Something is already loaded
-    choice = input(
-        "Data is already loaded. Do you want to overwrite it? (y/n): "
-    ).strip().lower()
-
-    if choice == "y":
-        return True
-
-    print("Returning to main menu.")
-    return False
-
-# load data from JSON and do filename validation
 def load_data_from_json(jsonfile_name):
-    # Keep asking until a valid, non-empty filename is provided
-    while not jsonfile_name:
-        jsonfile_name = input("Please provide a valid JSON file name to load the data from: ").strip()
-        if not jsonfile_name:
-            print("Filename cannot be blank.")
+    """
+    Loads records from a JSON save file.
 
-    jsonfile_name = normalise_filename(jsonfile_name)
+    Returns (data, clean_name, status). data is ALWAYS a list.
+    status is one of:
+        "loaded"          success
+        "no_name"         nothing was given
+        "invalid_name"    illegal characters in the name
+        "not_found"       file does not exist
+        "invalid_json"    file is corrupt/unreadable (set aside as .corrupt)
+        "invalid_format"  valid JSON but not a list of records (set aside)
+        "io_error"        the OS refused to read the file
+    """
+    name = normalise_filename(jsonfile_name)
+    if not name:
+        return [], "", "no_name"
+    if not is_valid_filename(name):
+        return [], "", "invalid_name"
 
-    if not is_valid_filename(jsonfile_name):
-        print("Invalid filename. Please avoid special characters.")
-        return [], jsonfile_name
-
-    # Check whether the file exists
-    if not os.path.isfile(jsonfile_name):
-        print(f"The file '{jsonfile_name}' does not exist.")
-        return [], jsonfile_name
+    path = _full_path(name)
+    if not os.path.isfile(path):
+        return [], name, "not_found"
 
     try:
-        with open(
-            jsonfile_name,
-            'r',
-            encoding='utf-8'
-        ) as file:
-
+        with open(path, 'r', encoding='utf-8') as file:
             data = json.load(file)
+    except ValueError:  # JSONDecodeError and UnicodeDecodeError
+        logger.error("%s contains invalid JSON.", path)
+        _backup_corrupt_file(path)
+        return [], name, "invalid_json"
+    except OSError as err:
+        logger.error("Could not read %s: %s", path, err)
+        return [], name, "io_error"
 
-        # Make sure the loaded data is a list
-        if not isinstance(data, list):
-            data = [data]
+    # A single record on its own is treated as a one-item list.
+    if isinstance(data, dict):
+        data = [data]
 
-        print(
-            f"Data successfully loaded from {jsonfile_name}."
-        )
+    if not isinstance(data, list) or not all(isinstance(r, dict) for r in data):
+        logger.error("%s is not a list of records.", path)
+        _backup_corrupt_file(path)
+        return [], name, "invalid_format"
 
-        return data, jsonfile_name
+    return data, name, "loaded"
 
-    except json.JSONDecodeError:
-        print(
-            f"The file '{jsonfile_name}' contains invalid JSON."
-        )
 
-        return [], jsonfile_name
+def is_data_loaded(data, jsonfile_name):
+    """True if there is already data/filename in memory (io_manager should
+    then ask the user before overwriting it)."""
+    return not (data == [] and jsonfile_name == "")
 
-    except OSError as error:
-        print(
-            f"An error occurred while loading "
-            f"{jsonfile_name}: {error}"
-        )
 
-        return [], jsonfile_name
-            
+# ---------------------------------------------------------------------------
+# Saving
+# ---------------------------------------------------------------------------
+
+def save_data_to_json(data, jsonfile_name):
+    """
+    Saves records to a JSON file.
+
+    Writes to a temporary file first and then swaps it in, so a crash midway
+    can never leave a half-written (corrupt) save file.
+
+    Returns (saved_name_or_None, status) where status is one of:
+        "saved", "no_name", "invalid_name", "io_error"
+    """
+    name = normalise_filename(jsonfile_name)
+    if not name:
+        return None, "no_name"
+    if not is_valid_filename(name):
+        return None, "invalid_name"
+
+    path = _full_path(name)
+    tmp_path = path + ".tmp"
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(tmp_path, 'w', encoding='utf-8') as file:
+            json.dump(data, file, indent=4, ensure_ascii=False)
+        os.replace(tmp_path, path)
+        return name, "saved"
+    except (OSError, TypeError, ValueError) as err:
+        logger.error("Could not save to %s: %s", path, err)
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return None, "io_error"
