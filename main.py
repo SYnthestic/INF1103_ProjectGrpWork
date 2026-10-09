@@ -18,14 +18,6 @@ import data_manager as dm
 import ai_manager as ai
 import logic_manager as logic
 from sme_interface_stores.sme_interface_gui import *
-from io_manager import (
-    retrieve_record_index_to_delete,
-    retrieve_updated_record,
-)
-from data_manager import (
-    update_record_by_index,
-    delete_record_by_index,
-)
 
 
 # Code
