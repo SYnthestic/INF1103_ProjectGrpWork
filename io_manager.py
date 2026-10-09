@@ -5,12 +5,6 @@ import sys
 import os
 import time
 
-print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
-print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
-print()
-print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
-print()
-
 # Set up clean cross-platform input capturing
 is_windows = os.name == 'nt'
 
@@ -105,6 +99,14 @@ def show_welcome_sequence():
     print(gui.woman_says_hi())
     print(gui.sustainability_banner())
     print(gui.woman_says_hi())
+
+def show_welcome_banner():
+    """Prints introductory text without executing upon module import."""
+    print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
+    print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
+    print()
+    print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
+    print()
 
 # Verifies that the input is a valid integer key for the menu options.
 def key_verifier(key):

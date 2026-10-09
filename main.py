@@ -28,6 +28,8 @@ scheme_grant_records = []
 ai_audit_data = {}
 jsonfile_name = ""
 
+in_and_out.show_welcome_banner()
+
 key = None
 while key != 0:
     key = in_and_out.get_menu_choice()
@@ -116,13 +118,13 @@ while key != 0:
                         updated_record = in_and_out.retrieve_updated_record(current_record)
                         
                         # Removed the data_manager. prefix here
-                        scheme_grant_records, jsonfile_name = update_record_by_index(
+                        scheme_grant_records, jsonfile_name = in_and_out.update_record_by_index(
                             scheme_grant_records, index, updated_record, jsonfile_name
                         )
                 elif sub_choice == 2:
                     index = in_and_out.retrieve_record_index_to_delete(len(scheme_grant_records))
                     if index != 0:
                         # Removed the data_manager. prefix here
-                        scheme_grant_records, jsonfile_name = delete_record_by_index(
+                        scheme_grant_records, jsonfile_name = in_and_out.delete_record_by_index(
                             scheme_grant_records, index, jsonfile_name
                         )
