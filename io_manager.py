@@ -504,3 +504,25 @@ if __name__ == "__main__":
     print("Profile collected:")
     for key, value in user_profile.items():
         print(f"  {key}: {value}")
+
+def retrieve_updated_record(current_record):
+    print("\nEditing record. Press Enter to keep the current value.")
+    
+    # Example for updating just the Company Name
+    new_name = input(f"Company Name [{current_record.get('Company Name')}]: ").strip()
+    if new_name:
+        current_record["Company Name"] = new_name
+
+    # Example for updating a number (Total Revenue)
+    while True:
+        new_rev = input(f"Total Revenue [{current_record.get('Company Total Revenue')}]: ").strip()
+        if not new_rev:
+            break # Keep current value
+        try:
+            current_record["Company Total Revenue"] = float(new_rev)
+            break
+        except ValueError:
+            print("Please enter a valid number.")
+            
+    # You can replicate the input block above for the remaining dictionary keys
+    return current_record
