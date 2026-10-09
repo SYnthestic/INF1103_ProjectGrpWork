@@ -154,3 +154,15 @@ def load_data_from_json(jsonfile_name):
     except Exception as e:
         print(f"An error occurred while loading data from {jsonfile_name}: {e}")
         return [], jsonfile_name
+
+def update_record_by_index(data, index, updated_record, jsonfile_name):
+    list_index = index - 1
+    data[list_index] = updated_record
+    
+    print("\nRecord successfully updated.")
+    
+    if jsonfile_name:
+        from data_manager import save_data_to_json
+        save_data_to_json(data, jsonfile_name)
+        
+    return data, jsonfile_name
