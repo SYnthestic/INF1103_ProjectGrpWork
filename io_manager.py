@@ -505,24 +505,159 @@ if __name__ == "__main__":
     for key, value in user_profile.items():
         print(f"  {key}: {value}")
 
-def retrieve_updated_record(current_record):
-    print("\nEditing record. Press Enter to keep the current value.")
-    
-    # Example for updating just the Company Name
-    new_name = input(f"Company Name [{current_record.get('Company Name')}]: ").strip()
-    if new_name:
-        current_record["Company Name"] = new_name
-
-    # Example for updating a number (Total Revenue)
+def retrieve_record_index_to_delete(total_records):
+    """
+    Prompts the user to select a record number by index (1-based)
+    or 0 to cancel out of the operation.
+    """
     while True:
-        new_rev = input(f"Total Revenue [{current_record.get('Company Total Revenue')}]: ").strip()
-        if not new_rev:
-            break # Keep current value
+        raw_input = input(f"\nEnter the record number (1-{total_records}) or 0 to cancel: ").strip()
+        if not raw_input:
+            continue
         try:
-            current_record["Company Total Revenue"] = float(new_rev)
+            choice = int(raw_input)
+            if 0 <= choice <= total_records:
+                return choice
+            else:
+                print(f"Please enter a number between 0 and {total_records}.")
+        except ValueError:
+            print("Invalid input. Please enter a valid number.")
+
+
+def retrieve_updated_record(current_record):
+    """
+    Prompts the user for updated values. Pressing Enter leaves the existing value untouched.
+    """
+    # Create a copy so we do not mutate in-place prematurely
+    updated = dict(current_record)
+
+    print("\n" + "=" * 50)
+    print("EDITING RECORD (Press Enter to keep current value)")
+    print("=" * 50)
+
+    # 1. Company Name
+    val = input(f"Company Name [{updated.get('Company Name')}]: ").strip()
+    if val:
+        updated["Company Name"] = val
+
+    # 2. Company Industry
+    valid_industries = [
+        "Logistics", "Manufacturing", "Retail", "Food & Beverage", 
+        "Healthcare", "Information Technology", "Construction", 
+        "Education", "Finance", "Hospitality", "Aerospace", "Others"
+    ]
+    while True:
+        val = input(f"Company Industry [{updated.get('Company Industry')}]: ").strip().title()
+        if not val:
+            break
+        if val in valid_industries:
+            if val == "Others":
+                val = get_valid_other_industry()
+            updated["Company Industry"] = val
+            break
+        print(f"Invalid sector. Choose from: {', '.join(valid_industries)}")
+
+    # 3. Total Revenue
+    while True:
+        val = input(f"Total Revenue (SGD) [{updated.get('Company Total Revenue')}]: ").strip()
+        if not val:
+            break
+        try:
+            num = float(val)
+            if num <= 0:
+                print("Total Revenue must be greater than zero.")
+                continue
+            updated["Company Total Revenue"] = num
             break
         except ValueError:
-            print("Please enter a valid number.")
-            
-    # You can replicate the input block above for the remaining dictionary keys
-    return current_record
+            print("Invalid input. Enter a numeric value.")
+
+    # 4. Total Employees
+    while True:
+        val = input(f"Total Employees [{updated.get('Total Employees')}]: ").strip()
+        if not val:
+            break
+        try:
+            num = int(val)
+            if num <= 0:
+                print("Total Employees must be greater than zero.")
+                continue
+            updated["Total Employees"] = num
+            break
+        except ValueError:
+            print("Invalid input. Enter an integer.")
+
+    # 5. Local Equity
+    while True:
+        val = input(f"Local Equity % [{updated.get('Local Equity')}]: ").strip()
+        if not val:
+            break
+        try:
+            num = float(val)
+            if not (0 < num <= 100):
+                print("Equity % must be between 0 and 100.")
+                continue
+            updated["Local Equity"] = num
+            break
+        except ValueError:
+            print("Invalid input. Enter a numeric value.")
+
+    # 6. Proposal Type & Cost Fields
+    val = input(f"Proposal Type [{updated.get('Proposal Type')}]:\n  1. Equipment / Energy Upgrade\n  2. ESG Reporting / Advisory\n(Enter 1, 2, or press Enter to keep): ").strip()
+    if val == "1":
+        updated["Proposal Type"] = "Equipment / Energy Upgrade"
+        updated["Reporting Advisory Fee"] = 0.0
+    elif val == "2":
+        updated["Proposal Type"] = "ESG Reporting / Advisory"
+        updated["Baseline Energy Expenditure"] = 0.0
+        updated["Estimated Retrofit Cost"] = 0.0
+
+    if updated.get("Proposal Type") == "Equipment / Energy Upgrade":
+        while True:
+            v = input(f"Baseline Energy Expenditure [{updated.get('Baseline Energy Expenditure')}]: ").strip()
+            if not v:
+                break
+            try:
+                num = float(v)
+                if num < 0:
+                    print("Value cannot be negative.")
+                    continue
+                updated["Baseline Energy Expenditure"] = num
+                break
+            except ValueError:
+                print("Invalid input. Enter a numeric value.")
+
+        while True:
+            v = input(f"Estimated Retrofit Cost [{updated.get('Estimated Retrofit Cost')}]: ").strip()
+            if not v:
+                break
+            try:
+                num = float(v)
+                if num < 0:
+                    print("Value cannot be negative.")
+                    continue
+                updated["Estimated Retrofit Cost"] = num
+                break
+            except ValueError:
+                print("Invalid input. Enter a numeric value.")
+    else:
+        while True:
+            v = input(f"Reporting Advisory Fee [{updated.get('Reporting Advisory Fee')}]: ").strip()
+            if not v:
+                break
+            try:
+                num = float(v)
+                if num < 0:
+                    print("Value cannot be negative.")
+                    continue
+                updated["Reporting Advisory Fee"] = num
+                break
+            except ValueError:
+                print("Invalid input. Enter a numeric value.")
+
+    # 7. Proposal Narrative
+    val = input(f"Proposal Narrative [{updated.get('Proposal Narrative')}]: ").strip()
+    if val:
+        updated["Proposal Narrative"] = val
+
+    return updated
