@@ -18,6 +18,14 @@ import data_manager as dm
 import ai_manager as ai
 import logic_manager as logic
 from sme_interface_stores.sme_interface_gui import *
+from io_manager import (
+    retrieve_record_index_to_delete,
+    retrieve_updated_record,
+)
+from data_manager import (
+    update_record_by_index,
+    delete_record_by_index,
+)
 
 
 # Code
@@ -97,26 +105,32 @@ while key != 0:
         case 3: #Pull from JSON
             if dm.check_overwrite(scheme_grant_records, jsonfile_name):
                 scheme_grant_records, jsonfile_name = dm.load_data_from_json(jsonfile_name)
-        case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
-            #Display part is IO job. Editing and deleting them is Data Manager's job
+
+        case 4: 
+            # Display part is IO job. Editing and deleting them is Data Manager's job
             in_and_out.display_applied_grants(scheme_grant_records, key)
-        case 5: #AI Processor
-            if len(scheme_grant_records) == 0:
-                in_and_out.display_no_records_message() 
-            else:
-                current_record = scheme_grant_records[-1]
-                narrative = current_record.get("Proposal Narrative", "")
-                ai_audit_data = ai.get_ai_response(narrative)
-                in_and_out.display_ai_audit(ai_audit_data)
-        case 6: # For the Logic Manager
-            if len(scheme_grant_records) == 0:
-                in_and_out.display_no_records_message()
-            elif not ai_audit_data:
-                in_and_out.display_no_ai_audit()
-            else:
-                current_record = scheme_grant_records[-1]
-                user_profile = in_and_out.convert_record_to_profile(current_record)
-                result = logic.evaluate_grant_application(user_profile, ai_audit_data)
-                in_and_out.display_grant_decision(result)
-        case _:
-            in_and_out.show_wrong_option_error()
+            
+            if len(scheme_grant_records) > 0:
+                print("\n[1] Edit a record")
+                print("[2] Delete a record")
+                print("[0] Return to main menu")
+                
+                sub_choice = in_and_out.key_verifier(input("➔ "))
+                
+                if sub_choice == 1:
+                    index = in_and_out.retrieve_record_index_to_delete(len(scheme_grant_records))
+                    if index != 0:
+                        current_record = scheme_grant_records[index - 1]
+                        updated_record = in_and_out.retrieve_updated_record(current_record)
+                        
+                        # Removed the data_manager. prefix here
+                        scheme_grant_records, jsonfile_name = update_record_by_index(
+                            scheme_grant_records, index, updated_record, jsonfile_name
+                        )
+                elif sub_choice == 2:
+                    index = in_and_out.retrieve_record_index_to_delete(len(scheme_grant_records))
+                    if index != 0:
+                        # Removed the data_manager. prefix here
+                        scheme_grant_records, jsonfile_name = delete_record_by_index(
+                            scheme_grant_records, index, jsonfile_name
+                        )
