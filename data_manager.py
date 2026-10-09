@@ -1,14 +1,3 @@
-"""
-Data Manager: system memory across runs (JSON only).
-
-Rules followed (per team project spec):
-- Functions only, no class definitions.
-- Nothing is printed and nothing is asked of the user here. All prompts and
-  messages live in io_manager.py. Every function RETURNS a status string
-  (documented on each function) so io_manager can show the right message.
-- Missing or corrupt files never crash the program.
-"""
-
 import json
 import logging
 import os
@@ -29,26 +18,55 @@ DATA_DIR = os.environ.get("DATA_DIR", ".")
 # File loaded automatically on startup.
 DEFAULT_SAVE_FILE = "audit_records.json"
 
+# Every saved audit record must contain these sections, each as a dict.
+REQUIRED_RECORD_SECTIONS = ("company_profile", "proposal", "ai_audit", "evaluation")
+
 
 # ---------------------------------------------------------------------------
 # Filename helpers
 # ---------------------------------------------------------------------------
 
 def normalise_filename(jsonfile_name):
-    """Strips whitespace and makes sure the name ends with .json."""
+    """Strips whitespace and makes sure the name ends with .json
+    (any capitalisation of the extension is accepted)."""
     jsonfile_name = str(jsonfile_name).strip()
-    if jsonfile_name and not jsonfile_name.endswith('.json'):
+    if jsonfile_name and not jsonfile_name.lower().endswith('.json'):
         jsonfile_name += '.json'
     return jsonfile_name
 
 
 def is_valid_filename(jsonfile_name):
-    """A bare filename only: no folders or special characters."""
-    return not any(char in jsonfile_name for char in INVALID_FILENAME_CHARS)
+    """A bare filename only: no folders, control characters, or empty stem."""
+    if any(char in jsonfile_name for char in INVALID_FILENAME_CHARS):
+        return False
+    if any(ord(char) < 32 for char in jsonfile_name):
+        return False
+    stem = jsonfile_name[:-len('.json')] if jsonfile_name.lower().endswith('.json') else jsonfile_name
+    # Rejects ".json", "..json", " .json" and similar nameless files.
+    return stem.strip(" .") != ""
 
 
 def _full_path(jsonfile_name):
     return os.path.join(DATA_DIR, jsonfile_name)
+
+
+# ---------------------------------------------------------------------------
+# Record helpers
+# ---------------------------------------------------------------------------
+
+def is_valid_audit_record(record):
+    """True if the record is a dict and every required section is a dict."""
+    if not isinstance(record, dict):
+        return False
+    return all(isinstance(record.get(section), dict) for section in REQUIRED_RECORD_SECTIONS)
+
+
+def _section(record, section_name):
+    """Safe access to a record section: always returns a dict."""
+    if not isinstance(record, dict):
+        return {}
+    section = record.get(section_name)
+    return section if isinstance(section, dict) else {}
 
 
 # ---------------------------------------------------------------------------
@@ -62,8 +80,8 @@ def generate_audit_id(records):
 
     highest_id = 0
     for record in records:
-        audit_id = record.get("audit_id", 0)
-        if isinstance(audit_id, int) and audit_id > highest_id:
+        audit_id = record.get("audit_id", 0) if isinstance(record, dict) else 0
+        if isinstance(audit_id, int) and not isinstance(audit_id, bool) and audit_id > highest_id:
             highest_id = audit_id
 
     return highest_id + 1
@@ -134,7 +152,7 @@ def load_data_from_json(jsonfile_name):
         "invalid_name"    illegal characters in the name
         "not_found"       file does not exist
         "invalid_json"    file is corrupt/unreadable (set aside as .corrupt)
-        "invalid_format"  valid JSON but not a list of records (set aside)
+        "invalid_format"  valid JSON but not a list of audit records (set aside)
         "io_error"        the OS refused to read the file
     """
     name = normalise_filename(jsonfile_name)
@@ -154,7 +172,7 @@ def load_data_from_json(jsonfile_name):
         logger.error("%s contains invalid JSON.", path)
         _backup_corrupt_file(path)
         return [], name, "invalid_json"
-    except OSError as err:
+    except (OSError, RecursionError) as err:
         logger.error("Could not read %s: %s", path, err)
         return [], name, "io_error"
 
@@ -162,8 +180,8 @@ def load_data_from_json(jsonfile_name):
     if isinstance(data, dict):
         data = [data]
 
-    if not isinstance(data, list) or not all(isinstance(r, dict) for r in data):
-        logger.error("%s is not a list of records.", path)
+    if not isinstance(data, list) or not all(is_valid_audit_record(r) for r in data):
+        logger.error("%s is not a list of audit records.", path)
         _backup_corrupt_file(path)
         return [], name, "invalid_format"
 
@@ -212,47 +230,58 @@ def save_data_to_json(data, jsonfile_name):
             pass
         return None, "io_error"
 
+
 # ---------------------------------------------------------------------------
 # Filtering / querying
 # ---------------------------------------------------------------------------
- 
+
 def filter_by_decision_status(records, decision_status):
     """Records whose evaluation decision_status matches exactly.
     Example: filter_by_decision_status(records, "PRE_APPROVED_TIER_1")"""
     return [
         r for r in records
-        if r.get("evaluation", {}).get("decision_status") == decision_status
+        if _section(r, "evaluation").get("decision_status") == decision_status
     ]
- 
- 
+
+
 def filter_approved_records(records):
     """Records where the audit passed."""
     return [
         r for r in records
-        if r.get("evaluation", {}).get("audit_passed") is True
+        if _section(r, "evaluation").get("audit_passed") is True
     ]
- 
- 
+
+
 def find_records_by_company(records, company_name):
     """Case-insensitive exact match on company name."""
     wanted = str(company_name).strip().lower()
     return [
         r for r in records
-        if str(r.get("company_profile", {}).get("company_name", "")).strip().lower() == wanted
+        if str(_section(r, "company_profile").get("company_name", "")).strip().lower() == wanted
     ]
- 
+
+
+def available_decision_statuses(records):
+    """Sorted list of the distinct decision statuses present in the records
+    (lets io_manager offer only filters that can match something)."""
+    statuses = {
+        _section(r, "evaluation").get("decision_status")
+        for r in records
+    }
+    return sorted(status for status in statuses if isinstance(status, str) and status)
+
+
 # ---------------------------------------------------------------------------
 # Bridge back to io_manager's display format
 # ---------------------------------------------------------------------------
- 
+
 def audit_record_to_display_format(audit_record):
     """
     Converts a saved audit record into the capitalised keys that
-    io_manager.display_applied_grants() and main.py's scheme_grant_records
-    use. Needed so records loaded from JSON can be listed with the records
-    entered in the current session.
+    io_manager.display_applied_grants() uses. Needed so records loaded from
+    JSON can be listed exactly like records entered in the current session.
     """
-    profile = audit_record.get("company_profile", {})
+    profile = _section(audit_record, "company_profile")
     return {
         "Company Name": profile.get("company_name", ""),
         "Company Industry": profile.get("company_industry", ""),
@@ -260,7 +289,7 @@ def audit_record_to_display_format(audit_record):
         "Total Employees": profile.get("group_employment_size", 0),
         "Local Equity": profile.get("local_shareholding_pct", 0.0),
         "Proposal Type": profile.get("proposal_type", ""),
-        "Proposal Narrative": audit_record.get("proposal", {}).get("raw_narrative", ""),
+        "Proposal Narrative": _section(audit_record, "proposal").get("raw_narrative", ""),
         "Baseline Energy Expenditure": profile.get("baseline_annual_energy_expenditure_sgd", 0.0),
         "Estimated Retrofit Cost": profile.get("estimated_retrofit_cost_sgd", 0.0),
         "Reporting Advisory Fee": profile.get("reporting_advisory_fee_sgd", 0.0),
