@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+from datetime import datetime
 
 print("Welcome to SME Green Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Green Grant and assess your compliance with the scope of the grant.")
