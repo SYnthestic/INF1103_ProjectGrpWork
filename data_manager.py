@@ -211,3 +211,33 @@ def save_data_to_json(data, jsonfile_name):
         except OSError:
             pass
         return None, "io_error"
+
+# ---------------------------------------------------------------------------
+# Filtering / querying
+# ---------------------------------------------------------------------------
+ 
+def filter_by_decision_status(records, decision_status):
+    """Records whose evaluation decision_status matches exactly.
+    Example: filter_by_decision_status(records, "PRE_APPROVED_TIER_1")"""
+    return [
+        r for r in records
+        if r.get("evaluation", {}).get("decision_status") == decision_status
+    ]
+ 
+ 
+def filter_approved_records(records):
+    """Records where the audit passed."""
+    return [
+        r for r in records
+        if r.get("evaluation", {}).get("audit_passed") is True
+    ]
+ 
+ 
+def find_records_by_company(records, company_name):
+    """Case-insensitive exact match on company name."""
+    wanted = str(company_name).strip().lower()
+    return [
+        r for r in records
+        if str(r.get("company_profile", {}).get("company_name", "")).strip().lower() == wanted
+    ]
+ 
