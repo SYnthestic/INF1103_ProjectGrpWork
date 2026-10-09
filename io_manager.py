@@ -65,3 +65,50 @@ def retrieve_total_revenue():
 if __name__ == "__main__":
     total_revenue = retrieve_total_revenue()
     print(f"Company's Total Revenue entered: SGD {total_revenue:,.2f}")
+
+
+# Print calls from data manager
+FILE_STATUS_MESSAGES = {
+    "saved": "Data successfully saved to {name}.",
+    "loaded": "Data successfully loaded from {name}.",
+    "no_name": "No filename provided.",
+    "invalid_name": "Invalid filename. Please avoid special characters.",
+    "not_found": "The file '{name}' does not exist.",
+    "invalid_json": "The file '{name}' is corrupted or contains invalid JSON. Starting fresh.",
+    "invalid_format": "The file '{name}' is not a valid list of audit records. Starting fresh.",
+    "io_error": "A file error occurred while accessing '{name}'.",
+}
+
+
+def display_file_status(status, jsonfile_name=""):
+    message = FILE_STATUS_MESSAGES.get(status, "Unknown file status.")
+    print(message.format(name=jsonfile_name))
+
+
+def prompt_for_filename(action):
+    """action is 'save' or 'load'."""
+    while True:
+        name = input(f"Please provide a valid JSON file name to {action} the data: ").strip()
+        if name:
+            return name
+        print("Filename cannot be blank.")
+
+
+def choose_save_or_new(jsonfile_name):
+    """Returns 'save' (load/append to the existing file) or 'new'."""
+    while True:
+        choice = input(
+            f"A save file named '{jsonfile_name}' already exists. "
+            "Do you want to load/append data to this file or create a brand new one? (save/new): "
+        ).strip().lower()
+        if choice in ("save", "new"):
+            return choice
+        print("Invalid input. Please enter 'save' or 'new'.")
+
+
+def confirm_overwrite_loaded_data():
+    choice = input("Data is already loaded. Do you want to overwrite it? (y/n): ").strip().lower()
+    if choice == "y":
+        return True
+    print("Returning to main menu.")
+    return False
