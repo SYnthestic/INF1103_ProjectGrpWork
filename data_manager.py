@@ -156,13 +156,28 @@ def load_data_from_json(jsonfile_name):
         return [], jsonfile_name
 
 def update_record_by_index(data, index, updated_record, jsonfile_name):
+    """
+    Updates the record at the specified 1-based index and syncs with the JSON save file.
+    """
     list_index = index - 1
     data[list_index] = updated_record
-    
-    print("\nRecord successfully updated.")
+    print(f"\nSuccessfully updated record for: {updated_record.get('Company Name', 'Unknown')}")
     
     if jsonfile_name:
-        from data_manager import save_data_to_json
+        save_data_to_json(data, jsonfile_name)
+        
+    return data, jsonfile_name
+
+
+def delete_record_by_index(data, index, jsonfile_name):
+    """
+    Deletes the record at the specified 1-based index and syncs with the JSON save file.
+    """
+    list_index = index - 1
+    deleted_record = data.pop(list_index)
+    print(f"\nSuccessfully deleted record for: {deleted_record.get('Company Name', 'Unknown')}")
+    
+    if jsonfile_name:
         save_data_to_json(data, jsonfile_name)
         
     return data, jsonfile_name
