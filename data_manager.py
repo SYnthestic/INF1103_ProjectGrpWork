@@ -1,7 +1,10 @@
 import json
 import logging
 import os
+import io_manager as in_and_out
 from datetime import datetime
+
+MAX_FILENAME_LEN = 50
 
 print("Welcome to SME Green Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Green Grant and assess your compliance with the scope of the grant.")
@@ -72,17 +75,23 @@ def check_for_preexisting_save_file(jsonfile_name):
         print(f"No existing save file found with the name '{jsonfile_name}'. Starting fresh.")
         return [], jsonfile_name
 
+
+
 def save_data_to_json(data, jsonfile_name):
     while True:
-        # Keep asking until a valid, non-empty filename is provided
         while not jsonfile_name:
-            jsonfile_name = input("Please provide a valid JSON file name to save the data: ").strip()
+            jsonfile_name = in_and_out.prompt_filename_on_disk(MAX_FILENAME_LEN)
             if not jsonfile_name:
                 print("Filename cannot be blank.")
 
+        # Check length before normalising (which may add ".json")
+        if len(jsonfile_name) > MAX_FILENAME_LEN:
+            print(f"File name is too long ({len(jsonfile_name)} characters). Maximum is {MAX_FILENAME_LEN}.")
+            jsonfile_name = ""
+            continue
+
         jsonfile_name = normalise_filename(jsonfile_name)
 
-        # Reject folder separators and special characters up front
         if not is_valid_filename(jsonfile_name):
             print(f"'{jsonfile_name}' is not a valid file name. Please avoid these characters: {INVALID_FILENAME_CHARS}")
             jsonfile_name = ""
@@ -91,15 +100,17 @@ def save_data_to_json(data, jsonfile_name):
         filepath = get_data_path(jsonfile_name)
 
         try:
-            # Create the data folder on first use
             os.makedirs(DATA_DIR, exist_ok=True)
             with open(filepath, 'w', encoding='utf-8') as file:
                 json.dump(data, file, indent=4, ensure_ascii=False)
-                print(f"Data successfully saved to {os.path.abspath(filepath)}.")
-                return jsonfile_name
         except (OSError, IOError) as e:
             print(f"An error occurred while saving data to {jsonfile_name}: {e}")
             jsonfile_name = ""
+            continue
+
+        print(f"Data successfully saved to {os.path.abspath(filepath)}.")
+        in_and_out.print_save_disk_block_deep_blue()
+        return jsonfile_name
 
 
 #Loading Part

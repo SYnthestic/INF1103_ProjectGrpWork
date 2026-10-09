@@ -86,14 +86,10 @@ while key != 0:
                 existing_records, jsonfile_name = dm.check_for_preexisting_save_file(jsonfile_name)
                 scheme_grant_records = existing_records + scheme_grant_records
                 jsonfile_name = dm.save_data_to_json(scheme_grant_records, jsonfile_name)
-                in_and_out.print_jsonfilename(jsonfile_name)
-                in_and_out.print_save_disk_block_deep_blue()
         case 2: #Save to JSON
             existing_records, jsonfile_name = dm.check_for_preexisting_save_file(jsonfile_name)
             scheme_grant_records = existing_records + scheme_grant_records
             jsonfile_name = dm.save_data_to_json(scheme_grant_records, jsonfile_name)
-            in_and_out.print_jsonfilename(jsonfile_name)
-            in_and_out.print_save_disk_block_deep_blue()
         case 3: #Pull from JSON
             if dm.check_overwrite(scheme_grant_records, jsonfile_name):
                 scheme_grant_records, jsonfile_name = dm.load_data_from_json(jsonfile_name)

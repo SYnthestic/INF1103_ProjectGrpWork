@@ -5,6 +5,9 @@ import sys
 import os
 import time
 
+BLUE = "\033[34m"
+LABEL = "\033[30;107m"  # black text on a bright white label
+RESET = "\033[0m"
 BUTTON_BOUNDS = (5, 35)
 
 
@@ -90,6 +93,33 @@ def hello():
 def goodbye_art():
     return text2art("Goodbye", font="rnd-xlarge")
 
+def save_disk_prompt_art(prompt=" Name: ", max_len=50):
+    """Floppy disk with an input slot sized to fit max_len characters."""
+    w = len(prompt) + max_len  # label/shutter width
+    inner = w + 4
+    body = inner + 4
+
+    def label_row(text=""):
+        return f"  {BLUE}██{RESET}  {LABEL}{text:<{w}}{RESET}  {BLUE}██ █{RESET}"
+
+    lines = [
+        f"  {BLUE}{'█' * body}▀▄{RESET}",
+        f"  {BLUE}{'█' * body} █{RESET}",
+        f"  {BLUE}██{RESET}  {'▀' * w}  {BLUE}██ █{RESET}",
+        f"  {BLUE}██{RESET}  {'█' * w}  {BLUE}██ █{RESET}",
+        f"  {BLUE}██{RESET}  {'█' * w}  {BLUE}██ █{RESET}",
+        f"  {BLUE}██{' ' * inner}██ █{RESET}",
+        label_row(f"SAVE TO DISK (max {max_len} chars)".center(w)),
+        label_row(prompt),  # <- input row (index 7)
+        label_row(),
+        f"  {BLUE}{'█' * body}▀{RESET}",
+        f"   {BLUE}{'▀' * (body + 1)}{RESET}",
+    ]
+
+    input_row = 7
+    rows_up = len(lines) - input_row
+    col = 7 + len(prompt)
+    return "\n".join(lines), rows_up, col
 
 def save_disk_block_deep_blue():
     # Terminal Color Codes

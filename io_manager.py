@@ -4,6 +4,7 @@ import random
 import sys
 import os
 import time
+import textwrap
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
@@ -11,45 +12,58 @@ print()
 print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
 print()
 
-# Set up clean cross-platform input capturing
-is_windows = os.name == 'nt'
+
+
+import os
+import sys
+
+# ========================================================
+# Platform setup (done once)
+# ========================================================
+is_windows = os.name == "nt"
 
 if is_windows:
     import msvcrt
     import ctypes
-    # Need access to low-level Windows console input mode handles
     from ctypes import wintypes
+
     kernel32 = ctypes.windll.kernel32
     STD_INPUT_HANDLE = -10
     ENABLE_MOUSE_INPUT = 0x0010
     ENABLE_EXTENDED_FLAGS = 0x0080
+    _saved_console_mode = wintypes.DWORD()
 else:
     import select
-    import tty
     import termios
+    import tty
 
+
+# ========================================================
+# Mouse tracking
+# ========================================================
 def enable_mouse_tracking():
-    sys.stdout.write("\033[?1000h\033[?25l")
+    sys.stdout.write("\033[?1000h\033[?25l")  # mouse on, hide cursor
     sys.stdout.flush()
     if is_windows:
-        # Extra Windows system hook to ensure the console terminal application unblocks mouse tracking
         hInput = kernel32.GetStdHandle(STD_INPUT_HANDLE)
-        mode = wintypes.DWORD()
-        kernel32.GetConsoleMode(hInput, ctypes.byref(mode))
-        kernel32.SetConsoleMode(hInput, (mode.value & ~ENABLE_EXTENDED_FLAGS) | ENABLE_MOUSE_INPUT)
+        kernel32.GetConsoleMode(hInput, ctypes.byref(_saved_console_mode))  # remember original
+        mode = _saved_console_mode.value
+        kernel32.SetConsoleMode(hInput, (mode & ~ENABLE_EXTENDED_FLAGS) | ENABLE_MOUSE_INPUT)
+
 
 def disable_mouse_tracking():
-    sys.stdout.write("\033[?1000l\033[?25h\n")
+    sys.stdout.write("\033[?1000l\033[?25h\n")  # mouse off, show cursor
     sys.stdout.flush()
+    if is_windows:
+        # Put the console back how we found it, so later typing behaves normally
+        hInput = kernel32.GetStdHandle(STD_INPUT_HANDLE)
+        kernel32.SetConsoleMode(hInput, _saved_console_mode.value)
+
 
 # ========================================================
-# ⚙️ THE UNIFIED HYBRID INPUT ENGINE (Reused by all buttons)
+# Button input: Enter or a mouse click inside [min_x, max_x]
 # ========================================================
 def execute_button_interaction(button_art, min_x=5, max_x=35):
-    """
-    Prints any button art and waits for an Enter key or a mouse click 
-    within the specific horizontal columns (min_x to max_x).
-    """
     print(button_art, end="", flush=True)
     enable_mouse_tracking()
 
@@ -57,47 +71,103 @@ def execute_button_interaction(button_art, min_x=5, max_x=35):
         if is_windows:
             buffer = ""
             while True:
-                if msvcrt.kbhit():
-                    char = msvcrt.getch()
-                    if char in (b'\r', b'\n'):
-                        break
-                    try:
-                        decoded = char.decode('utf-8', errors='ignore')
-                    except:
-                        continue
-                    buffer += decoded
-                    if "\033[M" in buffer:
-                        idx = buffer.find("\033[M")
-                        if len(buffer) >= idx + 6:
-                            payload = buffer[idx+3:idx+6]
-                            if len(payload) == 3:
-                                click_type = ord(payload[0]) - 32
-                                click_x = ord(payload[1]) - 32
-                                if click_type == 0 and min_x <= click_x <= max_x:
-                                    break
-                            buffer = ""
+                if not msvcrt.kbhit():
+                    continue
+                char = msvcrt.getch()
+                if char in (b"\r", b"\n"):
+                    break
+
+                buffer += char.decode("utf-8", errors="ignore")
+                if "\033" not in buffer:      # not part of a mouse report, don't let it pile up
+                    buffer = ""
+                    continue
+
+                if "\033[M" in buffer:
+                    idx = buffer.find("\033[M")
+                    if len(buffer) >= idx + 6:
+                        payload = buffer[idx + 3: idx + 6]
+                        click_type = ord(payload[0]) - 32
+                        click_x = ord(payload[1]) - 32
+                        if click_type == 0 and min_x <= click_x <= max_x:
+                            break
+                        buffer = ""
         else:
             fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
             try:
-                tty.setraw(sys.stdin.fileno())
+                tty.setraw(fd)
                 while True:
                     r, _, _ = select.select([sys.stdin], [], [])
                     if r:
-                        user_input = sys.stdin.read(1)
-                        if user_input in ('\n', '\r'):
+                        ch = sys.stdin.read(1)
+                        if ch in ("\n", "\r"):
                             break
-                        if user_input == '\033':
-                            next_chars = sys.stdin.read(5)
-                            if next_chars.startswith('[M'):
-                                click_type = ord(next_chars[2]) - 32
-                                click_x = ord(next_chars[3]) - 32
+                        if ch == "\033":
+                            rest = sys.stdin.read(5)
+                            if rest.startswith("[M"):
+                                click_type = ord(rest[2]) - 32
+                                click_x = ord(rest[3]) - 32
                                 if click_type == 0 and min_x <= click_x <= max_x:
                                     break
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     finally:
         disable_mouse_tracking()
+
+
+# ========================================================
+# Text input: single keypress reader + length-limited line reader
+# ========================================================
+def _read_key():
+    """Read one keypress without waiting for Enter."""
+    if is_windows:
+        ch = msvcrt.getwch()
+        if ch in ("\x00", "\xe0"):  # arrow/function keys send 2 codes; skip both
+            msvcrt.getwch()
+            return ""
+        return ch
+
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        return sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
+def read_limited(max_len, blocked=""):
+    """Read a line, silently ignoring keys once max_len characters are typed.
+
+    blocked: characters that can't be typed at all (e.g. invalid filename chars).
+    """
+    buf = []
+    while True:
+        ch = _read_key()
+
+        if ch in ("\r", "\n"):            # Enter: finish
+            break
+        if ch == "\x03":                  # Ctrl+C
+            raise KeyboardInterrupt
+        if ch in ("\x08", "\x7f"):        # Backspace
+            if buf:
+                buf.pop()
+                sys.stdout.write("\b \b")
+                sys.stdout.flush()
+            continue
+        if not ch or not ch.isprintable() or ch in blocked:
+            continue
+        if len(buf) >= max_len:           # limit reached: ignore the key
+            continue
+
+        buf.append(ch)
+        sys.stdout.write(ch)
+        sys.stdout.flush()
+
+    return "".join(buf)
+
+
+
 
 # Shows welcome sequence with ASCII art and sustainability banner
 def show_welcome_sequence():
@@ -365,19 +435,79 @@ def confirm_save_to_json():
 def print_jsonfilename(jsonfile_name):
     print(f"Data successfully saved to {jsonfile_name}.")
 
+# Shows the floppy disk and lets the user type the file name on its label.
+def prompt_filename_on_disk(max_len=50, blocked=""):
+    art, rows_up, col = gui.save_disk_prompt_art(max_len=max_len)
+    print(art)
+
+    # Jump back up into the label and start typing there
+    sys.stdout.write(f"\033[{rows_up}A\033[{col}G{gui.LABEL}")
+    sys.stdout.flush()
+    try:
+        return read_limited(max_len, blocked).strip()
+    finally:
+        # Reset colours and move back below the disk
+        # (no newline is echoed now, so move down the full rows_up)
+        sys.stdout.write(f"{gui.RESET}\033[{rows_up}B\r")
+        sys.stdout.flush()
 # Just an icon to let you know the save was successful, without having to print the full path every time.
 def print_save_disk_block_deep_blue():
     print(gui.save_disk_block_deep_blue())
+
+# Enables paper format
+#So it looks abit like you are reading your work on paper while also looking at a command console
+PAPER_WIDTH = 110
+
+
+def print_on_paper(lines, title="REPORT", footer="End of report", width=PAPER_WIDTH):
+    """Print a list of text lines inside a paper-style frame."""
+    inner = width - 4  # usable space between "| " and " |"
+
+    def row(text=""):
+        print(f"| {text:<{inner}} |")
+
+    print()
+    print("+" + "-" * (width - 2) + "+")
+    row(title.center(inner))
+    row("=" * inner)
+    row()
+
+    for text in lines:
+        stripped = text.lstrip()
+        indent = " " * (len(text) - len(stripped))
+        # Bullets get a hanging indent so wrapped lines align under the text
+        if stripped.startswith("- "):
+            indent += "  "
+        wrapped = textwrap.wrap(text, width=inner, subsequent_indent=indent) or [""]
+        for piece in wrapped:
+            row(piece)
+
+    row()
+    row("-" * inner)
+    row(footer.center(inner))
+    row()
+    print(("\\/" * width)[:width])  # torn paper edge
+
+
+def format_pairs(data, width=PAPER_WIDTH):
+    """Turn a dict into aligned 'key : value' lines with a hanging indent."""
+    inner = width - 4
+    key_w = max(len(str(k)) for k in data)
+    lines = []
+    for key, value in data.items():
+        label = f"{str(key):<{key_w}} : "
+        indent = " " * len(label)
+        wrapped = textwrap.wrap(str(value), width=inner - len(label)) or [""]
+        lines.append(label + wrapped[0])
+        lines.extend(indent + extra for extra in wrapped[1:])
+    return lines
 
 # Renders the AI Manager's structured output for the CLI. All console
 # print statements in the codebase belong in io_manager.py per the
 # architecture, so ai_manager.py and logic_manager.py never print
 # directly — they just return data for this layer to display.
 def display_ai_audit(ai_audit):
-    print()
-    print("AI Audit Result:")
-    for key, value in ai_audit.items():
-        print(f"  {key}: {value}")
+    print_on_paper(format_pairs(ai_audit), title="AI AUDIT REPORT")
 
 # Runs whenever AI Manager is using the get_ai_response() function. It gives one bar for every second passed
 def run_ai_analysis_bar(stop_event, timeout_seconds=60):
@@ -412,35 +542,27 @@ def run_ai_analysis_bar(stop_event, timeout_seconds=60):
 
 
 # Renders the Logic Manager's decision for the CLI.
+# Renders the Logic Manager's decision for the CLI.
 def display_grant_decision(result):
-    print()
-    print("=" * 60)
-    print("GRANT ELIGIBILITY DECISION")
-    print("=" * 60)
-    print(f"SME Eligible     : {'YES' if result['is_sme'] else 'NO'}")
-    print(f"Decision Status  : {result['decision_status']}")
-    print(f"Audit Passed     : {result['audit_passed']}")
-    print(f"Approved Subsidy : SGD {result['approved_subsidy_sgd']:,.2f}")
+    lines = [
+        f"SME Eligible     : {'YES' if result['is_sme'] else 'NO'}",
+        f"Decision Status  : {result['decision_status']}",
+        f"Audit Passed     : {result['audit_passed']}",
+        f"Approved Subsidy : SGD {result['approved_subsidy_sgd']:,.2f}",
+    ]
 
-    if result["matched_schemes"]:
-        print()
-        print("Matched Schemes:")
-        for scheme in result["matched_schemes"]:
-            print(f"  - {scheme}")
+    sections = [
+        ("Matched Schemes:", result["matched_schemes"]),
+        ("Reasons:", result["reasons"]),
+        ("Recommendations:", result["recommendations"]),
+    ]
+    for heading, items in sections:
+        if items:
+            lines.append("")
+            lines.append(heading)
+            lines.extend(f"  - {item}" for item in items)
 
-    if result["reasons"]:
-        print()
-        print("Reasons:")
-        for reason in result["reasons"]:
-            print(f"  - {reason}")
-
-    if result["recommendations"]:
-        print()
-        print("Recommendations:")
-        for rec in result["recommendations"]:
-            print(f"  - {rec}")
-
-    print("=" * 60)
+    print_on_paper(lines, title="GRANT ELIGIBILITY DECISION")
 
 # Coordinator that collects every input and maps it onto the exact dict
 # keys logic_manager.py's evaluate_grant_application() expects.
