@@ -28,8 +28,6 @@ scheme_grant_records = []
 ai_audit_data = {}
 jsonfile_name = ""
 
-in_and_out.show_welcome_banner()
-
 key = None
 while key != 0:
     key = in_and_out.get_menu_choice()
@@ -88,43 +86,37 @@ while key != 0:
                 existing_records, jsonfile_name = dm.check_for_preexisting_save_file(jsonfile_name)
                 scheme_grant_records = existing_records + scheme_grant_records
                 jsonfile_name = dm.save_data_to_json(scheme_grant_records, jsonfile_name)
-                in_and_out.print_jsonfilename(jsonfile_name)
-                in_and_out.print_save_disk_block_deep_blue()
         case 2: #Save to JSON
             existing_records, jsonfile_name = dm.check_for_preexisting_save_file(jsonfile_name)
             scheme_grant_records = existing_records + scheme_grant_records
             jsonfile_name = dm.save_data_to_json(scheme_grant_records, jsonfile_name)
-            in_and_out.print_jsonfilename(jsonfile_name)
-            in_and_out.print_save_disk_block_deep_blue()
         case 3: #Pull from JSON
             if dm.check_overwrite(scheme_grant_records, jsonfile_name):
                 scheme_grant_records, jsonfile_name = dm.load_data_from_json(jsonfile_name)
-
-        case 4: 
-            # Display part is IO job. Editing and deleting them is Data Manager's job
-            in_and_out.display_applied_grants(scheme_grant_records, key)
-            
-            if len(scheme_grant_records) > 0:
-                print("\n[1] Edit a record")
-                print("[2] Delete a record")
-                print("[0] Return to main menu")
-                
-                sub_choice = in_and_out.key_verifier(input("➔ "))
-                
-                if sub_choice == 1:
-                    index = in_and_out.retrieve_record_index_to_delete(len(scheme_grant_records))
-                    if index != 0:
-                        current_record = scheme_grant_records[index - 1]
-                        updated_record = in_and_out.retrieve_updated_record(current_record)
-                        
-                        # Removed the data_manager. prefix here
-                        scheme_grant_records, jsonfile_name = in_and_out.update_record_by_index(
-                            scheme_grant_records, index, updated_record, jsonfile_name
-                        )
-                elif sub_choice == 2:
-                    index = in_and_out.retrieve_record_index_to_delete(len(scheme_grant_records))
-                    if index != 0:
-                        # Removed the data_manager. prefix here
-                        scheme_grant_records, jsonfile_name = in_and_out.delete_record_by_index(
-                            scheme_grant_records, index, jsonfile_name
-                        )
+        case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
+                    #Display part is IO job. Editing and deleting them is Data Manager's job
+                    in_and_out.display_applied_grants(scheme_grant_records, key)
+        case 5: #Update. Tia, this is your target
+            print("Update Function U/C")
+        case 6: #Delete. Tia's target no.2
+            print("Delete Function U/C")
+        case 7: #AI Processor
+            if len(scheme_grant_records) == 0:
+                in_and_out.display_no_records_message() 
+            else:
+                current_record = scheme_grant_records[-1]
+                narrative = current_record.get("Proposal Narrative", "")
+                ai_audit_data = ai.get_ai_response(narrative)
+                in_and_out.display_ai_audit(ai_audit_data)
+        case 8: # For the Logic Manager
+            if len(scheme_grant_records) == 0:
+                in_and_out.display_no_records_message()
+            elif not ai_audit_data:
+                in_and_out.display_no_ai_audit()
+            else:
+                current_record = scheme_grant_records[-1]
+                user_profile = in_and_out.convert_record_to_profile(current_record)
+                result = logic.evaluate_grant_application(user_profile, ai_audit_data)
+                in_and_out.display_grant_decision(result)
+        case _:
+            in_and_out.show_wrong_option_error()
