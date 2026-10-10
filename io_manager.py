@@ -5,17 +5,14 @@ import sys
 import os
 import time
 import textwrap
+import codecs
+from contextlib import contextmanager
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
 print()
 print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
 print()
-
-
-
-import os
-import sys
 
 # ========================================================
 # Platform setup (done once)
@@ -32,10 +29,45 @@ if is_windows:
     ENABLE_MOUSE_INPUT = 0x0010
     ENABLE_EXTENDED_FLAGS = 0x0080
     _saved_console_mode = wintypes.DWORD()
+
+    def _getb():
+        """Read one raw byte (blocks, no CPU spinning)."""
+        return msvcrt.getch()
+
+    def _pending(timeout=0.02):
+        """Is another byte already waiting?"""
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            if msvcrt.kbhit():
+                return True
+            time.sleep(0.002)
+        return False
+
 else:
     import select
     import termios
     import tty
+
+    def _getb():
+        return os.read(sys.stdin.fileno(), 1)
+
+    def _pending(timeout=0.02):
+        return bool(select.select([sys.stdin.fileno()], [], [], timeout)[0])
+
+
+@contextmanager
+def _raw_input():
+    """Raw terminal mode on Unix, set once and restored after. No-op on Windows."""
+    if is_windows:
+        yield
+        return
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        yield
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
 # ========================================================
@@ -46,7 +78,7 @@ def enable_mouse_tracking():
     sys.stdout.flush()
     if is_windows:
         hInput = kernel32.GetStdHandle(STD_INPUT_HANDLE)
-        kernel32.GetConsoleMode(hInput, ctypes.byref(_saved_console_mode))  # remember original
+        kernel32.GetConsoleMode(hInput, ctypes.byref(_saved_console_mode))
         mode = _saved_console_mode.value
         kernel32.SetConsoleMode(hInput, (mode & ~ENABLE_EXTENDED_FLAGS) | ENABLE_MOUSE_INPUT)
 
@@ -55,114 +87,119 @@ def disable_mouse_tracking():
     sys.stdout.write("\033[?1000l\033[?25h\n")  # mouse off, show cursor
     sys.stdout.flush()
     if is_windows:
-        # Put the console back how we found it, so later typing behaves normally
         hInput = kernel32.GetStdHandle(STD_INPUT_HANDLE)
         kernel32.SetConsoleMode(hInput, _saved_console_mode.value)
 
 
 # ========================================================
-# Button input: Enter or a mouse click inside [min_x, max_x]
+# One event reader shared by every button/choice prompt
 # ========================================================
-def execute_button_interaction(button_art, min_x=5, max_x=35):
-    print(button_art, end="", flush=True)
+def _read_event():
+    """Return ("key", char), ("click", column), or None for anything ignorable."""
+    b = _getb()
+
+    if is_windows and b in (b"\x00", b"\xe0"):   # arrow/function key: skip 2nd byte
+        _getb()
+        return None
+
+    if b != b"\x1b":
+        return ("key", b.decode("utf-8", "ignore"))
+
+    # ESC: either a lone Esc press or the start of an escape sequence
+    if not _pending() or _getb() != b"[":
+        return None
+    if not _pending() or _getb() != b"M":        # some other sequence (e.g. arrows)
+        return None
+
+    # Mouse report: ESC [ M <button> <x> <y>
+    btn, x, _y = _getb(), _getb(), _getb()
+    if btn[0] - 32 == 0:                          # left button press
+        return ("click", x[0] - 32)
+    return None
+
+
+def wait_for_choice(art, regions, keys):
+    """Show `art`, then wait for a mapped key or a left click inside a region.
+
+    regions: {value: (min_x, max_x)}    keys: {"y": value, "\\r": value, ...}
+    Returns the matching value.
+    """
+    print(art, end="", flush=True)
     enable_mouse_tracking()
-
     try:
-        if is_windows:
-            buffer = ""
+        with _raw_input():
             while True:
-                if not msvcrt.kbhit():
+                event = _read_event()
+                if event is None:
                     continue
-                char = msvcrt.getch()
-                if char in (b"\r", b"\n"):
-                    break
-
-                buffer += char.decode("utf-8", errors="ignore")
-                if "\033" not in buffer:      # not part of a mouse report, don't let it pile up
-                    buffer = ""
-                    continue
-
-                if "\033[M" in buffer:
-                    idx = buffer.find("\033[M")
-                    if len(buffer) >= idx + 6:
-                        payload = buffer[idx + 3: idx + 6]
-                        click_type = ord(payload[0]) - 32
-                        click_x = ord(payload[1]) - 32
-                        if click_type == 0 and min_x <= click_x <= max_x:
-                            break
-                        buffer = ""
-        else:
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            try:
-                tty.setraw(fd)
-                while True:
-                    r, _, _ = select.select([sys.stdin], [], [])
-                    if r:
-                        ch = sys.stdin.read(1)
-                        if ch in ("\n", "\r"):
-                            break
-                        if ch == "\033":
-                            rest = sys.stdin.read(5)
-                            if rest.startswith("[M"):
-                                click_type = ord(rest[2]) - 32
-                                click_x = ord(rest[3]) - 32
-                                if click_type == 0 and min_x <= click_x <= max_x:
-                                    break
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                kind, val = event
+                if kind == "key":
+                    if val == "\x03":
+                        raise KeyboardInterrupt
+                    if val.lower() in keys:
+                        return keys[val.lower()]
+                else:
+                    for value, (lo, hi) in regions.items():
+                        if lo <= val <= hi:
+                            return value
     finally:
         disable_mouse_tracking()
 
 
+# Thin wrappers so existing callers don't change
+def execute_button_interaction(button_art, min_x=5, max_x=35):
+    wait_for_choice(button_art, {True: (min_x, max_x)}, {"\r": True, "\n": True})
+
+
+def execute_choice_interaction(art, regions, keys):
+    return wait_for_choice(art, regions, keys)
+
+
 # ========================================================
-# Text input: single keypress reader + length-limited line reader
+# Text input: length-limited line reader
 # ========================================================
+_decoder = codecs.getincrementaldecoder("utf-8")("ignore")
+
+
 def _read_key():
-    """Read one keypress without waiting for Enter."""
+    """Read one character without waiting for Enter."""
     if is_windows:
         ch = msvcrt.getwch()
-        if ch in ("\x00", "\xe0"):  # arrow/function keys send 2 codes; skip both
+        if ch in ("\x00", "\xe0"):
             msvcrt.getwch()
             return ""
         return ch
-
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        return sys.stdin.read(1)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    while True:                                   # assemble multi-byte UTF-8 characters
+        s = _decoder.decode(_getb())
+        if s:
+            return s
 
 
 def read_limited(max_len, blocked=""):
-    """Read a line, silently ignoring keys once max_len characters are typed.
-
-    blocked: characters that can't be typed at all (e.g. invalid filename chars).
-    """
+    """Read a line, silently ignoring keys once max_len characters are typed."""
     buf = []
-    while True:
-        ch = _read_key()
+    with _raw_input():                            # set once, not per keystroke
+        while True:
+            ch = _read_key()
 
-        if ch in ("\r", "\n"):            # Enter: finish
-            break
-        if ch == "\x03":                  # Ctrl+C
-            raise KeyboardInterrupt
-        if ch in ("\x08", "\x7f"):        # Backspace
-            if buf:
-                buf.pop()
-                sys.stdout.write("\b \b")
-                sys.stdout.flush()
-            continue
-        if not ch or not ch.isprintable() or ch in blocked:
-            continue
-        if len(buf) >= max_len:           # limit reached: ignore the key
-            continue
+            if ch in ("\r", "\n"):
+                break
+            if ch == "\x03":
+                raise KeyboardInterrupt
+            if ch in ("\x08", "\x7f"):
+                if buf:
+                    buf.pop()
+                    sys.stdout.write("\b \b")
+                    sys.stdout.flush()
+                continue
+            if not ch or not ch.isprintable() or ch in blocked:
+                continue
+            if len(buf) >= max_len:
+                continue
 
-        buf.append(ch)
-        sys.stdout.write(ch)
-        sys.stdout.flush()
+            buf.append(ch)
+            sys.stdout.write(ch)
+            sys.stdout.flush()
 
     return "".join(buf)
 
@@ -172,19 +209,23 @@ def read_limited(max_len, blocked=""):
 # Shows welcome sequence with ASCII art and sustainability banner
 def show_welcome_sequence():
     print(gui.hello())
-    print(gui.woman_says_hi())
-    print(gui.sustainability_banner())
-    print(gui.woman_says_hi())
+    print(gui.framed_sustainability_banner())
 
 # Verifies that the input is a valid integer key for the menu options.
-def key_verifier(key):
+def key_verifier(key, max_digits=2):
+    if not isinstance(key, str):
+        return None
+
     key = key.strip()
 
-    if not key:
+    if not key:  # Empty response
         print("Empty Response!")
         return None
-    if not (key.isascii() and key.isdigit()):
-        print("Error! Please enter a number.")
+    if not (key.isascii() and key.isdigit()):  # Letters, symbols, negatives, decimals, floats
+        print("Error! Please enter a whole number (no letters, symbols or decimals).")
+        return None
+    if len(key) > max_digits:  # Also protects int() from huge inputs
+        print(f"Error! Please enter at most {max_digits} digits.")
         return None
 
     return int(key)
@@ -192,9 +233,9 @@ def key_verifier(key):
 # Menu Options
 def get_menu_choice():
     key = None
-    while key is None:
+    while key is None: #Prints the menu and then asks you to get the key
         print(gui.boxed_menu())
-        key = key_verifier(input("➔   "))
+        key = key_verifier(input("➔   ")) #This function calls the key_verifier function which checks if the key is an integer
     return key
 
 # Display Company Profile
@@ -381,22 +422,40 @@ def retrieve_reporting_advisory_fee():
 def display_applied_grants(scheme_grant_records, key):
     red = "\033[91m"
     reset = "\033[0m"
+
     if len(scheme_grant_records) == 0:
         print(f"\n {red}⚠️  SYSTEM NOTICE: You do not have any grants applied.{reset}\n")
-        # Now this will execute perfectly without a NameError!
         gui.return_button()
         return
-    elif key == 1:
-        print("Scheme Grant Records:")
-        for i, grant in enumerate(scheme_grant_records, start=1):
-            print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Proposal Narrative: {grant.get('Proposal Narrative', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
-        print(type(scheme_grant_records))
+
+    # Build the paper contents: one block per grant
+    lines = []
+    for i, grant in enumerate(scheme_grant_records, start=1):
+        if i > 1:
+            lines.append("")
+        lines.append(f"{i}. {grant['Company Name']} - {grant['Company Industry']}")
+        details = {
+            "Total Revenue": grant["Company Total Revenue"],
+            "Total Employees": grant["Total Employees"],
+            "Local Equity": grant["Local Equity"],
+            "Proposal Type": grant.get("Proposal Type", "N/A"),
+            "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
+            "Baseline Energy Expenditure": grant["Baseline Energy Expenditure"],
+            "Estimated Retrofit Cost": grant["Estimated Retrofit Cost"],
+            "Reporting Advisory Fee": grant.get("Reporting Advisory Fee", 0.0),
+        }
+        lines.extend(format_pairs(details, indent="   "))
+
+    count = len(scheme_grant_records)
+    footer = f"{count} record{'s' if count != 1 else ''}"
+
+    if key == 1:
+        print_on_paper(lines, title="SCHEME GRANT RECORDS", footer=footer)
         gui.ai_button()
-    else:
-        print("List of Grants Already Applied For:")
-        for i, grant in enumerate(scheme_grant_records, start=1):
-            print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Proposal Narrative: {grant.get('Proposal Narrative', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
+    else: # When key = 4
+        print_on_paper(lines, title="GRANTS ALREADY APPLIED FOR", footer=footer)
         gui.return_button()
+
     return scheme_grant_records
 
 # Bridges main.py's case-1 record format (capitalised, display-oriented
@@ -422,14 +481,8 @@ def convert_record_to_profile(record):
 # Y/N confirmation for whether to save the just-processed record to
 # JSON, used right after the automated AI + Logic audit in main.py.
 def confirm_save_to_json():
-    while True:
-        choice = input("Save this record to JSON now? (y/n): ").strip().lower()
-        if choice == "y":
-            return True
-        elif choice == "n":
-            return False
-        else:
-            print("Invalid input. Please enter 'y' or 'n'.")
+    art, regions = gui.yes_no_buttons("Save this record to JSON now?")
+    return execute_choice_interaction(art, regions, {"y": True, "n": False})
 
 # Prints the JSON filename to the console after saving, so main.py doesn't have to know the details of how io_manager.py handles the display.
 def print_jsonfilename(jsonfile_name):
@@ -489,17 +542,17 @@ def print_on_paper(lines, title="REPORT", footer="End of report", width=PAPER_WI
     print(("\\/" * width)[:width])  # torn paper edge
 
 
-def format_pairs(data, width=PAPER_WIDTH):
+def format_pairs(data, width=PAPER_WIDTH, indent=""):
     """Turn a dict into aligned 'key : value' lines with a hanging indent."""
-    inner = width - 4
+    inner = width - 4 - len(indent)
     key_w = max(len(str(k)) for k in data)
     lines = []
     for key, value in data.items():
         label = f"{str(key):<{key_w}} : "
-        indent = " " * len(label)
+        hang = " " * len(label)
         wrapped = textwrap.wrap(str(value), width=inner - len(label)) or [""]
-        lines.append(label + wrapped[0])
-        lines.extend(indent + extra for extra in wrapped[1:])
+        lines.append(indent + label + wrapped[0])
+        lines.extend(indent + hang + extra for extra in wrapped[1:])
     return lines
 
 # Renders the AI Manager's structured output for the CLI. All console
