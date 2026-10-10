@@ -240,8 +240,10 @@ def boxed_menu():
         row("    2. Save to JSON"),
         row("    3. Pull from JSON"),
         row("    4. Display Current Records"),
-        row("    5. AI Processor"),
-        row("    6. Logic Manager"),
+        row("    5. Update Records"),
+        row("    6. Delete Records"),
+        row("    7. AI Processor"),
+        row("    8. Logic Manager"),
         blank,
         border,
     ]
