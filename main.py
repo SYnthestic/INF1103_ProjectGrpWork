@@ -94,9 +94,13 @@ while key != 0:
             if dm.check_overwrite(scheme_grant_records, jsonfile_name):
                 scheme_grant_records, jsonfile_name = dm.load_data_from_json(jsonfile_name)
         case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
-            #Display part is IO job. Editing and deleting them is Data Manager's job
-            in_and_out.display_applied_grants(scheme_grant_records, key)
-        case 5: #AI Processor
+                    #Display part is IO job. Editing and deleting them is Data Manager's job
+                    in_and_out.display_applied_grants(scheme_grant_records, key)
+        case 5: #Update. Tia, this is your target
+            print("Update Function U/C")
+        case 6: #Delete. Tia's target no.2
+            print("Delete Function U/C")
+        case 7: #AI Processor
             if len(scheme_grant_records) == 0:
                 in_and_out.display_no_records_message() 
             else:
@@ -104,7 +108,7 @@ while key != 0:
                 narrative = current_record.get("Proposal Narrative", "")
                 ai_audit_data = ai.get_ai_response(narrative)
                 in_and_out.display_ai_audit(ai_audit_data)
-        case 6: # For the Logic Manager
+        case 8: # For the Logic Manager
             if len(scheme_grant_records) == 0:
                 in_and_out.display_no_records_message()
             elif not ai_audit_data:
