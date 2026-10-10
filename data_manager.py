@@ -50,6 +50,21 @@ def is_valid_filename(jsonfile_name):
 def _full_path(jsonfile_name):
     return os.path.join(DATA_DIR, jsonfile_name)
 
+def generate_company_save_filename(company_name):
+    """Return a stable, safe JSON filename for one company.
+
+    Repeated assessments for the same company use this same JSON/PDF pair;
+    different company names produce separate pairs.
+    """
+    company_name = str(company_name or "Company").strip()
+    safe_name = "".join(
+        "_" if char in INVALID_FILENAME_CHARS or ord(char) < 32 else char
+        for char in company_name
+    )
+    safe_name = re.sub(r"\s+", " ", safe_name).strip(" .")[:100].rstrip(" .")
+    if not safe_name:
+        safe_name = "Company"
+    return f"audit_{safe_name}.json"
 
 # ---------------------------------------------------------------------------
 # Record helpers
