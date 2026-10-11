@@ -50,6 +50,7 @@ def is_valid_filename(jsonfile_name):
 def _full_path(jsonfile_name):
     return os.path.join(DATA_DIR, jsonfile_name)
 
+
 def generate_company_save_filename(company_name):
     """Return a stable, safe JSON filename for one company.
 
@@ -65,6 +66,7 @@ def generate_company_save_filename(company_name):
     if not safe_name:
         safe_name = "Company"
     return f"audit_{safe_name}.json"
+
 
 # ---------------------------------------------------------------------------
 # Record helpers
@@ -319,8 +321,6 @@ def audit_record_to_display_format(audit_record):
         "Estimated Retrofit Cost": profile.get("estimated_retrofit_cost_sgd", 0.0),
         "Reporting Advisory Fee": profile.get("reporting_advisory_fee_sgd", 0.0),
     }
-
-
 # ---------------------------------------------------------------------------
 # PDF export
 # ---------------------------------------------------------------------------
@@ -374,19 +374,29 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
 
-        # Use a common Unicode font when present, with built-in fonts as fallback.
-        regular_font = "Helvetica"
-        bold_font = "Helvetica-Bold"
-        font_candidates = [
-            (r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\arialbd.ttf"),
-            ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-        ]
+        # Embed Times New Roman when available so the report keeps the requested
+        # typeface on other computers. In Docker, mount/provide the font files
+        # and set TIMES_NEW_ROMAN_FONT and TIMES_NEW_ROMAN_BOLD_FONT. The
+        # built-in Times fonts are the portable fallback when TNR is unavailable.
+        regular_font = "Times-Roman"
+        bold_font = "Times-Bold"
+        configured_regular = os.environ.get("TIMES_NEW_ROMAN_FONT")
+        configured_bold = os.environ.get("TIMES_NEW_ROMAN_BOLD_FONT")
+        font_candidates = []
+        if configured_regular:
+            font_candidates.append((configured_regular, configured_bold))
+        font_candidates.extend([
+            (r"C:\Windows\Fonts\times.ttf", r"C:\Windows\Fonts\timesbd.ttf"),
+            ("/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf",
+             "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Bold.ttf"),
+            ("/Library/Fonts/Times New Roman.ttf",
+             "/Library/Fonts/Times New Roman Bold.ttf"),
+        ])
         for regular_path, bold_path in font_candidates:
-            if os.path.isfile(regular_path):
+            if regular_path and os.path.isfile(regular_path):
                 pdfmetrics.registerFont(TTFont("CompanyAudit", regular_path))
                 regular_font = "CompanyAudit"
-                if os.path.isfile(bold_path):
+                if bold_path and os.path.isfile(bold_path):
                     pdfmetrics.registerFont(TTFont("CompanyAudit-Bold", bold_path))
                     bold_font = "CompanyAudit-Bold"
                 else:
@@ -415,8 +425,8 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
             spaceAfter=2 * mm,
         )
         subtitle_style = ParagraphStyle(
-            "CompanyAuditSubtitle", parent=styles["Normal"], fontName=regular_font,
-            fontSize=9, leading=12, alignment=1, textColor=muted,
+            "CompanyAuditSubtitle", parent=styles["Normal"], fontName=bold_font,
+            fontSize=9, leading=12, alignment=1, textColor=navy,
             spaceAfter=5 * mm,
         )
         section_style = ParagraphStyle(
@@ -435,6 +445,22 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
         small_style = ParagraphStyle(
             "CompanyAuditSmall", parent=body_style, fontSize=8, leading=10,
             textColor=muted,
+        )
+        disclaimer_style = ParagraphStyle(
+            "CompanyAuditDisclaimer", parent=small_style, fontName=bold_font,
+            fontSize=9, leading=12,
+        )
+        black_small_style = ParagraphStyle(
+            "CompanyAuditBlackSmall", parent=small_style,
+            textColor=colors.black,
+        )
+        black_disclaimer_style = ParagraphStyle(
+            "CompanyAuditBlackDisclaimer", parent=disclaimer_style,
+            textColor=colors.black,
+        )
+        ai_note_style = ParagraphStyle(
+            "CompanyAuditAINote", parent=disclaimer_style,
+            textColor=colors.black,
         )
         outcome_style = ParagraphStyle(
             "CompanyAuditOutcome", parent=body_style, fontName=bold_font,
@@ -466,7 +492,7 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
             "estimated_lifetime_abatement_tonnes": "Estimated lifetime abatement",
             "detected_exclusion_keywords": "Potential exclusions",
             "implementation_bottleneck": "Implementation constraint",
-            "ai_reasoning_summary": "Assessment summary",
+            "ai_reasoning_summary": "AI-generated proposal analysis",
             "approved_subsidy_sgd": "Potential grant amount",
             "audit_passed": "Screening result",
             "is_sme": "Meets SME criteria",
@@ -587,6 +613,21 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
                 "The saved assessment does not record a positive eligibility result. Review the details below.",
             )
 
+        def screening_result_for(evaluation):
+            """Translate the logic status into a clear reader-facing outcome."""
+            status = str(evaluation.get("decision_status", "")).upper()
+            if status.startswith("MANUAL"):
+                return "Further review required"
+            if status.startswith("REJECT"):
+                return "Did not qualify"
+            if evaluation.get("audit_passed") is True:
+                return "Passed"
+            if not status:
+                return "Not recorded"
+            # An unfamiliar or incomplete status should not be presented as
+            # a rejection or a pass; route it to review in the report wording.
+            return "Further review required"
+
         def add_page_chrome(canvas, doc):
             canvas.saveState()
             canvas.setFillColor(navy)
@@ -594,8 +635,14 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
             canvas.setStrokeColor(line)
             canvas.line(20 * mm, 16 * mm, A4[0] - 20 * mm, 16 * mm)
             canvas.setFont(regular_font, 8)
-            canvas.setFillColor(muted)
-            canvas.drawString(20 * mm, 10 * mm, "CONFIDENTIAL - Prepared for the named company")
+            canvas.setFillColor(colors.black)
+            footer_company_name = report_company_name
+            footer_text = f"CONFIDENTIAL | Prepared for {footer_company_name}"
+            max_footer_width = A4[0] - 50 * mm
+            while footer_text and pdfmetrics.stringWidth(footer_text, regular_font, 8) > max_footer_width:
+                footer_company_name = footer_company_name[:-4] + "..." if len(footer_company_name) > 4 else "..."
+                footer_text = f"CONFIDENTIAL | Prepared for {footer_company_name}"
+            canvas.drawString(20 * mm, 10 * mm, footer_text)
             canvas.drawRightString(A4[0] - 20 * mm, 10 * mm, f"Page {doc.page}")
             canvas.restoreState()
 
@@ -607,6 +654,15 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
             author="SME Green Grant Eligibility Auditor",
         )
         story = []
+        report_company_name = "the named company"
+        if records:
+            first_record = records[0]
+            if all(isinstance(first_record.get(section), dict) for section in REQUIRED_RECORD_SECTIONS):
+                first_profile = _section(first_record, "company_profile")
+                report_company_name = str(first_profile.get("company_name") or report_company_name).strip()
+            else:
+                report_company_name = str(first_record.get("Company Name") or report_company_name).strip()
+
         if not records:
             story.extend([
                 Spacer(1, 5 * mm),
@@ -667,9 +723,9 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
                 assessment_date = "Not recorded"
                 assessment_time = "Not recorded"
 
-            story.append(para(f"Audit reference {record_id}", small_style))
-            story.append(para(f"Date: {assessment_date} (YYYY-MM-DD)", small_style))
-            story.append(para(f"Time: {assessment_time}", small_style))
+            story.append(para(f"Assessment ID: {record_id}", black_small_style))
+            story.append(para(f"Date: {assessment_date} (YYYY-MM-DD)", black_small_style))
+            story.append(para(f"Time: {assessment_time}", black_small_style))
             story.append(Spacer(1, 3 * mm))
 
             colored_outcome_style = ParagraphStyle(
@@ -692,15 +748,15 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
             story.extend([outcome_panel, Spacer(1, 2 * mm)])
             story.append(para(
                 "This is a preliminary automated screening report, not an official grant decision or funding offer.",
-                small_style,
+                black_disclaimer_style,
             ))
 
-            story.append(Paragraph("Assessment summary", section_style))
+            story.append(Paragraph("Logic Manager eligibility assessment", section_style))
             summary_items = [
                 ("Decision status", evaluation.get("decision_status", "Not recorded")),
                 ("Meets SME criteria", evaluation.get("is_sme", "Not recorded")),
                 ("Potential grant amount", evaluation.get("approved_subsidy_sgd", 0)),
-                ("Screening result", evaluation.get("audit_passed", False)),
+                ("Screening outcome", screening_result_for(evaluation)),
             ]
             add_detail_table(story, summary_items)
 
@@ -708,6 +764,7 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
             add_detail_table(story, list(profile.items()))
 
             story.append(Paragraph("Proposal", section_style))
+            story.append(Spacer(1, 3 * mm))
             narrative = proposal.get("raw_narrative", "")
             if narrative:
                 story.append(para(narrative, narrative_style))
@@ -718,11 +775,19 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
                 story.append(Spacer(1, 2 * mm))
                 add_detail_table(story, other_proposal)
 
-            story.append(Paragraph("Scope and impact assessment", section_style))
+            story.append(PageBreak())
+            story.append(Paragraph("AI-generated scope and impact analysis", section_style))
+            story.append(para(
+                "Supporting analysis generated by AI from the proposal description. "
+                "It does not determine grant eligibility; the Logic Manager applies "
+                "the programmed rules shown in the eligibility assessment above.",
+                ai_note_style,
+            ))
+            story.append(Spacer(1, 3 * mm))
             ai_rows = [(key, value) for key, value in ai_audit.items() if key != "ai_reasoning_summary"]
             add_detail_table(story, ai_rows)
             if ai_audit.get("ai_reasoning_summary"):
-                story.append(para("Assessment summary", label_style))
+                story.append(para("AI-generated proposal summary", label_style))
                 story.append(para(ai_audit["ai_reasoning_summary"], body_style))
 
             reasons = evaluation.get("reasons", [])
