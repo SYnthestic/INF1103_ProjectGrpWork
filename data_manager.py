@@ -3,8 +3,6 @@ import logging
 import os
 import re
 from datetime import datetime
-import io_manager as in_and_out
-MAX_FILENAME_LEN = 50
 
 # Stay silent unless someone configures logging (otherwise Python's default
 # handler would write warnings straight to the terminal).
@@ -227,8 +225,6 @@ def is_data_loaded(data, jsonfile_name):
 # Saving
 # ---------------------------------------------------------------------------
 
-
-
 def save_data_to_json(data, jsonfile_name):
     """
     Saves records to a JSON file.
@@ -260,6 +256,8 @@ def save_data_to_json(data, jsonfile_name):
         except OSError:
             pass
         return None, "io_error"
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +298,10 @@ def available_decision_statuses(records):
         for r in records
     }
     return sorted(status for status in statuses if isinstance(status, str) and status)
+
+def merge_records(existing, new_records):
+    """Existing records first, then any new ones not already present."""
+    return existing + [r for r in new_records if r not in existing]
 
 
 # ---------------------------------------------------------------------------

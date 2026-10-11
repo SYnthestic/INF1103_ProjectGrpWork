@@ -82,17 +82,15 @@ while key != 0:
             result = logic.evaluate_grant_application(user_profile, ai_audit_data)
             in_and_out.display_grant_decision(result)
 
+            # end of case 1
             if in_and_out.confirm_save_to_json():
-                existing_records, jsonfile_name = dm.check_for_preexisting_save_file(jsonfile_name)
-                scheme_grant_records = existing_records + scheme_grant_records
-                jsonfile_name = dm.save_data_to_json(scheme_grant_records, jsonfile_name)
-        case 2: #Save to JSON
-            existing_records, jsonfile_name = dm.check_for_preexisting_save_file(jsonfile_name)
-            scheme_grant_records = existing_records + scheme_grant_records
-            jsonfile_name = dm.save_data_to_json(scheme_grant_records, jsonfile_name)
-        case 3: #Pull from JSON
-            if dm.check_overwrite(scheme_grant_records, jsonfile_name):
-                scheme_grant_records, jsonfile_name = dm.load_data_from_json(jsonfile_name)
+                jsonfile_name = in_and_out.save_records(scheme_grant_records, jsonfile_name)
+        case 2:  # Save to JSON
+            jsonfile_name = in_and_out.save_records(scheme_grant_records, jsonfile_name)
+        case 3:  # Pull from JSON
+            scheme_grant_records, jsonfile_name = in_and_out.load_records(
+                scheme_grant_records, jsonfile_name
+            )
         case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
                     #Display part is IO job. Editing and deleting them is Data Manager's job
                     in_and_out.display_applied_grants(scheme_grant_records, key)

@@ -1,4 +1,5 @@
 from sme_interface_stores import sme_interface_gui as gui
+import data_manager as dm
 import logic_manager as logic
 import random
 import sys
@@ -480,9 +481,114 @@ def convert_record_to_profile(record):
 
 # Y/N confirmation for whether to save the just-processed record to
 # JSON, used right after the automated AI + Logic audit in main.py.
+# io_manager.py
+
+# Asks for a save/load file name using the floppy-disk label prompt.
+# Re-prompts until a non-empty name is entered.
+def retrieve_json_filename():
+    while True:
+        if sys.stdin.isatty():
+            name = prompt_filename_on_disk(
+                max_len=50,
+                blocked=dm.INVALID_FILENAME_CHARS,
+            )
+        else:
+            # Fallback for piped input or terminals without cursor control
+            name = input("Enter JSON file name (e.g. grants): ").strip()
+
+        if name:
+            return name
+        print("File name cannot be empty. Please try again.")
+
+
+def confirm_overwrite_records():
+    while True:
+        choice = input("This will replace the records currently in memory. Continue? (y/n): ").strip().lower()
+        if choice == "y":
+            return True
+        if choice == "n":
+            return False
+        print("Invalid input. Please enter 'y' or 'n'.")
+
+
+def confirm_append_to_existing_file(file_name):
+    while True:
+        choice = input(f"'{file_name}' already exists. Add to it? (y = add, n = cancel): ").strip().lower()
+        if choice == "y":
+            return True
+        if choice == "n":
+            return False
+        print("Invalid input. Please enter 'y' or 'n'.")
+
+
+def display_save_result(status, file_name):
+    messages = {
+        "saved": f"Data successfully saved to {file_name}.",
+        "no_name": "No file name was given.",
+        "invalid_name": "That file name contains illegal characters.",
+        "io_error": "The file could not be written.",
+    }
+    print(messages.get(status, f"Unknown save status: {status}"))
+    if status == "saved":
+        print(gui.save_disk_block_deep_blue())
+
+
+def display_load_result(status, file_name):
+    messages = {
+        "loaded": f"Records loaded successfully from {file_name}.",
+        "no_name": "No file name was given.",
+        "invalid_name": "That file name contains illegal characters.",
+        "not_found": f"File '{file_name}' was not found.",
+        "invalid_json": "The file is corrupt or unreadable. It was set aside as a .corrupt backup.",
+        "invalid_format": "The file is valid JSON but not a list of audit records. It was set aside.",
+        "io_error": "The operating system refused to read the file.",
+    }
+    print(messages.get(status, f"Unknown load status: {status}"))
+
+
 def confirm_save_to_json():
     art, regions = gui.yes_no_buttons("Save this record to JSON now?")
     return execute_choice_interaction(art, regions, {"y": True, "n": False})
+
+def save_records(records, jsonfile_name):
+    """Asks for a file name if needed, merges with an existing file if the
+    user agrees, saves, and returns the (possibly updated) jsonfile_name."""
+    if not jsonfile_name:
+        jsonfile_name = retrieve_json_filename()
+
+    clean_name, status = dm.inspect_save_file(jsonfile_name)
+    if status in ("no_name", "invalid_name"):
+        display_save_result(status, jsonfile_name)
+        return ""
+
+    to_save = records
+    if status == "exists":
+        if not confirm_append_to_existing_file(clean_name):
+            return clean_name
+        existing, _, load_status = dm.load_data_from_json(clean_name)
+        if load_status != "loaded":
+            display_load_result(load_status, clean_name)
+            return clean_name
+        to_save = dm.merge_records(existing, records)
+
+    saved_name, save_status = dm.save_data_to_json(to_save, clean_name)
+    display_save_result(save_status, clean_name)
+    return saved_name or clean_name
+
+
+def load_records(records, jsonfile_name):
+    """Confirms before replacing records in memory, loads, shows the result,
+    and returns (records, jsonfile_name). On failure both are unchanged."""
+    if dm.is_data_loaded(records, jsonfile_name) and not confirm_overwrite_records():
+        return records, jsonfile_name
+
+    name = retrieve_json_filename()
+    loaded, clean_name, status = dm.load_data_from_json(name)
+    display_load_result(status, clean_name or name)
+
+    if status == "loaded":
+        return loaded, clean_name
+    return records, jsonfile_name
 
 # Prints the JSON filename to the console after saving, so main.py doesn't have to know the details of how io_manager.py handles the display.
 def print_jsonfilename(jsonfile_name):
@@ -625,51 +731,57 @@ def build_user_profile():
     company_name = retrieve_company_name()
     company_industry = retrieve_company_industry()
     total_revenue = retrieve_total_revenue()
-    print(f"Company's Total Revenue entered: SGD {total_revenue:,.2f}")
+    total_employees = retrieve_total_employees()
+    local_equity = retrieve_local_equity()
+    proposal_type = retrieve_proposal_type()
+
+    if proposal_type == "Equipment / Energy Upgrade":
+        baseline_energy_expenditure = retrieve_baseline_energy_expenditure()
+        estimated_retrofit_cost = retrieve_estimated_retrofit_cost()
+        reporting_advisory_fee = 0.0
+    else:
+        baseline_energy_expenditure = 0.0
+        estimated_retrofit_cost = 0.0
+        reporting_advisory_fee = retrieve_reporting_advisory_fee()
+
+    user_profile = {
+        "company_name": company_name,
+        "company_industry": company_industry,
+        "annual_revenue_sgd": total_revenue,
+        "group_employment_size": total_employees,
+        "local_shareholding_pct": local_equity,
+        "proposal_type": proposal_type,
+        "baseline_annual_energy_expenditure_sgd": baseline_energy_expenditure,
+        "estimated_retrofit_cost_sgd": estimated_retrofit_cost,
+        "reporting_advisory_fee_sgd": reporting_advisory_fee,
+    }
+
+    return user_profile
+
+# When there is no records
+def display_no_records_message():
+    print("No records yet. Please select option 1 first.")
+    gui.return_button()
+
+# When AI hasn't yet audited the machine. The AI will audit right after finishing the input for the company grant so it only activates in practice when no data exists
+def display_no_ai_audit():
+    print("No AI audit yet. Please run option 5 first.")
+    gui.return_button()
+
+# ASCII related
+# io_manager.py
+def show_wrong_option_error():
+    print(gui.wrong_sign_red())
+    gui.return_button()
+
+# 
+def show_goodbye():
+    print(gui.goodbye_art())
 
 
-# Print calls from data manager
-FILE_STATUS_MESSAGES = {
-    "saved": "Data successfully saved to {name}.",
-    "loaded": "Data successfully loaded from {name}.",
-    "no_name": "No filename provided.",
-    "invalid_name": "Invalid filename. Please avoid special characters.",
-    "not_found": "The file '{name}' does not exist.",
-    "invalid_json": "The file '{name}' is corrupted or contains invalid JSON. Starting fresh.",
-    "invalid_format": "The file '{name}' is not a valid list of audit records. Starting fresh.",
-    "io_error": "A file error occurred while accessing '{name}'.",
-}
-
-
-def display_file_status(status, jsonfile_name=""):
-    message = FILE_STATUS_MESSAGES.get(status, "Unknown file status.")
-    print(message.format(name=jsonfile_name))
-
-
-def prompt_for_filename(action):
-    """action is 'save' or 'load'."""
-    while True:
-        name = input(f"Please provide a valid JSON file name to {action} the data: ").strip()
-        if name:
-            return name
-        print("Filename cannot be blank.")
-
-
-def choose_save_or_new(jsonfile_name):
-    """Returns 'save' (load/append to the existing file) or 'new'."""
-    while True:
-        choice = input(
-            f"A save file named '{jsonfile_name}' already exists. "
-            "Do you want to load/append data to this file or create a brand new one? (save/new): "
-        ).strip().lower()
-        if choice in ("save", "new"):
-            return choice
-        print("Invalid input. Please enter 'save' or 'new'.")
-
-
-def confirm_overwrite_loaded_data():
-    choice = input("Data is already loaded. Do you want to overwrite it? (y/n): ").strip().lower()
-    if choice == "y":
-        return True
-    print("Returning to main menu.")
-    return False
+if __name__ == "__main__":
+    user_profile = build_user_profile()
+    print()
+    print("Profile collected:")
+    for key, value in user_profile.items():
+        print(f"  {key}: {value}")

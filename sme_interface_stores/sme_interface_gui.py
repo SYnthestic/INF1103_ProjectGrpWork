@@ -222,7 +222,8 @@ def save_disk_block_deep_blue():
 """
     return disk_art
 
-def print_boxed_menu():
+# sme_interface_gui.py
+def boxed_menu():
     border = "▓⚗_⚗▓ " * 10
     blank = "▓" + " " * 57 + "▓"
 
