@@ -1,5 +1,12 @@
-from sme_interface_stores.sme_interface_gui import print_return_keycap, hello, sustainability_banner, woman_says_hi, save_disk_block_deep_blue, wrong_sign_red, goodbye_art
-
+from sme_interface_stores import sme_interface_gui as gui
+import logic_manager as logic
+import random
+import sys
+import os
+import time
+import textwrap
+import codecs
+from contextlib import contextmanager
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
@@ -7,34 +14,239 @@ print()
 print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
 print()
 
+# ========================================================
+# Platform setup (done once)
+# ========================================================
+is_windows = os.name == "nt"
+
+if is_windows:
+    import msvcrt
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.windll.kernel32
+    STD_INPUT_HANDLE = -10
+    ENABLE_MOUSE_INPUT = 0x0010
+    ENABLE_EXTENDED_FLAGS = 0x0080
+    _saved_console_mode = wintypes.DWORD()
+
+    def _getb():
+        """Read one raw byte (blocks, no CPU spinning)."""
+        return msvcrt.getch()
+
+    def _pending(timeout=0.02):
+        """Is another byte already waiting?"""
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            if msvcrt.kbhit():
+                return True
+            time.sleep(0.002)
+        return False
+
+else:
+    import select
+    import termios
+    import tty
+
+    def _getb():
+        return os.read(sys.stdin.fileno(), 1)
+
+    def _pending(timeout=0.02):
+        return bool(select.select([sys.stdin.fileno()], [], [], timeout)[0])
+
+
+@contextmanager
+def _raw_input():
+    """Raw terminal mode on Unix, set once and restored after. No-op on Windows."""
+    if is_windows:
+        yield
+        return
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        yield
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
+# ========================================================
+# Mouse tracking
+# ========================================================
+def enable_mouse_tracking():
+    sys.stdout.write("\033[?1000h\033[?25l")  # mouse on, hide cursor
+    sys.stdout.flush()
+    if is_windows:
+        hInput = kernel32.GetStdHandle(STD_INPUT_HANDLE)
+        kernel32.GetConsoleMode(hInput, ctypes.byref(_saved_console_mode))
+        mode = _saved_console_mode.value
+        kernel32.SetConsoleMode(hInput, (mode & ~ENABLE_EXTENDED_FLAGS) | ENABLE_MOUSE_INPUT)
+
+
+def disable_mouse_tracking():
+    sys.stdout.write("\033[?1000l\033[?25h\n")  # mouse off, show cursor
+    sys.stdout.flush()
+    if is_windows:
+        hInput = kernel32.GetStdHandle(STD_INPUT_HANDLE)
+        kernel32.SetConsoleMode(hInput, _saved_console_mode.value)
+
+
+# ========================================================
+# One event reader shared by every button/choice prompt
+# ========================================================
+def _read_event():
+    """Return ("key", char), ("click", column), or None for anything ignorable."""
+    b = _getb()
+
+    if is_windows and b in (b"\x00", b"\xe0"):   # arrow/function key: skip 2nd byte
+        _getb()
+        return None
+
+    if b != b"\x1b":
+        return ("key", b.decode("utf-8", "ignore"))
+
+    # ESC: either a lone Esc press or the start of an escape sequence
+    if not _pending() or _getb() != b"[":
+        return None
+    if not _pending() or _getb() != b"M":        # some other sequence (e.g. arrows)
+        return None
+
+    # Mouse report: ESC [ M <button> <x> <y>
+    btn, x, _y = _getb(), _getb(), _getb()
+    if btn[0] - 32 == 0:                          # left button press
+        return ("click", x[0] - 32)
+    return None
+
+
+def wait_for_choice(art, regions, keys):
+    """Show `art`, then wait for a mapped key or a left click inside a region.
+
+    regions: {value: (min_x, max_x)}    keys: {"y": value, "\\r": value, ...}
+    Returns the matching value.
+    """
+    print(art, end="", flush=True)
+    enable_mouse_tracking()
+    try:
+        with _raw_input():
+            while True:
+                event = _read_event()
+                if event is None:
+                    continue
+                kind, val = event
+                if kind == "key":
+                    if val == "\x03":
+                        raise KeyboardInterrupt
+                    if val.lower() in keys:
+                        return keys[val.lower()]
+                else:
+                    for value, (lo, hi) in regions.items():
+                        if lo <= val <= hi:
+                            return value
+    finally:
+        disable_mouse_tracking()
+
+
+# Thin wrappers so existing callers don't change
+def execute_button_interaction(button_art, min_x=5, max_x=35):
+    wait_for_choice(button_art, {True: (min_x, max_x)}, {"\r": True, "\n": True})
+
+
+def execute_choice_interaction(art, regions, keys):
+    return wait_for_choice(art, regions, keys)
+
+
+# ========================================================
+# Text input: length-limited line reader
+# ========================================================
+_decoder = codecs.getincrementaldecoder("utf-8")("ignore")
+
+
+def _read_key():
+    """Read one character without waiting for Enter."""
+    if is_windows:
+        ch = msvcrt.getwch()
+        if ch in ("\x00", "\xe0"):
+            msvcrt.getwch()
+            return ""
+        return ch
+    while True:                                   # assemble multi-byte UTF-8 characters
+        s = _decoder.decode(_getb())
+        if s:
+            return s
+
+
+def read_limited(max_len, blocked=""):
+    """Read a line, silently ignoring keys once max_len characters are typed."""
+    buf = []
+    with _raw_input():                            # set once, not per keystroke
+        while True:
+            ch = _read_key()
+
+            if ch in ("\r", "\n"):
+                break
+            if ch == "\x03":
+                raise KeyboardInterrupt
+            if ch in ("\x08", "\x7f"):
+                if buf:
+                    buf.pop()
+                    sys.stdout.write("\b \b")
+                    sys.stdout.flush()
+                continue
+            if not ch or not ch.isprintable() or ch in blocked:
+                continue
+            if len(buf) >= max_len:
+                continue
+
+            buf.append(ch)
+            sys.stdout.write(ch)
+            sys.stdout.flush()
+
+    return "".join(buf)
+
+
+
+
 # Shows welcome sequence with ASCII art and sustainability banner
 def show_welcome_sequence():
-    print(hello())
-    print(woman_says_hi())
-    print(sustainability_banner())
-    print(woman_says_hi())
+    print(gui.hello())
+    print(gui.framed_sustainability_banner())
 
 # Verifies that the input is a valid integer key for the menu options.
-def key_verifier(key):
+def key_verifier(key, max_digits=2):
+    if not isinstance(key, str):
+        return None
+
     key = key.strip()
 
-    if not key:
+    if not key:  # Empty response
         print("Empty Response!")
         return None
-    if not (key.isascii() and key.isdigit()):
-        print("Error! Please enter a number.")
+    if not (key.isascii() and key.isdigit()):  # Letters, symbols, negatives, decimals, floats
+        print("Error! Please enter a whole number (no letters, symbols or decimals).")
+        return None
+    if len(key) > max_digits:  # Also protects int() from huge inputs
+        print(f"Error! Please enter at most {max_digits} digits.")
         return None
 
     return int(key)
 
+# Menu Options
+def get_menu_choice():
+    key = None
+    while key is None: #Prints the menu and then asks you to get the key
+        print(gui.boxed_menu())
+        key = key_verifier(input("➔   ")) #This function calls the key_verifier function which checks if the key is an integer
+    return key
 
-def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
+# Display Company Profile
+def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, proposal_narrative, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
     print(f"Company Name: {company_name}")
     print(f"Company Industry: {company_industry}")
     print(f"Company Total Revenue: {total_revenue}")
     print(f"Total Employees: {total_employees}")
     print(f"Local Equity: {local_equity}")
     print(f"Proposal Type: {proposal_type}")
+    print(f"Proposal Narrative:  {proposal_narrative}")
     print(f"Baseline Energy Expenditure: {baseline_energy_expenditure}")
     print(f"Estimated Retrofit Cost: {estimated_retrofit_cost}")
     print(f"Reporting Advisory Fee: {reporting_advisory_fee}")
@@ -207,19 +419,43 @@ def retrieve_reporting_advisory_fee():
             print("Invalid input. Please enter a numeric value for the reporting/advisory fee.")
 
 # For displaying list of grants already applied for by the company
-def display_applied_grants(scheme_grant_records):
+def display_applied_grants(scheme_grant_records, key):
     red = "\033[91m"
     reset = "\033[0m"
+
     if len(scheme_grant_records) == 0:
         print(f"\n {red}⚠️  SYSTEM NOTICE: You do not have any grants applied.{reset}\n")
-        # Now this will execute perfectly without a NameError!
-        print_return_keycap()
+        gui.return_button()
         return
-    else:
-        print("List of Grants Already Applied For:")
-        for i, grant in enumerate(scheme_grant_records, start=1):
-            print(f'''{i}. {grant['Company Name']} - {grant['Company Industry']} | Total Revenue: {grant['Company Total Revenue']} | Total Employees: {grant['Total Employees']} | Local Equity: {grant['Local Equity']} | Proposal Type: {grant.get('Proposal Type', 'N/A')} | Baseline Energy Expenditure: {grant['Baseline Energy Expenditure']} | Estimated Retrofit Cost: {grant['Estimated Retrofit Cost']} | Reporting Advisory Fee: {grant.get('Reporting Advisory Fee', 0.0)}''')
-    print_return_keycap()
+
+    # Build the paper contents: one block per grant
+    lines = []
+    for i, grant in enumerate(scheme_grant_records, start=1):
+        if i > 1:
+            lines.append("")
+        lines.append(f"{i}. {grant['Company Name']} - {grant['Company Industry']}")
+        details = {
+            "Total Revenue": grant["Company Total Revenue"],
+            "Total Employees": grant["Total Employees"],
+            "Local Equity": grant["Local Equity"],
+            "Proposal Type": grant.get("Proposal Type", "N/A"),
+            "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
+            "Baseline Energy Expenditure": grant["Baseline Energy Expenditure"],
+            "Estimated Retrofit Cost": grant["Estimated Retrofit Cost"],
+            "Reporting Advisory Fee": grant.get("Reporting Advisory Fee", 0.0),
+        }
+        lines.extend(format_pairs(details, indent="   "))
+
+    count = len(scheme_grant_records)
+    footer = f"{count} record{'s' if count != 1 else ''}"
+
+    if key == 1:
+        print_on_paper(lines, title="SCHEME GRANT RECORDS", footer=footer)
+        gui.ai_button()
+    else: # When key = 4
+        print_on_paper(lines, title="GRANTS ALREADY APPLIED FOR", footer=footer)
+        gui.return_button()
+
     return scheme_grant_records
 
 # Bridges main.py's case-1 record format (capitalised, display-oriented
@@ -245,64 +481,141 @@ def convert_record_to_profile(record):
 # Y/N confirmation for whether to save the just-processed record to
 # JSON, used right after the automated AI + Logic audit in main.py.
 def confirm_save_to_json():
-    while True:
-        choice = input("Save this record to JSON now? (y/n): ").strip().lower()
-        if choice == "y":
-            return True
-        elif choice == "n":
-            return False
-        else:
-            print("Invalid input. Please enter 'y' or 'n'.")
+    art, regions = gui.yes_no_buttons("Save this record to JSON now?")
+    return execute_choice_interaction(art, regions, {"y": True, "n": False})
 
 # Prints the JSON filename to the console after saving, so main.py doesn't have to know the details of how io_manager.py handles the display.
 def print_jsonfilename(jsonfile_name):
     print(f"Data successfully saved to {jsonfile_name}.")
 
+# Shows the floppy disk and lets the user type the file name on its label.
+def prompt_filename_on_disk(max_len=50, blocked=""):
+    art, rows_up, col = gui.save_disk_prompt_art(max_len=max_len)
+    print(art)
+
+    # Jump back up into the label and start typing there
+    sys.stdout.write(f"\033[{rows_up}A\033[{col}G{gui.LABEL}")
+    sys.stdout.flush()
+    try:
+        return read_limited(max_len, blocked).strip()
+    finally:
+        # Reset colours and move back below the disk
+        # (no newline is echoed now, so move down the full rows_up)
+        sys.stdout.write(f"{gui.RESET}\033[{rows_up}B\r")
+        sys.stdout.flush()
 # Just an icon to let you know the save was successful, without having to print the full path every time.
 def print_save_disk_block_deep_blue():
-    print(save_disk_block_deep_blue())
+    print(gui.save_disk_block_deep_blue())
+
+# Enables paper format
+#So it looks abit like you are reading your work on paper while also looking at a command console
+PAPER_WIDTH = 110
+
+
+def print_on_paper(lines, title="REPORT", footer="End of report", width=PAPER_WIDTH):
+    """Print a list of text lines inside a paper-style frame."""
+    inner = width - 4  # usable space between "| " and " |"
+
+    def row(text=""):
+        print(f"| {text:<{inner}} |")
+
+    print()
+    print("+" + "-" * (width - 2) + "+")
+    row(title.center(inner))
+    row("=" * inner)
+    row()
+
+    for text in lines:
+        stripped = text.lstrip()
+        indent = " " * (len(text) - len(stripped))
+        # Bullets get a hanging indent so wrapped lines align under the text
+        if stripped.startswith("- "):
+            indent += "  "
+        wrapped = textwrap.wrap(text, width=inner, subsequent_indent=indent) or [""]
+        for piece in wrapped:
+            row(piece)
+
+    row()
+    row("-" * inner)
+    row(footer.center(inner))
+    row()
+    print(("\\/" * width)[:width])  # torn paper edge
+
+
+def format_pairs(data, width=PAPER_WIDTH, indent=""):
+    """Turn a dict into aligned 'key : value' lines with a hanging indent."""
+    inner = width - 4 - len(indent)
+    key_w = max(len(str(k)) for k in data)
+    lines = []
+    for key, value in data.items():
+        label = f"{str(key):<{key_w}} : "
+        hang = " " * len(label)
+        wrapped = textwrap.wrap(str(value), width=inner - len(label)) or [""]
+        lines.append(indent + label + wrapped[0])
+        lines.extend(indent + hang + extra for extra in wrapped[1:])
+    return lines
 
 # Renders the AI Manager's structured output for the CLI. All console
 # print statements in the codebase belong in io_manager.py per the
 # architecture, so ai_manager.py and logic_manager.py never print
 # directly — they just return data for this layer to display.
 def display_ai_audit(ai_audit):
-    print()
-    print("AI Audit Result:")
-    for key, value in ai_audit.items():
-        print(f"  {key}: {value}")
+    print_on_paper(format_pairs(ai_audit), title="AI AUDIT REPORT")
+
+# Runs whenever AI Manager is using the get_ai_response() function. It gives one bar for every second passed
+def run_ai_analysis_bar(stop_event, timeout_seconds=60):
+    """
+    Animates the progress bar. Stops instantly if stop_event is flagged 
+    or when it hits the maximum timeout.
+    """
+    cyan = "\033[96m"
+    reset = "\033[0m"
+    
+    print("\nAnalysing your proposal with the AI Manager, please wait...\n")
+    sys.stdout.write("\033[?25l")  # Hide text cursor
+    sys.stdout.flush()
+    
+    try:
+        # Loop for the maximum allowed duration
+        for i in range(1, timeout_seconds + 1):
+            # Check if the API background thread has finished and flagged us to stop
+            if stop_event.is_set():
+                break
+                
+            percent = int((i / timeout_seconds) * 100)
+            progress_bar = f"\r   Time Taken: [{cyan}{'█' * i}{' ' * (timeout_seconds - i)}{reset}] {percent}% ({i}/{timeout_seconds}s)"
+            
+            sys.stdout.write(progress_bar)
+            sys.stdout.flush()
+            time.sleep(1)
+    finally:
+        # Restore terminal text cursor
+        sys.stdout.write("\033[?25h\n\n")
+        sys.stdout.flush()
 
 
 # Renders the Logic Manager's decision for the CLI.
+# Renders the Logic Manager's decision for the CLI.
 def display_grant_decision(result):
-    print()
-    print("=" * 60)
-    print("GRANT ELIGIBILITY DECISION")
-    print("=" * 60)
-    print(f"SME Eligible     : {'YES' if result['is_sme'] else 'NO'}")
-    print(f"Decision Status  : {result['decision_status']}")
-    print(f"Audit Passed     : {result['audit_passed']}")
-    print(f"Approved Subsidy : SGD {result['approved_subsidy_sgd']:,.2f}")
+    lines = [
+        f"SME Eligible     : {'YES' if result['is_sme'] else 'NO'}",
+        f"Decision Status  : {result['decision_status']}",
+        f"Audit Passed     : {result['audit_passed']}",
+        f"Approved Subsidy : SGD {result['approved_subsidy_sgd']:,.2f}",
+    ]
 
-    if result["matched_schemes"]:
-        print()
-        print("Matched Schemes:")
-        for scheme in result["matched_schemes"]:
-            print(f"  - {scheme}")
+    sections = [
+        ("Matched Schemes:", result["matched_schemes"]),
+        ("Reasons:", result["reasons"]),
+        ("Recommendations:", result["recommendations"]),
+    ]
+    for heading, items in sections:
+        if items:
+            lines.append("")
+            lines.append(heading)
+            lines.extend(f"  - {item}" for item in items)
 
-    if result["reasons"]:
-        print()
-        print("Reasons:")
-        for reason in result["reasons"]:
-            print(f"  - {reason}")
-
-    if result["recommendations"]:
-        print()
-        print("Recommendations:")
-        for rec in result["recommendations"]:
-            print(f"  - {rec}")
-
-    print("=" * 60)
+    print_on_paper(lines, title="GRANT ELIGIBILITY DECISION")
 
 # Coordinator that collects every input and maps it onto the exact dict
 # keys logic_manager.py's evaluate_grant_application() expects.
@@ -312,55 +625,51 @@ def build_user_profile():
     company_name = retrieve_company_name()
     company_industry = retrieve_company_industry()
     total_revenue = retrieve_total_revenue()
-    total_employees = retrieve_total_employees()
-    local_equity = retrieve_local_equity()
-    proposal_type = retrieve_proposal_type()
-
-    if proposal_type == "Equipment / Energy Upgrade":
-        baseline_energy_expenditure = retrieve_baseline_energy_expenditure()
-        estimated_retrofit_cost = retrieve_estimated_retrofit_cost()
-        reporting_advisory_fee = 0.0
-    else:
-        baseline_energy_expenditure = 0.0
-        estimated_retrofit_cost = 0.0
-        reporting_advisory_fee = retrieve_reporting_advisory_fee()
-
-    user_profile = {
-        "company_name": company_name,
-        "company_industry": company_industry,
-        "annual_revenue_sgd": total_revenue,
-        "group_employment_size": total_employees,
-        "local_shareholding_pct": local_equity,
-        "proposal_type": proposal_type,
-        "baseline_annual_energy_expenditure_sgd": baseline_energy_expenditure,
-        "estimated_retrofit_cost_sgd": estimated_retrofit_cost,
-        "reporting_advisory_fee_sgd": reporting_advisory_fee,
-    }
-
-    return user_profile
-
-def display_no_records_message():
-    print("No records yet. Please select option 1 first.")
-    print_return_keycap()
-
-def display_no_ai_audit():
-    print("No AI audit yet. Please run option 5 first.")
-    print_return_keycap()
-
-# ASCII related
-# io_manager.py
-def show_wrong_option_error():
-    print(wrong_sign_red())
-    print_return_keycap()
-
-# 
-def show_goodbye():
-    print(goodbye_art())
+    print(f"Company's Total Revenue entered: SGD {total_revenue:,.2f}")
 
 
-if __name__ == "__main__":
-    user_profile = build_user_profile()
-    print()
-    print("Profile collected:")
-    for key, value in user_profile.items():
-        print(f"  {key}: {value}")
+# Print calls from data manager
+FILE_STATUS_MESSAGES = {
+    "saved": "Data successfully saved to {name}.",
+    "loaded": "Data successfully loaded from {name}.",
+    "no_name": "No filename provided.",
+    "invalid_name": "Invalid filename. Please avoid special characters.",
+    "not_found": "The file '{name}' does not exist.",
+    "invalid_json": "The file '{name}' is corrupted or contains invalid JSON. Starting fresh.",
+    "invalid_format": "The file '{name}' is not a valid list of audit records. Starting fresh.",
+    "io_error": "A file error occurred while accessing '{name}'.",
+}
+
+
+def display_file_status(status, jsonfile_name=""):
+    message = FILE_STATUS_MESSAGES.get(status, "Unknown file status.")
+    print(message.format(name=jsonfile_name))
+
+
+def prompt_for_filename(action):
+    """action is 'save' or 'load'."""
+    while True:
+        name = input(f"Please provide a valid JSON file name to {action} the data: ").strip()
+        if name:
+            return name
+        print("Filename cannot be blank.")
+
+
+def choose_save_or_new(jsonfile_name):
+    """Returns 'save' (load/append to the existing file) or 'new'."""
+    while True:
+        choice = input(
+            f"A save file named '{jsonfile_name}' already exists. "
+            "Do you want to load/append data to this file or create a brand new one? (save/new): "
+        ).strip().lower()
+        if choice in ("save", "new"):
+            return choice
+        print("Invalid input. Please enter 'save' or 'new'.")
+
+
+def confirm_overwrite_loaded_data():
+    choice = input("Data is already loaded. Do you want to overwrite it? (y/n): ").strip().lower()
+    if choice == "y":
+        return True
+    print("Returning to main menu.")
+    return False
