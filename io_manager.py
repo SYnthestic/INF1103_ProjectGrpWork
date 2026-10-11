@@ -1,4 +1,5 @@
 from sme_interface_stores import sme_interface_gui as gui
+import data_manager as dm
 import logic_manager as logic
 import random
 import sys
@@ -239,13 +240,14 @@ def get_menu_choice():
     return key
 
 # Display Company Profile
-def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, proposal_narrative, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
+def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, sustainability_grant, proposal_narrative, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
     print(f"Company Name: {company_name}")
     print(f"Company Industry: {company_industry}")
     print(f"Company Total Revenue: {total_revenue}")
     print(f"Total Employees: {total_employees}")
     print(f"Local Equity: {local_equity}")
     print(f"Proposal Type: {proposal_type}")
+    print(f": {sustainability_grant}")
     print(f"Proposal Narrative:  {proposal_narrative}")
     print(f"Baseline Energy Expenditure: {baseline_energy_expenditure}")
     print(f"Estimated Retrofit Cost: {estimated_retrofit_cost}")
@@ -361,8 +363,8 @@ def retrieve_baseline_energy_expenditure():
             continue
         try:
             baseline_energy_expenditure = float(raw_value)
-            if baseline_energy_expenditure < 0:
-                print("Baseline annual energy expenditure cannot be negative. Please try again.")
+            if baseline_energy_expenditure <= 0:
+                print("Baseline annual energy expenditure cannot be zero or negative. Please try again.")
                 continue
             else:
                 return baseline_energy_expenditure
@@ -378,8 +380,8 @@ def retrieve_estimated_retrofit_cost():
             continue
         try:
             estimated_retrofit_cost = float(raw_value)
-            if estimated_retrofit_cost < 0:
-                print("Estimated retrofit cost cannot be negative. Please try again.")
+            if estimated_retrofit_cost <= 0:
+                print("Estimated retrofit cost cannot be zero or negative. Please try again.")
                 continue
             else:
                 return estimated_retrofit_cost
@@ -418,6 +420,45 @@ def retrieve_reporting_advisory_fee():
         except ValueError:
             print("Invalid input. Please enter a numeric value for the reporting/advisory fee.")
 
+# Sustainability Grant that Company's want to apply
+def retrieve_sustainability_grant():
+    valid_grants = ['1. Energy Efficiency Grant (EEG) -Base Tier', '2. Energy Efficiency Grant (EEG) -Advanced Tier', '3. Enterprise Development Grant (EDG)', '4. Sustainability Reporting Programme (SRP)', '5. Others']
+    while True:
+        print('\nWhich Sustainability Grant would your company like to apply for?')
+        for grant in valid_grants:
+            print(grant)
+
+        grant_choice = input(f"Enter the number corresponding to your choice (1-5): ").strip()
+
+        if grant_choice == "":
+            print("Sustainability Grant choice cannot be empty. Please select a valid option from 1 to 5.")
+            continue
+        
+        if grant_choice not in ['1', '2', '3', '4', '5']:
+            print("Invalid choice. Please select a valid option (1-5).")
+            continue
+
+
+        if grant_choice == '5':
+            while True:
+                other_grant = input("Please specify the Sustainability Grant that is not stated in the options: ").strip()
+                if other_grant == "":
+                    print("Sustainability Grant cannot be empty. Please provide a valid grant name.")
+                elif not other_grant.replace(" ", "").isalpha():
+                    print("Invalid input. Please enter a valid grant name.")
+                else:
+                    other_grant = other_grant
+                    return other_grant
+        
+        else:
+                selected_grant = valid_grants[int(grant_choice) - 1]
+                return selected_grant
+
+if __name__ == "__main__":
+    sustainability_grant = retrieve_sustainability_grant()
+    print(f"Sustainability Grant selected: {sustainability_grant}")
+
+
 # For displaying list of grants already applied for by the company
 def display_applied_grants(scheme_grant_records, key):
     red = "\033[91m"
@@ -439,6 +480,7 @@ def display_applied_grants(scheme_grant_records, key):
             "Total Employees": grant["Total Employees"],
             "Local Equity": grant["Local Equity"],
             "Proposal Type": grant.get("Proposal Type", "N/A"),
+            "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
             "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
             "Baseline Energy Expenditure": grant["Baseline Energy Expenditure"],
             "Estimated Retrofit Cost": grant["Estimated Retrofit Cost"],
@@ -472,6 +514,7 @@ def convert_record_to_profile(record):
         "group_employment_size": record.get("Total Employees", 0),
         "local_shareholding_pct": record.get("Local Equity", 0.0),
         "proposal_type": record.get("Proposal Type", "Equipment / Energy Upgrade"),
+        "sustainability_grant":  record.get("Sustainability Grant", "Not Specified"),
         "baseline_annual_energy_expenditure_sgd": record.get("Baseline Energy Expenditure", 0.0),
         "estimated_retrofit_cost_sgd": record.get("Estimated Retrofit Cost", 0.0),
         "reporting_advisory_fee_sgd": record.get("Reporting Advisory Fee", 0.0),
@@ -480,9 +523,114 @@ def convert_record_to_profile(record):
 
 # Y/N confirmation for whether to save the just-processed record to
 # JSON, used right after the automated AI + Logic audit in main.py.
+# io_manager.py
+
+# Asks for a save/load file name using the floppy-disk label prompt.
+# Re-prompts until a non-empty name is entered.
+def retrieve_json_filename():
+    while True:
+        if sys.stdin.isatty():
+            name = prompt_filename_on_disk(
+                max_len=50,
+                blocked=dm.INVALID_FILENAME_CHARS,
+            )
+        else:
+            # Fallback for piped input or terminals without cursor control
+            name = input("Enter JSON file name (e.g. grants): ").strip()
+
+        if name:
+            return name
+        print("File name cannot be empty. Please try again.")
+
+
+def confirm_overwrite_records():
+    while True:
+        choice = input("This will replace the records currently in memory. Continue? (y/n): ").strip().lower()
+        if choice == "y":
+            return True
+        if choice == "n":
+            return False
+        print("Invalid input. Please enter 'y' or 'n'.")
+
+
+def confirm_append_to_existing_file(file_name):
+    while True:
+        choice = input(f"'{file_name}' already exists. Add to it? (y = add, n = cancel): ").strip().lower()
+        if choice == "y":
+            return True
+        if choice == "n":
+            return False
+        print("Invalid input. Please enter 'y' or 'n'.")
+
+
+def display_save_result(status, file_name):
+    messages = {
+        "saved": f"Data successfully saved to {file_name}.",
+        "no_name": "No file name was given.",
+        "invalid_name": "That file name contains illegal characters.",
+        "io_error": "The file could not be written.",
+    }
+    print(messages.get(status, f"Unknown save status: {status}"))
+    if status == "saved":
+        print(gui.save_disk_block_deep_blue())
+
+
+def display_load_result(status, file_name):
+    messages = {
+        "loaded": f"Records loaded successfully from {file_name}.",
+        "no_name": "No file name was given.",
+        "invalid_name": "That file name contains illegal characters.",
+        "not_found": f"File '{file_name}' was not found.",
+        "invalid_json": "The file is corrupt or unreadable. It was set aside as a .corrupt backup.",
+        "invalid_format": "The file is valid JSON but not a list of audit records. It was set aside.",
+        "io_error": "The operating system refused to read the file.",
+    }
+    print(messages.get(status, f"Unknown load status: {status}"))
+
+
 def confirm_save_to_json():
     art, regions = gui.yes_no_buttons("Save this record to JSON now?")
     return execute_choice_interaction(art, regions, {"y": True, "n": False})
+
+def save_records(records, jsonfile_name):
+    """Asks for a file name if needed, merges with an existing file if the
+    user agrees, saves, and returns the (possibly updated) jsonfile_name."""
+    if not jsonfile_name:
+        jsonfile_name = retrieve_json_filename()
+
+    clean_name, status = dm.inspect_save_file(jsonfile_name)
+    if status in ("no_name", "invalid_name"):
+        display_save_result(status, jsonfile_name)
+        return ""
+
+    to_save = records
+    if status == "exists":
+        if not confirm_append_to_existing_file(clean_name):
+            return clean_name
+        existing, _, load_status = dm.load_data_from_json(clean_name)
+        if load_status != "loaded":
+            display_load_result(load_status, clean_name)
+            return clean_name
+        to_save = dm.merge_records(existing, records)
+
+    saved_name, save_status = dm.save_data_to_json(to_save, clean_name)
+    display_save_result(save_status, clean_name)
+    return saved_name or clean_name
+
+
+def load_records(records, jsonfile_name):
+    """Confirms before replacing records in memory, loads, shows the result,
+    and returns (records, jsonfile_name). On failure both are unchanged."""
+    if dm.is_data_loaded(records, jsonfile_name) and not confirm_overwrite_records():
+        return records, jsonfile_name
+
+    name = retrieve_json_filename()
+    loaded, clean_name, status = dm.load_data_from_json(name)
+    display_load_result(status, clean_name or name)
+
+    if status == "loaded":
+        return loaded, clean_name
+    return records, jsonfile_name
 
 # Prints the JSON filename to the console after saving, so main.py doesn't have to know the details of how io_manager.py handles the display.
 def print_jsonfilename(jsonfile_name):

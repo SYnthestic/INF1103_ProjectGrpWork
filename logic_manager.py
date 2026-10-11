@@ -141,6 +141,10 @@ def evaluate_grant_application(user_profile, ai_audit):
         "proposal_type", "Equipment / Energy Upgrade"
     )
 
+    sustainability_grant = user_profile.get(
+        "sustainability_grant", 0
+    )
+
     reporting_advisory_fee = user_profile.get(
         "reporting_advisory_fee_sgd", 0.0
     )
