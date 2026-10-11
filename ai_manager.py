@@ -4,7 +4,7 @@ import sys
 import time
 import threading
 from openai import OpenAI
-import io_manager as io
+from sme_interface_stores.sme_interface_gui import run_ai_analysis_bar
 
 
 def setup_ai_client():
@@ -87,7 +87,7 @@ def get_ai_response(proposal_narrative):
     api_thread.start()
 
     # 2. Run the ASCII progress bar on the main UI thread immediately
-    io.run_ai_analysis_bar(api_done_event, timeout_seconds=60)
+    run_ai_analysis_bar(api_done_event, timeout_seconds=60)
 
     # 3. Ensure background thread wraps up completely before processing results
     api_thread.join()
