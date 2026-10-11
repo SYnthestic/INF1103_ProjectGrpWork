@@ -625,57 +625,51 @@ def build_user_profile():
     company_name = retrieve_company_name()
     company_industry = retrieve_company_industry()
     total_revenue = retrieve_total_revenue()
-    total_employees = retrieve_total_employees()
-    local_equity = retrieve_local_equity()
-    proposal_type = retrieve_proposal_type()
-
-    if proposal_type == "Equipment / Energy Upgrade":
-        baseline_energy_expenditure = retrieve_baseline_energy_expenditure()
-        estimated_retrofit_cost = retrieve_estimated_retrofit_cost()
-        reporting_advisory_fee = 0.0
-    else:
-        baseline_energy_expenditure = 0.0
-        estimated_retrofit_cost = 0.0
-        reporting_advisory_fee = retrieve_reporting_advisory_fee()
-
-    user_profile = {
-        "company_name": company_name,
-        "company_industry": company_industry,
-        "annual_revenue_sgd": total_revenue,
-        "group_employment_size": total_employees,
-        "local_shareholding_pct": local_equity,
-        "proposal_type": proposal_type,
-        "baseline_annual_energy_expenditure_sgd": baseline_energy_expenditure,
-        "estimated_retrofit_cost_sgd": estimated_retrofit_cost,
-        "reporting_advisory_fee_sgd": reporting_advisory_fee,
-    }
-
-    return user_profile
-
-# When there is no records
-def display_no_records_message():
-    print("No records yet. Please select option 1 first.")
-    gui.return_button()
-
-# When AI hasn't yet audited the machine. The AI will audit right after finishing the input for the company grant so it only activates in practice when no data exists
-def display_no_ai_audit():
-    print("No AI audit yet. Please run option 5 first.")
-    gui.return_button()
-
-# ASCII related
-# io_manager.py
-def show_wrong_option_error():
-    print(gui.wrong_sign_red())
-    gui.return_button()
-
-# 
-def show_goodbye():
-    print(gui.goodbye_art())
+    print(f"Company's Total Revenue entered: SGD {total_revenue:,.2f}")
 
 
-if __name__ == "__main__":
-    user_profile = build_user_profile()
-    print()
-    print("Profile collected:")
-    for key, value in user_profile.items():
-        print(f"  {key}: {value}")
+# Print calls from data manager
+FILE_STATUS_MESSAGES = {
+    "saved": "Data successfully saved to {name}.",
+    "loaded": "Data successfully loaded from {name}.",
+    "no_name": "No filename provided.",
+    "invalid_name": "Invalid filename. Please avoid special characters.",
+    "not_found": "The file '{name}' does not exist.",
+    "invalid_json": "The file '{name}' is corrupted or contains invalid JSON. Starting fresh.",
+    "invalid_format": "The file '{name}' is not a valid list of audit records. Starting fresh.",
+    "io_error": "A file error occurred while accessing '{name}'.",
+}
+
+
+def display_file_status(status, jsonfile_name=""):
+    message = FILE_STATUS_MESSAGES.get(status, "Unknown file status.")
+    print(message.format(name=jsonfile_name))
+
+
+def prompt_for_filename(action):
+    """action is 'save' or 'load'."""
+    while True:
+        name = input(f"Please provide a valid JSON file name to {action} the data: ").strip()
+        if name:
+            return name
+        print("Filename cannot be blank.")
+
+
+def choose_save_or_new(jsonfile_name):
+    """Returns 'save' (load/append to the existing file) or 'new'."""
+    while True:
+        choice = input(
+            f"A save file named '{jsonfile_name}' already exists. "
+            "Do you want to load/append data to this file or create a brand new one? (save/new): "
+        ).strip().lower()
+        if choice in ("save", "new"):
+            return choice
+        print("Invalid input. Please enter 'save' or 'new'.")
+
+
+def confirm_overwrite_loaded_data():
+    choice = input("Data is already loaded. Do you want to overwrite it? (y/n): ").strip().lower()
+    if choice == "y":
+        return True
+    print("Returning to main menu.")
+    return False
