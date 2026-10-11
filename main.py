@@ -42,21 +42,24 @@ while key != 0:
             total_employees = in_and_out.retrieve_total_employees()
             get_local_equity = in_and_out.retrieve_local_equity()
             proposal_type = in_and_out.retrieve_proposal_type()
+            sustainability_grant = in_and_out.retrieve_sustainability_grant()   # NEW
             proposal_narrative = in_and_out.retrieve_proposal_narrative()
 
-            # Only ask for the cost fields relevant to the declared
-            # proposal type, rather than asking every applicant for
-            # both an energy/retrofit budget and a reporting fee.
             if proposal_type == "Equipment / Energy Upgrade":
-                baseline_energy_expensiture = in_and_out.retrieve_baseline_energy_expenditure()
+                baseline_energy_expenditure = in_and_out.retrieve_baseline_energy_expenditure()
                 retrofit_cost = in_and_out.retrieve_estimated_retrofit_cost()
                 reporting_advisory_fee = 0.0
             else:
-                baseline_energy_expensiture = 0.0
+                baseline_energy_expenditure = 0.0
                 retrofit_cost = 0.0
                 reporting_advisory_fee = in_and_out.retrieve_reporting_advisory_fee()
 
-            in_and_out.display_company_profile(company_name, company_industry, get_total_revenue, total_employees, get_local_equity, proposal_type, proposal_narrative, baseline_energy_expensiture, retrofit_cost, reporting_advisory_fee)
+            in_and_out.display_company_profile(
+                company_name, company_industry, get_total_revenue, total_employees,
+                get_local_equity, proposal_type, sustainability_grant,          # NEW
+                proposal_narrative, baseline_energy_expenditure, retrofit_cost,
+                reporting_advisory_fee
+            )
             scheme_grant_records.append({
                 "Company Name": company_name,
                 "Company Industry": company_industry,
@@ -64,8 +67,9 @@ while key != 0:
                 "Total Employees": total_employees,
                 "Local Equity": get_local_equity,
                 "Proposal Type": proposal_type,
+                "Sustainability Grant": sustainability_grant,                   # NEW
                 "Proposal Narrative": proposal_narrative,
-                "Baseline Energy Expenditure": baseline_energy_expensiture,
+                "Baseline Energy Expenditure": baseline_energy_expenditure,
                 "Estimated Retrofit Cost": retrofit_cost,
                 "Reporting Advisory Fee": reporting_advisory_fee
             })

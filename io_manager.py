@@ -240,13 +240,14 @@ def get_menu_choice():
     return key
 
 # Display Company Profile
-def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, proposal_narrative, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
+def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, sustainability_grant, proposal_narrative, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
     print(f"Company Name: {company_name}")
     print(f"Company Industry: {company_industry}")
     print(f"Company Total Revenue: {total_revenue}")
     print(f"Total Employees: {total_employees}")
     print(f"Local Equity: {local_equity}")
     print(f"Proposal Type: {proposal_type}")
+    print(f": {sustainability_grant}")
     print(f"Proposal Narrative:  {proposal_narrative}")
     print(f"Baseline Energy Expenditure: {baseline_energy_expenditure}")
     print(f"Estimated Retrofit Cost: {estimated_retrofit_cost}")
@@ -428,14 +429,15 @@ def retrieve_sustainability_grant():
             print(grant)
 
         grant_choice = input(f"Enter the number corresponding to your choice (1-5): ").strip()
+
+        if grant_choice == "":
+            print("Sustainability Grant choice cannot be empty. Please select a valid option from 1 to 5.")
+            continue
         
         if grant_choice not in ['1', '2', '3', '4', '5']:
             print("Invalid choice. Please select a valid option (1-5).")
             continue
 
-        if grant_choice == "":
-            print("Sustainability Grant choice cannot be empty. Please select a valid option from 1 to 5.")
-            continue
 
         if grant_choice == '5':
             while True:
@@ -445,6 +447,7 @@ def retrieve_sustainability_grant():
                 elif not other_grant.replace(" ", "").isalpha():
                     print("Invalid input. Please enter a valid grant name.")
                 else:
+                    other_grant = other_grant
                     return other_grant
         
         else:
@@ -456,9 +459,6 @@ if __name__ == "__main__":
     print(f"Sustainability Grant selected: {sustainability_grant}")
 
 
-#For displaying list of grants already applied for by the company
-def display_applied_grants(scheme_grant_records):
-    print("List of Grants Already Applied For:")
 # For displaying list of grants already applied for by the company
 def display_applied_grants(scheme_grant_records, key):
     red = "\033[91m"
@@ -480,6 +480,7 @@ def display_applied_grants(scheme_grant_records, key):
             "Total Employees": grant["Total Employees"],
             "Local Equity": grant["Local Equity"],
             "Proposal Type": grant.get("Proposal Type", "N/A"),
+            "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
             "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
             "Baseline Energy Expenditure": grant["Baseline Energy Expenditure"],
             "Estimated Retrofit Cost": grant["Estimated Retrofit Cost"],
@@ -513,6 +514,7 @@ def convert_record_to_profile(record):
         "group_employment_size": record.get("Total Employees", 0),
         "local_shareholding_pct": record.get("Local Equity", 0.0),
         "proposal_type": record.get("Proposal Type", "Equipment / Energy Upgrade"),
+        "sustainability_grant":  record.get("Sustainability Grant", "Not Specified"),
         "baseline_annual_energy_expenditure_sgd": record.get("Baseline Energy Expenditure", 0.0),
         "estimated_retrofit_cost_sgd": record.get("Estimated Retrofit Cost", 0.0),
         "reporting_advisory_fee_sgd": record.get("Reporting Advisory Fee", 0.0),
