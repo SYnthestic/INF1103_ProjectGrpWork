@@ -362,8 +362,8 @@ def retrieve_baseline_energy_expenditure():
             continue
         try:
             baseline_energy_expenditure = float(raw_value)
-            if baseline_energy_expenditure < 0:
-                print("Baseline annual energy expenditure cannot be negative. Please try again.")
+            if baseline_energy_expenditure <= 0:
+                print("Baseline annual energy expenditure cannot be zero or negative. Please try again.")
                 continue
             else:
                 return baseline_energy_expenditure
@@ -379,8 +379,8 @@ def retrieve_estimated_retrofit_cost():
             continue
         try:
             estimated_retrofit_cost = float(raw_value)
-            if estimated_retrofit_cost < 0:
-                print("Estimated retrofit cost cannot be negative. Please try again.")
+            if estimated_retrofit_cost <= 0:
+                print("Estimated retrofit cost cannot be zero or negative. Please try again.")
                 continue
             else:
                 return estimated_retrofit_cost
@@ -419,6 +419,46 @@ def retrieve_reporting_advisory_fee():
         except ValueError:
             print("Invalid input. Please enter a numeric value for the reporting/advisory fee.")
 
+# Sustainability Grant that Company's want to apply
+def retrieve_sustainability_grant():
+    valid_grants = ['1. Energy Efficiency Grant (EEG) -Base Tier', '2. Energy Efficiency Grant (EEG) -Advanced Tier', '3. Enterprise Development Grant (EDG)', '4. Sustainability Reporting Programme (SRP)', '5. Others']
+    while True:
+        print('\nWhich Sustainability Grant would your company like to apply for?')
+        for grant in valid_grants:
+            print(grant)
+
+        grant_choice = input(f"Enter the number corresponding to your choice (1-5): ").strip()
+        
+        if grant_choice not in ['1', '2', '3', '4', '5']:
+            print("Invalid choice. Please select a valid option (1-5).")
+            continue
+
+        if grant_choice == "":
+            print("Sustainability Grant choice cannot be empty. Please select a valid option from 1 to 5.")
+            continue
+
+        if grant_choice == '5':
+            while True:
+                other_grant = input("Please specify the Sustainability Grant that is not stated in the options: ").strip()
+                if other_grant == "":
+                    print("Sustainability Grant cannot be empty. Please provide a valid grant name.")
+                elif not other_grant.replace(" ", "").isalpha():
+                    print("Invalid input. Please enter a valid grant name.")
+                else:
+                    return other_grant
+        
+        else:
+                selected_grant = valid_grants[int(grant_choice) - 1]
+                return selected_grant
+
+if __name__ == "__main__":
+    sustainability_grant = retrieve_sustainability_grant()
+    print(f"Sustainability Grant selected: {sustainability_grant}")
+
+
+#For displaying list of grants already applied for by the company
+def display_applied_grants(scheme_grant_records):
+    print("List of Grants Already Applied For:")
 # For displaying list of grants already applied for by the company
 def display_applied_grants(scheme_grant_records, key):
     red = "\033[91m"
