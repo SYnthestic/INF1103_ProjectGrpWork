@@ -2,6 +2,8 @@ import json
 import logging
 import os
 import re
+import time
+from contextlib import contextmanager
 from datetime import datetime
 
 # Stay silent unless someone configures logging (otherwise Python's default
@@ -363,6 +365,55 @@ def write_json_file(filename, data):
         return False
 
 
+# ---------- Locking ----------
+# users.json and audit_history.json are read, changed and rewritten as a
+# whole. If two copies of the app (e.g. two containers sharing one folder)
+# did that at the same moment, one change would be lost. A small ".lock"
+# file, created atomically, makes the second one wait its turn.
+LOCK_TIMEOUT_SECONDS = 5.0
+LOCK_STALE_SECONDS = 30.0
+
+
+@contextmanager
+def _file_lock(filename):
+    """Yields True once this process holds the lock for `filename`, or
+    False if it could not be obtained within LOCK_TIMEOUT_SECONDS (the
+    caller then reports a failed save instead of risking a lost update).
+    A lock older than LOCK_STALE_SECONDS (left by a crashed run) is
+    removed."""
+    lock_path = _full_path(filename) + ".lock"
+    held = False
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
+        while True:
+            try:
+                descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(descriptor)
+                held = True
+                break
+            except FileExistsError:
+                try:
+                    if time.time() - os.path.getmtime(lock_path) > LOCK_STALE_SECONDS:
+                        os.remove(lock_path)
+                        continue
+                except OSError:
+                    pass  # lock vanished or cannot be inspected: just retry
+                if time.monotonic() >= deadline:
+                    break
+                time.sleep(0.05)
+    except OSError as err:
+        logger.error("Could not lock %s: %s", filename, err)
+    try:
+        yield held
+    finally:
+        if held:
+            try:
+                os.remove(lock_path)
+            except OSError:
+                pass
+
+
 # ---------- Users ----------
 def load_users():
     """All stored users as {username: record}, or None if unreadable."""
@@ -388,17 +439,20 @@ def user_exists(username):
 def save_new_user(user_record):
     """Adds a new user (built by logic_manager.build_new_user_record).
     Returns False if the username is already taken or the write failed."""
-    users = load_users()
-    if users is None:
-        return False
-    username = user_record["username"]
-    if username in users:
-        return False
+    with _file_lock(USERS_FILE) as locked:
+        if not locked:
+            return False
+        users = load_users()
+        if users is None:
+            return False
+        username = user_record["username"]
+        if username in users:
+            return False
 
-    stored = dict(user_record)
-    stored["created_at"] = datetime.now().isoformat(timespec="seconds")
-    users[username] = stored
-    return write_json_file(USERS_FILE, users)
+        stored = dict(user_record)
+        stored["created_at"] = datetime.now().isoformat(timespec="seconds")
+        users[username] = stored
+        return write_json_file(USERS_FILE, users)
 
 
 # ---------- Audit history ----------
@@ -420,26 +474,29 @@ def get_user_audits(username):
 def append_user_audit(username, application, ai_audit, result):
     """Saves one completed audit (inputs + AI output + decision) under the
     logged-in user. Returns the saved record, or None on failure."""
-    history = load_audit_history()
-    if history is None:
+    with _file_lock(AUDIT_HISTORY_FILE) as locked:
+        if not locked:
+            return None
+        history = load_audit_history()
+        if history is None:
+            return None
+        user_audits = history.get(username)
+        if not isinstance(user_audits, list):
+            user_audits = []
+            history[username] = user_audits
+
+        audit_record = {
+            "audit_id": generate_audit_id(user_audits),
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "application": application,
+            "ai_audit": ai_audit,
+            "result": result,
+        }
+        user_audits.append(audit_record)
+
+        if write_json_file(AUDIT_HISTORY_FILE, history):
+            return audit_record
         return None
-    user_audits = history.get(username)
-    if not isinstance(user_audits, list):
-        user_audits = []
-        history[username] = user_audits
-
-    audit_record = {
-        "audit_id": generate_audit_id(user_audits),
-        "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "application": application,
-        "ai_audit": ai_audit,
-        "result": result,
-    }
-    user_audits.append(audit_record)
-
-    if write_json_file(AUDIT_HISTORY_FILE, history):
-        return audit_record
-    return None
 
 
 # ---------------------------------------------------------------------------
