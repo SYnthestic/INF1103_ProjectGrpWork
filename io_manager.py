@@ -503,7 +503,7 @@ def display_company_profile(company_name, company_industry, total_revenue, total
     print(f"Total Employees: {total_employees}")
     print(f"Local Equity: {local_equity}")
     print(f"Proposal Type: {proposal_type}")
-    print(f": {sustainability_grant}")
+    print(f"Sustainability Grant: {sustainability_grant}")
     print(f"Proposal Narrative:  {proposal_narrative}")
     print(f"Baseline Energy Expenditure: {baseline_energy_expenditure}")
     print(f"Estimated Retrofit Cost: {estimated_retrofit_cost}")
