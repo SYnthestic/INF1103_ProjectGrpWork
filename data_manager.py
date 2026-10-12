@@ -156,28 +156,30 @@ def load_data_from_json(jsonfile_name):
         return [], jsonfile_name
 
 def update_record_by_index(data, index, updated_record, jsonfile_name):
-    """
-    Updates the record at the specified 1-based index and syncs with the JSON save file.
-    """
-    list_index = index - 1
-    data[list_index] = updated_record
-    print(f"\nSuccessfully updated record for: {updated_record.get('Company Name', 'Unknown')}")
-    
+    """1-based index. Returns (data, jsonfile_name, status):
+    "updated", "invalid_index", or a save status if syncing the file failed."""
+    if not 1 <= index <= len(data):
+        return data, jsonfile_name, "invalid_index"
+
+    data[index - 1] = updated_record
+
     if jsonfile_name:
-        save_data_to_json(data, jsonfile_name)
-        
-    return data, jsonfile_name
+        _, save_status = save_data_to_json(data, jsonfile_name)
+        if save_status != "saved":
+            return data, jsonfile_name, save_status
+    return data, jsonfile_name, "updated"
 
 
 def delete_record_by_index(data, index, jsonfile_name):
-    """
-    Deletes the record at the specified 1-based index and syncs with the JSON save file.
-    """
-    list_index = index - 1
-    deleted_record = data.pop(list_index)
-    print(f"\nSuccessfully deleted record for: {deleted_record.get('Company Name', 'Unknown')}")
-    
+    """1-based index. Returns (data, jsonfile_name, status):
+    "deleted", "invalid_index", or a save status if syncing the file failed."""
+    if not 1 <= index <= len(data):
+        return data, jsonfile_name, "invalid_index"
+
+    data.pop(index - 1)
+
     if jsonfile_name:
-        save_data_to_json(data, jsonfile_name)
-        
-    return data, jsonfile_name
+        _, save_status = save_data_to_json(data, jsonfile_name)
+        if save_status != "saved":
+            return data, jsonfile_name, save_status
+    return data, jsonfile_name, "deleted"

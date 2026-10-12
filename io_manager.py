@@ -452,9 +452,10 @@ def display_applied_grants(scheme_grant_records, key):
     if key == 1:
         print_on_paper(lines, title="SCHEME GRANT RECORDS", footer=footer)
         gui.ai_button()
-    else: # When key = 4
+    elif key == 4 | 5 | 6:
         print_on_paper(lines, title="GRANTS ALREADY APPLIED FOR", footer=footer)
-        gui.return_button()
+        if key == 4:
+            gui.return_button()
 
     return scheme_grant_records
 
@@ -506,6 +507,34 @@ def prompt_filename_on_disk(max_len=50, blocked=""):
 # Just an icon to let you know the save was successful, without having to print the full path every time.
 def print_save_disk_block_deep_blue():
     print(gui.save_disk_block_deep_blue())
+
+# For updating or deleting a record, we need to ask the user which record they want to change. This function prompts for a 1-based index and validates it.
+def retrieve_record_index(records, action="update"):
+    while True:
+        choice = input(f"Enter the record number to {action} (1-{len(records)}): ").strip()
+        if choice.isdigit() and 1 <= int(choice) <= len(records):
+            return int(choice)          # 1-based, matches the functions above
+        print(f"Invalid choice. Please enter a number from 1 to {len(records)}.")
+
+
+def confirm_delete(company_name):
+    while True:
+        choice = input(f"Delete the record for {company_name}? (y/n): ").strip().lower()
+        if choice in ("y", "n"):
+            return choice == "y"
+        print("Invalid input. Please enter 'y' or 'n'.")
+
+
+def display_edit_result(status, company_name):
+    messages = {
+        "updated": f"Successfully updated record for: {company_name}",
+        "deleted": f"Successfully deleted record for: {company_name}",
+        "invalid_index": "That record number does not exist.",
+        "no_name": "Record changed in memory, but no file name is set.",
+        "invalid_name": "Record changed in memory, but the file name is invalid.",
+        "io_error": "Record changed in memory, but the file could not be written.",
+    }
+    print(messages.get(status, f"Unknown status: {status}"))
 
 # Enables paper format
 #So it looks abit like you are reading your work on paper while also looking at a command console

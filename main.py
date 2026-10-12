@@ -96,10 +96,30 @@ while key != 0:
         case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
                     #Display part is IO job. Editing and deleting them is Data Manager's job
                     in_and_out.display_applied_grants(scheme_grant_records, key)
-        case 5: #Update. Tia, this is your target
-            print("Update Function U/C")
-        case 6: #Delete. Tia's target no.2
-            print("Delete Function U/C")
+        case 5:  # Update
+            if not scheme_grant_records:
+                in_and_out.display_no_records_message()
+            else:
+                in_and_out.display_applied_grants(scheme_grant_records, key)
+                index = in_and_out.retrieve_record_index(scheme_grant_records, "update")
+                updated = in_and_out.retrieve_updated_record(scheme_grant_records[index - 1])
+                scheme_grant_records, jsonfile_name, status = dm.update_record_by_index(
+                    scheme_grant_records, index, updated, jsonfile_name
+                )
+                in_and_out.display_edit_result(status, updated.get("Company Name", "Unknown"))
+
+        case 6:  # Delete
+            if not scheme_grant_records:
+                in_and_out.display_no_records_message()
+            else:
+                in_and_out.display_applied_grants(scheme_grant_records, key)
+                index = in_and_out.retrieve_record_index(scheme_grant_records, "delete")
+                name = scheme_grant_records[index - 1].get("Company Name", "Unknown")
+                if in_and_out.confirm_delete(name):
+                    scheme_grant_records, jsonfile_name, status = dm.delete_record_by_index(
+                        scheme_grant_records, index, jsonfile_name
+                    )
+                    in_and_out.display_edit_result(status, name)
         case 7: #AI Processor
             if len(scheme_grant_records) == 0:
                 in_and_out.display_no_records_message() 
