@@ -553,7 +553,7 @@ def display_applied_grants(scheme_grant_records, key):
     if key == 1:
         print_on_paper(lines, title="SCHEME GRANT RECORDS", footer=footer)
         gui.ai_button()
-    elif key == 4 | 5 | 6:
+    elif key in (4, 5, 6):
         print_on_paper(lines, title="GRANTS ALREADY APPLIED FOR", footer=footer)
         if key == 4:
             gui.return_button()
@@ -722,6 +722,14 @@ def retrieve_record_index(records, action="update"):
         if choice.isdigit() and 1 <= int(choice) <= len(records):
             return int(choice)          # 1-based, matches the functions above
         print(f"Invalid choice. Please enter a number from 1 to {len(records)}.")
+
+# io_manager.py
+def retrieve_updated_record(record):
+    updated = dict(record)   # copy, so the original isn't modified until the update succeeds
+    # ask only for the fields the user wants to change, e.g.:
+    updated["Company Name"] = retrieve_company_name()
+    updated["Sustainability Grant"] = retrieve_sustainability_grant()
+    return updated
 
 
 def confirm_delete(company_name):
