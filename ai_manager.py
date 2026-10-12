@@ -94,7 +94,9 @@ def get_ai_response(proposal_narrative):
             api_done_event.set()
 
     # 1. Spawn and start the background API network thread
-    api_thread = threading.Thread(target=worker_api_call)
+    # daemon: if the user presses Ctrl+C during the wait, the program can
+    # exit straight away instead of waiting for the network call to finish.
+    api_thread = threading.Thread(target=worker_api_call, daemon=True)
     api_thread.start()
 
     # 2. Run the ASCII progress bar on the main UI thread immediately

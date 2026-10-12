@@ -21,6 +21,25 @@ from sme_interface_stores.sme_interface_gui import *
 
 
 # ========================================================
+# Clean exit on Ctrl+C / end of input
+# ========================================================
+# Without this, pressing Ctrl+C at any prompt (or running Docker without
+# -it, so there is no keyboard input) ends the program with a long
+# traceback. Every other error still shows its normal traceback.
+def _handle_uncaught(exc_type, exc, tb):
+    if issubclass(exc_type, KeyboardInterrupt):
+        print("\n\nInterrupted. Goodbye!")
+    elif issubclass(exc_type, EOFError):
+        print("\n\nNo more input available. If you run the app in Docker, "
+              "start it with 'docker run -it ...' so you can type into it.")
+    else:
+        sys.__excepthook__(exc_type, exc, tb)
+
+
+sys.excepthook = _handle_uncaught
+
+
+# ========================================================
 # Account flows: I/O collects -> Logic hashes/verifies -> Data stores
 # ========================================================
 def create_account_flow():
