@@ -1,3 +1,8 @@
+import hashlib
+import hmac
+import secrets
+
+
 def module_description():
     return (
         "This is the Logic Manager module.\n"
@@ -13,6 +18,86 @@ def module_description():
 
 
 VALID_SCOPES = ["Scope-1", "Scope-2", "Scope-3"]
+
+
+# =========================================================
+# Password hashing (SHA-256)
+# =========================================================
+# Passwords are never stored. Instead we store:
+#   - a random 16-byte salt, unique per user, so two users with the
+#     same password get different hashes (defeats rainbow tables)
+#   - the SHA-256 based PBKDF2 hash of salt + password, repeated
+#     HASH_ITERATIONS times so brute-forcing is slow
+# Comparison uses hmac.compare_digest (constant time) so attackers
+# can't learn the hash byte-by-byte from response timing.
+HASH_ALGORITHM = "pbkdf2_sha256"
+HASH_ITERATIONS = 200_000
+SALT_BYTES = 16
+
+
+def hash_password(password, salt_hex=None, iterations=HASH_ITERATIONS):
+    """
+    Hashes a password with SHA-256 (PBKDF2-HMAC-SHA256).
+
+    If salt_hex is None a fresh random salt is generated (new account);
+    otherwise the stored salt is reused (login check).
+
+    Returns:
+        dict: algorithm, iterations, salt (hex), password_hash (hex)
+    """
+
+    if salt_hex is None:
+        salt_hex = secrets.token_hex(SALT_BYTES)
+
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        bytes.fromhex(salt_hex),
+        iterations
+    )
+
+    return {
+        "algorithm": HASH_ALGORITHM,
+        "iterations": iterations,
+        "salt": salt_hex,
+        "password_hash": digest.hex()
+    }
+
+
+def build_new_user_record(username, password):
+    """Builds the record the Data Manager stores for a new account."""
+
+    record = {"username": username}
+    record.update(hash_password(password))
+    return record
+
+
+def verify_password(password, user_record):
+    """
+    Checks a login attempt against a stored user record.
+
+    user_record may be None (unknown username). We still run a hash in
+    that case so a wrong username takes as long as a wrong password,
+    which stops attackers discovering which usernames exist.
+
+    Returns:
+        bool: True if the password is correct.
+    """
+
+    if not user_record:
+        hash_password(password)  # dummy work to equalise timing
+        return False
+
+    attempt = hash_password(
+        password,
+        salt_hex=user_record.get("salt", ""),
+        iterations=user_record.get("iterations", HASH_ITERATIONS)
+    )
+
+    return hmac.compare_digest(
+        attempt["password_hash"],
+        user_record.get("password_hash", "")
+    )
 
 
 def check_sme_status(local_equity_pct, annual_revenue, headcount):
