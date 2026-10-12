@@ -407,6 +407,13 @@ def show_audit_saved_to_history(audit_record):
         print(f"Audit #{audit_record['audit_id']} saved to your history.")
 
 
+def show_audit_not_saved_ai_failed():
+    yellow = "\033[93m"
+    reset = "\033[0m"
+    print(f"{yellow}The AI analysis failed, so this audit was NOT added to your history.")
+    print(f"Check your internet connection and OPENROUTER_API_KEY, then run option 1 again.{reset}")
+
+
 # Helpers so one damaged field in audit_history.json (null, wrong type)
 # cannot crash the history screens.
 def _as_dict(value):
