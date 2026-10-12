@@ -7,6 +7,7 @@ import os
 import time
 import textwrap
 import codecs
+import getpass
 from contextlib import contextmanager
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
@@ -232,12 +233,154 @@ def key_verifier(key, max_digits=2):
     return int(key)
 
 # Menu Options
-def get_menu_choice():
+def get_menu_choice(username=None):
     key = None
     while key is None: #Prints the menu and then asks you to get the key
         print(gui.boxed_menu())
+        if username:
+            print_account_menu(username)
         key = key_verifier(input("➔   ")) #This function calls the key_verifier function which checks if the key is an integer
     return key
+
+
+# ========================================================
+# Login / account screens
+# ========================================================
+USERNAME_MIN_LEN = 3
+USERNAME_MAX_LEN = 20
+PASSWORD_MIN_LEN = 8
+PASSWORD_MAX_LEN = 64
+
+
+# Extra line shown under gui.boxed_menu() once logged in.
+# (Can be moved into boxed_menu() itself later for a consistent look.)
+def print_account_menu(username):
+    cyan = "\033[96m"
+    reset = "\033[0m"
+    print(f"   {cyan}Logged in as: {username}{reset}")
+
+
+# Login screen shown before the main menu.
+def get_auth_choice():
+    key = None
+    while key is None:
+        lines = [
+            "1. Login",
+            "2. Create a new account",
+            "0. Exit",
+        ]
+        print_on_paper(lines, title="ACCOUNT LOGIN", footer="Please login to continue")
+        key = key_verifier(input("➔   "))
+    return key
+
+
+def is_valid_username(username):
+    """3-20 characters: letters, digits and underscores only."""
+    return (
+        USERNAME_MIN_LEN <= len(username) <= USERNAME_MAX_LEN
+        and username.isascii()
+        and username.replace("_", "").isalnum()
+    )
+
+
+# New account: username format check (whether it is taken is checked
+# against stored data in main.py via the Data Manager).
+def retrieve_new_username():
+    while True:
+        username = input(
+            f"Choose a username ({USERNAME_MIN_LEN}-{USERNAME_MAX_LEN} characters, "
+            "letters/digits/underscore): "
+        ).strip().lower()
+        if username == "":
+            print("Username cannot be empty. Please try again.")
+        elif not is_valid_username(username):
+            print("Invalid username. Use only letters, digits and underscores.")
+        else:
+            return username
+
+
+# Login: just needs something typed in; the Logic Manager decides if it's right.
+def retrieve_username():
+    while True:
+        username = input("Username: ").strip().lower()
+        if username == "":
+            print("Username cannot be empty. Please try again.")
+        else:
+            return username
+
+
+def password_problems(password):
+    """Returns a list of rules the password breaks (empty if it's fine)."""
+    problems = []
+    if len(password) < PASSWORD_MIN_LEN:
+        problems.append(f"be at least {PASSWORD_MIN_LEN} characters long")
+    if len(password) > PASSWORD_MAX_LEN:
+        problems.append(f"be at most {PASSWORD_MAX_LEN} characters long")
+    if not any(ch.isalpha() for ch in password):
+        problems.append("contain at least one letter")
+    if not any(ch.isdigit() for ch in password):
+        problems.append("contain at least one digit")
+    if password != password.strip():
+        problems.append("not start or end with a space")
+    return problems
+
+
+# New account: hidden input, strength rules, typed twice to confirm.
+def retrieve_new_password():
+    while True:
+        password = getpass.getpass(
+            f"Choose a password (min {PASSWORD_MIN_LEN} chars, letters and digits, hidden): "
+        )
+        problems = password_problems(password)
+        if problems:
+            print("Password must " + ", ".join(problems) + ".")
+            continue
+
+        confirm = getpass.getpass("Confirm password: ")
+        if confirm != password:
+            print("Passwords do not match. Please try again.")
+            continue
+        return password
+
+
+# Login: hidden input.
+def retrieve_password():
+    while True:
+        password = getpass.getpass("Password (hidden): ")
+        if password == "":
+            print("Password cannot be empty. Please try again.")
+        else:
+            return password
+
+
+def show_username_taken(username):
+    print(f"The username '{username}' is already taken. Please choose another.")
+
+
+def show_account_created(username):
+    green = "\033[92m"
+    reset = "\033[0m"
+    print(f"\n{green}Account '{username}' created. You can now login.{reset}\n")
+
+
+def show_account_save_failed():
+    red = "\033[91m"
+    reset = "\033[0m"
+    print(f"\n{red}Could not save the new account. Please try again.{reset}\n")
+
+
+def show_login_success(username):
+    green = "\033[92m"
+    reset = "\033[0m"
+    print(f"\n{green}Welcome back, {username}!{reset}\n")
+
+
+def show_login_failed():
+    red = "\033[91m"
+    reset = "\033[0m"
+    # Deliberately vague: don't reveal whether the username exists.
+    print(f"\n{red}Invalid username or password.{reset}\n")
+
 
 # Display Company Profile
 def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, sustainability_grant, proposal_narrative, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):

@@ -261,6 +261,39 @@ def save_data_to_json(data, jsonfile_name):
 
 
 # ---------------------------------------------------------------------------
+# User accounts
+# ---------------------------------------------------------------------------
+# The Data Manager only stores accounts. It never hashes or checks passwords
+# (Logic Manager's job) and never prints prompts (I/O Manager's job).
+# For now accounts live in memory only, so they are lost when the program
+# closes.
+
+users = {}
+
+
+def get_user(username):
+    """Returns the stored user record for `username`, or None."""
+    return users.get(username)
+
+
+def user_exists(username):
+    return get_user(username) is not None
+
+
+def save_new_user(user_record):
+    """Adds a new user (built by logic_manager.build_new_user_record).
+    Returns False if the username is already taken."""
+    username = user_record["username"]
+    if username in users:
+        return False
+
+    stored = dict(user_record)
+    stored["created_at"] = datetime.now().isoformat(timespec="seconds")
+    users[username] = stored
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Filtering / querying
 # ---------------------------------------------------------------------------
 
