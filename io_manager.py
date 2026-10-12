@@ -246,18 +246,23 @@ def get_menu_choice(username=None):
 # ========================================================
 # Login / account screens
 # ========================================================
+# Menu numbers for the account options shown under the main menu.
+# Kept here so main.py and the printed menu always agree.
+MENU_LOGOUT = 10
+
 USERNAME_MIN_LEN = 3
 USERNAME_MAX_LEN = 20
 PASSWORD_MIN_LEN = 8
 PASSWORD_MAX_LEN = 64
 
 
-# Extra line shown under gui.boxed_menu() once logged in.
+# Extra menu lines shown under gui.boxed_menu() once logged in.
 # (Can be moved into boxed_menu() itself later for a consistent look.)
 def print_account_menu(username):
     cyan = "\033[96m"
     reset = "\033[0m"
     print(f"   {cyan}Logged in as: {username}{reset}")
+    print(f"   {MENU_LOGOUT}. Logout")
 
 
 # Login screen shown before the main menu.
@@ -380,6 +385,10 @@ def show_login_failed():
     reset = "\033[0m"
     # Deliberately vague: don't reveal whether the username exists.
     print(f"\n{red}Invalid username or password.{reset}\n")
+
+
+def show_logged_out(username):
+    print(f"\n{username} has been logged out.\n")
 
 
 # Display Company Profile

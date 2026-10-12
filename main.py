@@ -77,13 +77,13 @@ while running:
     if not running:
         break
 
-    # ---------- Session state ----------
+    # ---------- Fresh session state for each login ----------
     scheme_grant_records = []
     ai_audit_data = {}
     jsonfile_name = ""
 
     key = None
-    while key != 0:
+    while key != 0 and key != in_and_out.MENU_LOGOUT:
         key = in_and_out.get_menu_choice(current_user)
 
         match key:
@@ -175,5 +175,7 @@ while running:
                     user_profile = in_and_out.convert_record_to_profile(current_record)
                     result = logic.evaluate_grant_application(user_profile, ai_audit_data)
                     in_and_out.display_grant_decision(result)
+            case in_and_out.MENU_LOGOUT: # 10: Back to the login screen
+                in_and_out.show_logged_out(current_user)
             case _:
                 in_and_out.show_wrong_option_error()
