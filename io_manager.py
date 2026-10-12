@@ -248,6 +248,7 @@ def get_menu_choice(username=None):
 # ========================================================
 # Menu numbers for the account options shown under the main menu.
 # Kept here so main.py and the printed menu always agree.
+MENU_AUDIT_HISTORY = 9
 MENU_LOGOUT = 10
 
 USERNAME_MIN_LEN = 3
@@ -262,7 +263,7 @@ def print_account_menu(username):
     cyan = "\033[96m"
     reset = "\033[0m"
     print(f"   {cyan}Logged in as: {username}{reset}")
-    print(f"   {MENU_LOGOUT}. Logout")
+    print(f"   {MENU_AUDIT_HISTORY}. View my past audits      {MENU_LOGOUT}. Logout")
 
 
 # Login screen shown before the main menu.
@@ -399,6 +400,58 @@ def show_audit_saved_to_history(audit_record):
         print("Warning: this audit could not be saved to your history.")
     else:
         print(f"Audit #{audit_record['audit_id']} saved to your history.")
+
+
+# Summary table of every audit the user has done.
+def display_audit_history(audits, username):
+    if len(audits) == 0:
+        print(f"\nNo past audits found for '{username}'. Choose option 1 to start one.\n")
+        gui.return_button()
+        return False
+
+    lines = []
+    for audit in audits:
+        application = audit.get("application", {})
+        result = audit.get("result", {})
+        lines.append(
+            f"#{audit.get('audit_id', '?')}  {audit.get('timestamp', '').replace('T', ' ')}  |  "
+            f"{application.get('Company Name', 'N/A')}  |  "
+            f"{result.get('decision_status', 'N/A')}  |  "
+            f"SGD {result.get('approved_subsidy_sgd', 0.0):,.2f}"
+        )
+
+    count = len(audits)
+    print_on_paper(
+        lines,
+        title=f"PAST AUDITS - {username}",
+        footer=f"{count} audit{'s' if count != 1 else ''}"
+    )
+    return True
+
+
+# Asks which audit to open in full. Returns a list index, or None to go back.
+def select_audit_record(audits):
+    valid_ids = [audit.get("audit_id") for audit in audits]
+    while True:
+        choice = input("Enter an audit # to view in full (or press Enter to return): ").strip().lstrip("#")
+        if choice == "":
+            return None
+        if choice.isascii() and choice.isdigit() and int(choice) in valid_ids:
+            return valid_ids.index(int(choice))
+        print("Invalid audit number. Please try again.")
+
+
+# Full view of one saved audit, reusing the existing report layouts.
+def display_audit_detail(audit):
+    application = audit.get("application", {})
+    print(f"\nAudit #{audit.get('audit_id', '?')} - {audit.get('timestamp', '').replace('T', ' ')}")
+    if application:
+        print_on_paper(format_pairs(application), title="APPLICATION DETAILS")
+    if audit.get("ai_audit"):
+        display_ai_audit(audit["ai_audit"])
+    if audit.get("result"):
+        display_grant_decision(audit["result"])
+    gui.return_button()
 
 
 # Display Company Profile

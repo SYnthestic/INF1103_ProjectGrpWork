@@ -52,6 +52,15 @@ def login_flow():
     return None
 
 
+def audit_history_flow(username):
+    audits = dm.get_user_audits(username)
+    if not in_and_out.display_audit_history(audits, username):
+        return
+    index = in_and_out.select_audit_record(audits)
+    if index is not None:
+        in_and_out.display_audit_detail(audits[index])
+
+
 # Code
 in_and_out.show_welcome_sequence()
 # Test the fixed engine
@@ -179,6 +188,8 @@ while running:
                     user_profile = in_and_out.convert_record_to_profile(current_record)
                     result = logic.evaluate_grant_application(user_profile, ai_audit_data)
                     in_and_out.display_grant_decision(result)
+            case in_and_out.MENU_AUDIT_HISTORY: # 9: Past audits of the logged-in user
+                audit_history_flow(current_user)
             case in_and_out.MENU_LOGOUT: # 10: Back to the login screen
                 in_and_out.show_logged_out(current_user)
             case _:
