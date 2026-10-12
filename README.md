@@ -164,8 +164,8 @@ Other menu options: **2** save, **3** load, **4** view records, **7** and **8** 
 When the app starts you must log in (option **1**) or create an account (option **2**) before reaching the main menu.
 
 - Usernames: 3-20 characters, letters/digits/underscore, not case-sensitive.
-- Passwords: at least 8 characters with at least one letter and one digit. Typing is hidden.
-- Every audit completed with option **1** is saved automatically to your history. Option **9** lists your past audits and lets you open one in full. You only ever see your own audits.
+- Passwords: 8 to 64 characters, with at least one letter and one digit. Typing is hidden.
+- Every audit completed with option **1** is saved automatically to your history. Option **9** lists your past audits and lets you open one in full. You only ever see your own audits. If the AI call fails (for example a missing API key or no internet), the result is shown but is **not** added to your history, so just run option **1** again.
 
 Passwords are never stored. Each account stores a random salt and a salted SHA-256 hash (PBKDF2-HMAC-SHA256, 200,000 iterations), checked with a constant-time comparison.
 
@@ -174,11 +174,19 @@ Passwords are never stored. Each account stores a random salt and a salted SHA-2
 | `users.json` | Usernames, salts and password hashes |
 | `audit_history.json` | Each user's saved audits (inputs, AI result, decision) |
 
-Both files are plain JSON and are **not** otherwise protected yet. They are in `.gitignore` and `.dockerignore`, so they are never committed or copied into the Docker image. They are saved with the app's other files (see *Where saved files go*). To reset all accounts, delete both files.
+Both files are plain JSON and are **not** otherwise protected yet. They are in `.gitignore` and `.dockerignore`, so they are never committed or copied into the Docker image. They are saved with the app's other files (see *Where saved files go*). To reset all accounts, delete both files. A short-lived `users.json.lock` / `audit_history.json.lock` file may appear while the app is writing; it is removed automatically.
 
 ## Where saved files go
 
-Everything the app saves (saved records, `users.json` and `audit_history.json`) goes into one folder, chosen by the `DATA_DIR` environment variable.
+Everything the app saves goes into one folder, chosen by the `DATA_DIR` environment variable:
+
+| What | Where inside that folder |
+|---|---|
+| `users.json`, `audit_history.json` | the folder itself |
+| Records saved with option 2 (and PDF exports) | `records/<your username>/` - each user has a private folder, so users cannot load or overwrite each other's files |
+
+Files saved by an older version directly in the folder are not shown to any user; move them into `records/<username>/` to keep using them.
+
 
 - Docker: `/app/data` inside the container (set in the Dockerfile), which the `-v` option in Step 3 links to a folder on your computer. Keep `-v` in the `docker run` command, otherwise the files stay inside the container and are lost when it is removed.
 - Plain Python: the folder you run `python main.py` from (normally the project folder), unless `DATA_DIR` is set. To keep the files in a separate folder, add a line such as `DATA_DIR=data` to your `.env` file. The folder is created automatically.
@@ -197,4 +205,5 @@ Everything the app saves (saved records, `users.json` and `audit_history.json`) 
 | Windows "Protected folder access blocked" | Controlled Folder Access is blocking writes to Documents/Desktop. Keep your data folder outside those (for example `C:\SME_Grant_Data`), or allow `docker.exe` in Windows Security. |
 | Code changes have no effect in Docker | The image still holds the old code. Rebuild and recreate the container (Step 3, Option A, item 5). |
 | Accounts or saved files disappear in Docker, or no `.json` files appear in your folder | The files were saved inside the container. Recreate the container with `-v "<your folder>:/app/data"` (Step 3, Option A, item 3). A container created earlier without it must be removed with `docker rm sme-auditor` first, and the image rebuilt if your Dockerfile is old. |
+| `Could not save the new account` / an audit is not saved | Another copy of the app is writing at the same moment, or the data folder is not writable. Try again; if it keeps failing, check the folder's permissions (and delete a stale `*.lock` file in it). |
 | Filename rejected when saving | Use a plain name such as `Save1`, with no `/`, `\` or other special characters. |
