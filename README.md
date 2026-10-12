@@ -16,6 +16,17 @@ The project uses plain functions only (no classes).
 
 ---
 
+## Quick start
+
+1. Get the code (Step 1).
+2. Put your OpenRouter key in a `.env` file (Step 2).
+3. Run the app with Docker **or** plain Python (Step 3).
+4. Create an account, log in, and try the sample audit (Steps 4 and 5).
+
+The sections below walk through each step in detail.
+
+---
+
 ## Before you start
 
 You need:
@@ -61,41 +72,40 @@ Rules that matter:
 ### Option A: Docker
 
 1. Start Docker Desktop and wait until it says the engine is running.
-2. Confirm your `Dockerfile` contains these two lines (add them if missing):
-
-   ```dockerfile
-   ENV SME_DATA_DIR=/app/data
-   ENV PYTHONDONTWRITEBYTECODE=1
-   ```
-
-3. Build the image (from the project folder):
+2. Build the image from the project folder (repeat this whenever the code changes):
 
    ```
    docker build -t sme-grant-auditor .
    ```
 
-4. Create and run the container. The `-it` flag is required because the app asks for input:
+3. Pick a folder on your computer for the app's saved files, then run the container. Replace the part before the colon with your own folder:
 
-   ```
-   docker run -it --name sme-auditor --env-file .env -v "C:\SME_Grant_Data:/app/data" sme-grant-auditor
-   ```
+   | Your computer | Command |
+   |---|---|
+   | Windows (CMD or PowerShell) | `docker run -it --name sme-auditor --env-file .env -v "C:\SME_Grant_Data:/app/data" sme-grant-auditor` |
+   | Windows, `data` folder inside the project (PowerShell) | `docker run -it --name sme-auditor --env-file .env -v "${PWD}\data:/app/data" sme-grant-auditor` |
+   | Mac / Linux | `docker run -it --name sme-auditor --env-file .env -v "$HOME/SME_Grant_Data:/app/data" sme-grant-auditor` |
 
-   Replace `C:\SME_Grant_Data` with any folder on your computer where saved files should go.
-   On Mac/Linux use a path such as `"$HOME/SME_Grant_Data:/app/data"`.
+   What the options do:
 
-5. Next time, reuse the same container:
+   - `-it` is required because the app asks for input.
+   - `--env-file .env` passes in your API key.
+   - `-v "<your folder>:/app/data"` links a folder on your computer to the folder the app saves into. The Dockerfile already points the app at `/app/data`, so your JSON files (saved records, `users.json`, `audit_history.json`) appear in your folder and survive the container being removed. **Do not leave this out**, or the files are lost.
+
+4. Next time, reuse the same container:
 
    ```
    docker start -ai sme-auditor
    ```
 
-6. After changing code, `.env` or `requirements.txt`, recreate it:
+5. After changing code, `.env` or `requirements.txt`, recreate it (your saved files stay in your folder):
 
    ```
    docker rm sme-auditor
    docker build -t sme-grant-auditor .
-   docker run -it --name sme-auditor --env-file .env -v "C:\SME_Grant_Data:/app/data" sme-grant-auditor
    ```
+
+   then run the `docker run` command from item 3 again.
 
 ### Option B: Plain Python
 
@@ -123,9 +133,15 @@ If VS Code underlines `openai` as unresolved, choose the `.venv` interpreter via
 
 ---
 
-## Step 4: Try a sample run
+## Step 4: Create an account
 
-At the menu choose **1 (Start)** and enter:
+The app opens on a login screen. Choose **2** to create an account (a username and a password of at least 8 characters with a letter and a digit), then choose **1** to log in. More detail is under *Accounts and login* below.
+
+---
+
+## Step 5: Try a sample run
+
+Once logged in, choose **1 (Start)** at the menu and enter:
 
 | Prompt | Sample input |
 |---|---|
@@ -158,13 +174,14 @@ Passwords are never stored. Each account stores a random salt and a salted SHA-2
 | `users.json` | Usernames, salts and password hashes |
 | `audit_history.json` | Each user's saved audits (inputs, AI result, decision) |
 
-Both files are plain JSON and are **not** otherwise protected yet. They are in `.gitignore` and `.dockerignore`, so they are never committed or copied into the Docker image. To reset all accounts, delete both files.
+Both files are plain JSON and are **not** otherwise protected yet. They are in `.gitignore` and `.dockerignore`, so they are never committed or copied into the Docker image. They are saved with the app's other files (see *Where saved files go*). To reset all accounts, delete both files.
 
 ## Where saved files go
 
-- Plain Python: `SME_Grant_Data` in your user folder (for example `C:\Users\<you>\SME_Grant_Data`).
-- Docker: the folder you mounted with `-v`.
-- To choose another location, set the environment variable `SME_DATA_DIR`.
+Everything the app saves (saved records, `users.json` and `audit_history.json`) goes into one folder, chosen by the `DATA_DIR` environment variable.
+
+- Docker: `/app/data` inside the container (set in the Dockerfile), which the `-v` option in Step 3 links to a folder on your computer. Keep `-v` in the `docker run` command, otherwise the files stay inside the container and are lost when it is removed.
+- Plain Python: the folder you run `python main.py` from (normally the project folder), unless `DATA_DIR` is set. To keep the files in a separate folder, add a line such as `DATA_DIR=data` to your `.env` file. The folder is created automatically.
 
 ---
 
@@ -178,5 +195,6 @@ Both files are plain JSON and are **not** otherwise protected yet. They are in `
 | `container name "/sme-auditor" is already in use` | It already exists. Use `docker start -ai sme-auditor`, or `docker rm sme-auditor` to recreate it. |
 | Docker errors mentioning `pipe` or `dockerDesktopLinuxEngine` | Docker Desktop isn't running. Start it. |
 | Windows "Protected folder access blocked" | Controlled Folder Access is blocking writes to Documents/Desktop. Keep your data folder outside those (for example `C:\SME_Grant_Data`), or allow `docker.exe` in Windows Security. |
-| Code changes have no effect in Docker | The image still holds the old code. Rebuild and recreate the container (Step 3, Option A, item 6). |
+| Code changes have no effect in Docker | The image still holds the old code. Rebuild and recreate the container (Step 3, Option A, item 5). |
+| Accounts or saved files disappear in Docker, or no `.json` files appear in your folder | The files were saved inside the container. Recreate the container with `-v "<your folder>:/app/data"` (Step 3, Option A, item 3). A container created earlier without it must be removed with `docker rm sme-auditor` first, and the image rebuilt if your Dockerfile is old. |
 | Filename rejected when saving | Use a plain name such as `Save1`, with no `/`, `\` or other special characters. |
