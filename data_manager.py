@@ -263,16 +263,73 @@ def save_data_to_json(data, jsonfile_name):
 # ---------------------------------------------------------------------------
 # User accounts
 # ---------------------------------------------------------------------------
-# The Data Manager only stores accounts. It never hashes or checks passwords
-# (Logic Manager's job) and never prints prompts (I/O Manager's job).
-# For now accounts live in memory only, so they are lost when the program
-# closes.
+# users.json         -> {username: {password_hash, salt, ...}}
+#
+# The Data Manager only reads and writes these files. It never hashes or
+# checks passwords (Logic Manager's job) and never prints prompts (I/O
+# Manager's job). NOTE: storage is plain JSON for now and is NOT secure -
+# only the passwords are protected (by hashing).
 
-users = {}
+USERS_FILE = "users.json"
+
+
+def read_json_file(filename, default):
+    """Returns the parsed contents of a data file, or `default` if the file
+    does not exist yet. Returns None if the file exists but cannot be read,
+    so callers never overwrite data they failed to load. A corrupt file is
+    set aside as .corrupt, like the record save files."""
+    path = _full_path(filename)
+    if not os.path.isfile(path):
+        return default
+    try:
+        with open(path, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+    except ValueError:  # JSONDecodeError and UnicodeDecodeError
+        logger.error("%s contains invalid JSON.", path)
+        _backup_corrupt_file(path)
+        return default
+    except (OSError, RecursionError) as err:
+        logger.error("Could not read %s: %s", path, err)
+        return None
+    if not isinstance(data, type(default)):
+        logger.error("%s does not have the expected format.", path)
+        _backup_corrupt_file(path)
+        return default
+    return data
+
+
+def write_json_file(filename, data):
+    """Writes data to a temporary file first and then swaps it in, so a crash
+    midway can never leave a half-written file behind.
+    Returns True on success, False otherwise."""
+    path = _full_path(filename)
+    tmp_path = path + ".tmp"
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(tmp_path, 'w', encoding='utf-8') as file:
+            json.dump(data, file, indent=4, ensure_ascii=False)
+        os.replace(tmp_path, path)
+        return True
+    except (OSError, TypeError, ValueError) as err:
+        logger.error("Could not save to %s: %s", path, err)
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return False
+
+
+# ---------- Users ----------
+def load_users():
+    """All stored users as {username: record}, or None if unreadable."""
+    return read_json_file(USERS_FILE, {})
 
 
 def get_user(username):
     """Returns the stored user record for `username`, or None."""
+    users = load_users()
+    if users is None:
+        return None
     return users.get(username)
 
 
@@ -282,7 +339,10 @@ def user_exists(username):
 
 def save_new_user(user_record):
     """Adds a new user (built by logic_manager.build_new_user_record).
-    Returns False if the username is already taken."""
+    Returns False if the username is already taken or the write failed."""
+    users = load_users()
+    if users is None:
+        return False
     username = user_record["username"]
     if username in users:
         return False
@@ -290,7 +350,7 @@ def save_new_user(user_record):
     stored = dict(user_record)
     stored["created_at"] = datetime.now().isoformat(timespec="seconds")
     users[username] = stored
-    return True
+    return write_json_file(USERS_FILE, users)
 
 
 # ---------------------------------------------------------------------------

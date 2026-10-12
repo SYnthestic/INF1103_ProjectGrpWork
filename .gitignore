@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Local user accounts (contain password hashes)
+users.json
+*.json.tmp
