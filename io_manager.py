@@ -356,6 +356,10 @@ def retrieve_password():
         password = getpass.getpass("Password (hidden): ")
         if password == "":
             print("Password cannot be empty. Please try again.")
+        elif len(password) > PASSWORD_MAX_LEN:
+            # Accounts can never have a password this long, so don't bother
+            # hashing it - and don't allow huge inputs.
+            print(f"Passwords are at most {PASSWORD_MAX_LEN} characters long. Please try again.")
         else:
             return password
 

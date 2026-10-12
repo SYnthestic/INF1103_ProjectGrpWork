@@ -92,6 +92,12 @@ def build_new_user_record(username, password):
     return record
 
 
+# Upper limits used when checking a login, so a hand-edited or damaged
+# users.json (or an absurdly long password) cannot hang or crash the app.
+MAX_PASSWORD_CHARS_CHECKED = 256
+MAX_STORED_ITERATIONS = 5_000_000
+
+
 def verify_password(password, user_record):
     """
     Checks a login attempt against a stored user record.
@@ -100,24 +106,41 @@ def verify_password(password, user_record):
     that case so a wrong username takes as long as a wrong password,
     which stops attackers discovering which usernames exist.
 
+    A damaged record (missing/non-hex salt, bad iteration count, wrong
+    types) simply fails the login instead of crashing the program.
+
     Returns:
         bool: True if the password is correct.
     """
 
-    if not user_record:
+    if not isinstance(password, str) or len(password) > MAX_PASSWORD_CHARS_CHECKED:
+        return False
+
+    if not isinstance(user_record, dict):
         hash_password(password)  # dummy work to equalise timing
         return False
 
-    attempt = hash_password(
-        password,
-        salt_hex=user_record.get("salt", ""),
-        iterations=user_record.get("iterations", HASH_ITERATIONS)
-    )
+    salt = user_record.get("salt")
+    stored_hash = user_record.get("password_hash")
+    iterations = user_record.get("iterations", HASH_ITERATIONS)
 
-    return hmac.compare_digest(
-        attempt["password_hash"],
-        user_record.get("password_hash", "")
-    )
+    if (
+        not isinstance(salt, str)
+        or not isinstance(stored_hash, str)
+        or isinstance(iterations, bool)
+        or not isinstance(iterations, int)
+        or not 0 < iterations <= MAX_STORED_ITERATIONS
+    ):
+        return False
+
+    try:
+        attempt = hash_password(password, salt_hex=salt, iterations=iterations)
+        return hmac.compare_digest(
+            attempt["password_hash"].encode("ascii"),
+            stored_hash.encode("ascii")
+        )
+    except (ValueError, TypeError, UnicodeError):
+        return False
 
 
 def check_sme_status(local_equity_pct, annual_revenue, headcount):

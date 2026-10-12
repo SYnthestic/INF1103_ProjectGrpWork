@@ -332,11 +332,15 @@ def get_user(username):
     users = load_users()
     if users is None:
         return None
-    return users.get(username)
+    record = users.get(username)
+    return record if isinstance(record, dict) else None
 
 
 def user_exists(username):
-    return get_user(username) is not None
+    """True if the username is already in users.json (even if its record
+    is damaged, so it can never be silently overwritten)."""
+    users = load_users()
+    return users is not None and username in users
 
 
 def save_new_user(user_record):
@@ -365,7 +369,10 @@ def get_user_audits(username):
     """All audits saved by `username`, oldest first."""
     history = load_audit_history()
     audits = history.get(username, []) if history else []
-    return audits if isinstance(audits, list) else []
+    if not isinstance(audits, list):
+        return []
+    # Ignore damaged entries so the screens only ever see audit dicts.
+    return [audit for audit in audits if isinstance(audit, dict)]
 
 
 def append_user_audit(username, application, ai_audit, result):
