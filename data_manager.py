@@ -48,7 +48,49 @@ def is_valid_filename(jsonfile_name):
 
 
 def _full_path(jsonfile_name):
+    """Path of a shared file in DATA_DIR (users.json, audit_history.json)."""
     return os.path.join(DATA_DIR, jsonfile_name)
+
+
+# ---------------------------------------------------------------------------
+# Per-user record files
+# ---------------------------------------------------------------------------
+# Saved record files (menu options 2/3 and the PDF export) are kept in
+# DATA_DIR/records/<username>/ so one user can never load, overwrite or
+# list another user's files. main.py calls set_active_user() at login and
+# set_active_user(None) at logout. With no active user (e.g. tests or old
+# scripts) the files stay in DATA_DIR itself, as before.
+
+RECORDS_DIR_NAME = "records"
+_USERNAME_FOR_PATH = re.compile(r"[a-z0-9_]{1,64}")
+_active_user = None
+
+
+def set_active_user(username):
+    """Chooses whose folder the record files are saved to / loaded from.
+    Pass None to go back to no active user."""
+    global _active_user
+    if username is None:
+        _active_user = None
+        return
+    if not isinstance(username, str) or not _USERNAME_FOR_PATH.fullmatch(username):
+        # Never build a folder name from anything unexpected (e.g. "..").
+        raise ValueError("Invalid username for a records folder.")
+    _active_user = username
+
+
+def get_active_user():
+    return _active_user
+
+
+def _records_dir():
+    if _active_user is None:
+        return DATA_DIR
+    return os.path.join(DATA_DIR, RECORDS_DIR_NAME, _active_user)
+
+
+def _record_path(jsonfile_name):
+    return os.path.join(_records_dir(), jsonfile_name)
 
 
 def generate_company_save_filename(company_name):
@@ -155,7 +197,7 @@ def inspect_save_file(jsonfile_name):
         return "", "no_name"
     if not is_valid_filename(name):
         return "", "invalid_name"
-    if os.path.isfile(_full_path(name)):
+    if os.path.isfile(_record_path(name)):
         return name, "exists"
     return name, "not_found"
 
@@ -188,7 +230,7 @@ def load_data_from_json(jsonfile_name):
     if not is_valid_filename(name):
         return [], "", "invalid_name"
 
-    path = _full_path(name)
+    path = _record_path(name)
     if not os.path.isfile(path):
         return [], name, "not_found"
 
@@ -241,10 +283,10 @@ def save_data_to_json(data, jsonfile_name):
     if not is_valid_filename(name):
         return None, "invalid_name"
 
-    path = _full_path(name)
+    path = _record_path(name)
     tmp_path = path + ".tmp"
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(_records_dir(), exist_ok=True)
         with open(tmp_path, 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
         os.replace(tmp_path, path)
@@ -516,10 +558,10 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
     ):
         return None, "invalid_pdf_name"
 
-    pdf_path = _full_path(pdf_name)
+    pdf_path = _record_path(pdf_name)
 
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(_records_dir(), exist_ok=True)
 
         # Embed Times New Roman when available so the report keeps the requested
         # typeface on other computers. In Docker, mount/provide the font files

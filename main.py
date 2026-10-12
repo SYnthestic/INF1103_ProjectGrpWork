@@ -87,6 +87,8 @@ while running:
         break
 
     # ---------- Fresh session state for each login ----------
+    # Saved record files (options 2/3) live in this user's own folder.
+    dm.set_active_user(current_user)
     scheme_grant_records = []
     ai_audit_data = {}
     jsonfile_name = ""
@@ -197,5 +199,6 @@ while running:
                 audit_history_flow(current_user)
             case in_and_out.MENU_LOGOUT: # 10: Back to the login screen
                 in_and_out.show_logged_out(current_user)
+                dm.set_active_user(None)
             case _:
                 in_and_out.show_wrong_option_error()

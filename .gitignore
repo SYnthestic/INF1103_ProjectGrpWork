@@ -8,3 +8,5 @@ venv/
 users.json
 audit_history.json
 *.json.tmp
+records/
+*.lock
