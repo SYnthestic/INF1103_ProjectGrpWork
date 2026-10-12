@@ -10,7 +10,7 @@ A terminal app that takes an SME's details and a free-text upgrade proposal, use
 | `io_manager.py` | All user input, validation and screen output |
 | `ai_manager.py` | Sends the proposal to the AI API and returns a validated JSON result |
 | `logic_manager.py` | Eligibility checks, grant matching and subsidy maths (no AI) |
-| `data_manager.py` | Saving and loading records as JSON |
+| `data_manager.py` | Saving and loading records, user accounts and audit history as JSON |
 
 The project uses plain functions only (no classes).
 
@@ -141,7 +141,24 @@ At the menu choose **1 (Start)** and enter:
 
 The app then shows the AI audit and the grant decision, and asks whether to save. Because the AI estimates the energy reduction, exact figures can vary from run to run.
 
-Other menu options: **2** save, **3** load, **4** view records, **5** and **6** re-run the AI and logic steps on the latest record.
+Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **9** view your past audits, **10** logout.
+
+## Accounts and login
+
+When the app starts you must log in (option **1**) or create an account (option **2**) before reaching the main menu.
+
+- Usernames: 3-20 characters, letters/digits/underscore, not case-sensitive.
+- Passwords: at least 8 characters with at least one letter and one digit. Typing is hidden.
+- Every audit completed with option **1** is saved automatically to your history. Option **9** lists your past audits and lets you open one in full. You only ever see your own audits.
+
+Passwords are never stored. Each account stores a random salt and a salted SHA-256 hash (PBKDF2-HMAC-SHA256, 200,000 iterations), checked with a constant-time comparison.
+
+| File | Contents |
+|---|---|
+| `users.json` | Usernames, salts and password hashes |
+| `audit_history.json` | Each user's saved audits (inputs, AI result, decision) |
+
+Both files are plain JSON and are **not** otherwise protected yet. They are in `.gitignore` and `.dockerignore`, so they are never committed or copied into the Docker image. To reset all accounts, delete both files.
 
 ## Where saved files go
 
