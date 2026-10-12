@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import math
 import secrets
 
 
@@ -18,6 +19,25 @@ def module_description():
 
 
 VALID_SCOPES = ["Scope-1", "Scope-2", "Scope-3"]
+
+
+def _number(value, default=0.0):
+    """A finite float, or `default` for None, text, NaN or infinity.
+    Keeps one bad value from crashing the whole evaluation."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    value = float(value)
+    return value if math.isfinite(value) else default
+
+
+def _string_list(value):
+    """The exclusion keywords as a list of strings (a lone string is kept
+    whole instead of being read letter by letter)."""
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [str(item).strip() for item in value if item is not None and str(item).strip()]
 
 
 # =========================================================
@@ -204,20 +224,14 @@ def evaluate_grant_application(user_profile, ai_audit):
     # 1. Extract company information
     # ---------------------------------------------------------
 
-    annual_revenue = user_profile.get(
-        "annual_revenue_sgd", 0.0
-    )
+    annual_revenue = _number(user_profile.get("annual_revenue_sgd"))
 
-    headcount = user_profile.get(
-        "group_employment_size", 0
-    )
+    headcount = int(_number(user_profile.get("group_employment_size")))
 
-    local_equity = user_profile.get(
-        "local_shareholding_pct", 0.0
-    )
+    local_equity = _number(user_profile.get("local_shareholding_pct"))
 
-    baseline_spend = user_profile.get(
-        "baseline_annual_energy_expenditure_sgd", 0.0
+    baseline_spend = _number(
+        user_profile.get("baseline_annual_energy_expenditure_sgd")
     )
 
     # Applicant self-declares proposal type in io_manager.py, so this is
@@ -230,8 +244,8 @@ def evaluate_grant_application(user_profile, ai_audit):
         "sustainability_grant", 0
     )
 
-    reporting_advisory_fee = user_profile.get(
-        "reporting_advisory_fee_sgd", 0.0
+    reporting_advisory_fee = _number(
+        user_profile.get("reporting_advisory_fee_sgd")
     )
 
     # ---------------------------------------------------------
@@ -242,20 +256,20 @@ def evaluate_grant_application(user_profile, ai_audit):
         "scope_category", "Unknown"
     )
 
-    abatement = ai_audit.get(
-        "estimated_energy_reduction_pct", 0.0
+    abatement = _number(
+        ai_audit.get("estimated_energy_reduction_pct")
     )
 
-    exclusions = ai_audit.get(
-        "detected_exclusion_keywords", []
+    exclusions = _string_list(
+        ai_audit.get("detected_exclusion_keywords")
     )
 
     intervention = ai_audit.get(
         "primary_intervention_type", ""
     )
 
-    lifetime_abatement_tonnes = ai_audit.get(
-        "estimated_lifetime_abatement_tonnes", 0.0
+    lifetime_abatement_tonnes = _number(
+        ai_audit.get("estimated_lifetime_abatement_tonnes")
     )
 
     # ---------------------------------------------------------
@@ -420,6 +434,26 @@ def evaluate_grant_application(user_profile, ai_audit):
             "Ensure the external assurance statement covers, at "
             "minimum, Scope 1 and Scope 2 emissions in line with "
             "ISSB and GRI standards."
+        )
+
+    # ---------------------------------------------------------
+    # 8b. Equipment proposals need a positive baseline energy spend
+    # ---------------------------------------------------------
+    # The subsidy is calculated from the baseline spend, so a zero or
+    # missing value would otherwise "pre-approve" a SGD 0 subsidy.
+
+    elif baseline_spend <= 0:
+
+        decision_status = "MANUAL_REVIEW"
+
+        reasons.append(
+            "No valid baseline annual energy expenditure was provided, "
+            "so a subsidy cannot be calculated."
+        )
+
+        recommendations.append(
+            "Provide the company's baseline annual energy expenditure "
+            "(more than SGD 0) and resubmit the proposal."
         )
 
     # ---------------------------------------------------------

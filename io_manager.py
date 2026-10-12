@@ -8,6 +8,7 @@ import time
 import textwrap
 import codecs
 import getpass
+import math
 from contextlib import contextmanager
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
@@ -503,11 +504,20 @@ def get_valid_other_industry():
         else:
             return other_industry
 
+# Like float(), but also rejects "nan" and "inf", which float() accepts and
+# which slip past <= / >= range checks. Raises ValueError like float().
+def finite_float(text):
+    number = float(text)
+    if not math.isfinite(number):
+        raise ValueError("number must be finite")
+    return number
+
+
 # input of Company's Total Revenue
 def retrieve_total_revenue():
     while True:
         try:
-            total_revenue = float(input("Enter your Company's Total Revenue (in SGD): "))
+            total_revenue = finite_float(input("Enter your Company's Total Revenue (in SGD): "))
             if total_revenue < 0:
                 print("Total Revenue cannot be negative. Please try again.")
             elif total_revenue == 0:
@@ -539,7 +549,7 @@ def retrieve_local_equity():
             print("Equity % cannot be empty. Please try again.")
             continue
         try:
-            local_equity = float(raw_value)
+            local_equity = finite_float(raw_value)
             if local_equity <= 0 or local_equity > 100:
                 print("Equity % must be a value between 0 and 100. Please try again.")
                 continue
@@ -577,7 +587,7 @@ def retrieve_baseline_energy_expenditure():
             print("Baseline annual energy expenditure cannot be empty. Please try again.")
             continue
         try:
-            baseline_energy_expenditure = float(raw_value)
+            baseline_energy_expenditure = finite_float(raw_value)
             if baseline_energy_expenditure <= 0:
                 print("Baseline annual energy expenditure cannot be zero or negative. Please try again.")
                 continue
@@ -594,7 +604,7 @@ def retrieve_estimated_retrofit_cost():
             print("Estimated retrofit cost cannot be empty. Please try again.")
             continue
         try:
-            estimated_retrofit_cost = float(raw_value)
+            estimated_retrofit_cost = finite_float(raw_value)
             if estimated_retrofit_cost <= 0:
                 print("Estimated retrofit cost cannot be zero or negative. Please try again.")
                 continue
@@ -626,7 +636,7 @@ def retrieve_reporting_advisory_fee():
             print("Reporting/advisory fee cannot be empty. Please try again.")
             continue
         try:
-            reporting_advisory_fee = float(raw_value)
+            reporting_advisory_fee = finite_float(raw_value)
             if reporting_advisory_fee < 0:
                 print("Reporting/advisory fee cannot be negative. Please try again.")
                 continue
