@@ -237,9 +237,7 @@ def key_verifier(key, max_digits=2):
 def get_menu_choice(username=None):
     key = None
     while key is None: #Prints the menu and then asks you to get the key
-        print(gui.boxed_menu())
-        if username:
-            print_account_menu(username)
+        print(gui.boxed_menu(username))
         key = key_verifier(input("➔   ")) #This function calls the key_verifier function which checks if the key is an integer
     return key
 
@@ -256,15 +254,6 @@ USERNAME_MIN_LEN = 3
 USERNAME_MAX_LEN = 20
 PASSWORD_MIN_LEN = 8
 PASSWORD_MAX_LEN = 64
-
-
-# Extra menu lines shown under gui.boxed_menu() once logged in.
-# (Can be moved into boxed_menu() itself later for a consistent look.)
-def print_account_menu(username):
-    cyan = "\033[96m"
-    reset = "\033[0m"
-    print(f"   {cyan}Logged in as: {username}{reset}")
-    print(f"   {MENU_AUDIT_HISTORY}. View my past audits      {MENU_LOGOUT}. Logout")
 
 
 # Login screen shown before the main menu.
