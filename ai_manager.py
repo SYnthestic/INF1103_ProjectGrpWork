@@ -128,7 +128,8 @@ def parse_ai_audit(raw_content):
     model actually returned.
     """
 
-    if raw_content is None:
+    # Some models return a list of content parts (or nothing usable).
+    if not isinstance(raw_content, str):
         return dict(DEFAULT_AI_AUDIT)
 
     cleaned = raw_content.strip()

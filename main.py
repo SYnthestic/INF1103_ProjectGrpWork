@@ -63,12 +63,45 @@ def login_flow():
     password = in_and_out.retrieve_password()
 
     stored_user = dm.get_user(username)
-    if logic.verify_password(password, stored_user):
+    # The format check also guards against a hand-edited users.json holding
+    # a name that cannot be used for the user's folder.
+    if in_and_out.is_valid_username(username) and logic.verify_password(password, stored_user):
         in_and_out.show_login_success(username)
         return username
 
     in_and_out.show_login_failed()
     return None
+
+
+def attempt(step, *args):
+    """Runs one risky step (AI call, grant logic). Returns (True, result), or
+    (False, None) after showing a short message if it raised, so one
+    unexpected error can no longer end the whole program. Ctrl+C and end of
+    input are passed through so they still exit cleanly."""
+    try:
+        return True, step(*args)
+    except (KeyboardInterrupt, EOFError):
+        raise
+    except Exception as error:
+        in_and_out.show_unexpected_error(error)
+        return False, None
+
+
+def run_audit(record):
+    """AI Manager -> Logic Manager for one record, displaying both results.
+    Returns (ai_audit, result); result is None if a step failed."""
+    ok, ai_audit = attempt(ai.get_ai_response, in_and_out.flat_record(record).get("Proposal Narrative", ""))
+    if not ok:
+        return {}, None
+    in_and_out.display_ai_audit(ai_audit)
+
+    ok, result = attempt(
+        logic.evaluate_grant_application, in_and_out.convert_record_to_profile(record), ai_audit
+    )
+    if not ok:
+        return ai_audit, None
+    in_and_out.display_grant_decision(result)
+    return ai_audit, result
 
 
 def audit_history_flow(username):
@@ -164,17 +197,14 @@ while running:
                 # Automatically run the AI Manager and Logic Manager on the
                 # record just collected, instead of requiring the user to
                 # separately select options 5 and 6.
-                ai_audit_data = ai.get_ai_response(proposal_narrative)
-                in_and_out.display_ai_audit(ai_audit_data)
-
-                user_profile = in_and_out.convert_record_to_profile(scheme_grant_records[-1])
-                result = logic.evaluate_grant_application(user_profile, ai_audit_data)
-                in_and_out.display_grant_decision(result)
+                ai_audit_data, result = run_audit(scheme_grant_records[-1])
 
                 # Every completed audit is kept in the user's history, unless
                 # the AI call itself failed (missing API key, timeout, unusable
                 # answer) - that result is only a placeholder, not a real audit.
-                if ai.ai_call_failed(ai_audit_data):
+                if result is None:
+                    pass  # a step raised; the error was already shown
+                elif ai.ai_call_failed(ai_audit_data):
                     in_and_out.show_audit_not_saved_ai_failed()
                 else:
                     saved_audit = dm.append_user_audit(current_user, scheme_grant_records[-1], ai_audit_data, result)
@@ -200,20 +230,21 @@ while running:
                 if len(scheme_grant_records) == 0:
                     in_and_out.display_no_records_message() 
                 else:
-                    current_record = scheme_grant_records[-1]
-                    narrative = current_record.get("Proposal Narrative", "")
-                    ai_audit_data = ai.get_ai_response(narrative)
-                    in_and_out.display_ai_audit(ai_audit_data)
+                    narrative = in_and_out.flat_record(scheme_grant_records[-1]).get("Proposal Narrative", "")
+                    ok, new_audit = attempt(ai.get_ai_response, narrative)
+                    if ok:
+                        ai_audit_data = new_audit
+                        in_and_out.display_ai_audit(ai_audit_data)
             case 8: # For the Logic Manager
                 if len(scheme_grant_records) == 0:
                     in_and_out.display_no_records_message()
                 elif not ai_audit_data:
                     in_and_out.display_no_ai_audit()
                 else:
-                    current_record = scheme_grant_records[-1]
-                    user_profile = in_and_out.convert_record_to_profile(current_record)
-                    result = logic.evaluate_grant_application(user_profile, ai_audit_data)
-                    in_and_out.display_grant_decision(result)
+                    user_profile = in_and_out.convert_record_to_profile(scheme_grant_records[-1])
+                    ok, result = attempt(logic.evaluate_grant_application, user_profile, ai_audit_data)
+                    if ok:
+                        in_and_out.display_grant_decision(result)
             case in_and_out.MENU_AUDIT_HISTORY: # 9: Past audits of the logged-in user
                 audit_history_flow(current_user)
             case in_and_out.MENU_LOGOUT: # 10: Back to the login screen

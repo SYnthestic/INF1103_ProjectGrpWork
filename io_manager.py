@@ -396,6 +396,14 @@ def show_audit_saved_to_history(audit_record):
         print(f"Audit #{audit_record['audit_id']} saved to your history.")
 
 
+def show_unexpected_error(error):
+    red = "\033[91m"
+    reset = "\033[0m"
+    print(f"\n{red}Something went wrong and this step was skipped "
+          f"({type(error).__name__}: {error}).")
+    print(f"Nothing was saved. Please try again.{reset}\n")
+
+
 def show_audit_not_saved_ai_failed():
     yellow = "\033[93m"
     reset = "\033[0m"
@@ -714,6 +722,18 @@ if __name__ == "__main__":
 
 
 # For displaying list of grants already applied for by the company
+# Records loaded from a file can be in the newer nested layout
+# (company_profile / proposal / ...) or be missing fields. This turns any
+# record into the flat, capitalised layout the screens and main.py use, so
+# a file that doesn't match exactly shows "N/A" instead of crashing.
+def flat_record(record):
+    if not isinstance(record, dict):
+        return {}
+    if isinstance(record.get("company_profile"), dict):
+        return dm.audit_record_to_display_format(record)
+    return record
+
+
 def display_applied_grants(scheme_grant_records, key):
     red = "\033[91m"
     reset = "\033[0m"
@@ -726,18 +746,19 @@ def display_applied_grants(scheme_grant_records, key):
     # Build the paper contents: one block per grant
     lines = []
     for i, grant in enumerate(scheme_grant_records, start=1):
+        grant = flat_record(grant)
         if i > 1:
             lines.append("")
-        lines.append(f"{i}. {grant['Company Name']} - {grant['Company Industry']}")
+        lines.append(f"{i}. {grant.get('Company Name', 'N/A')} - {grant.get('Company Industry', 'N/A')}")
         details = {
-            "Total Revenue": grant["Company Total Revenue"],
-            "Total Employees": grant["Total Employees"],
-            "Local Equity": grant["Local Equity"],
+            "Total Revenue": grant.get("Company Total Revenue", "N/A"),
+            "Total Employees": grant.get("Total Employees", "N/A"),
+            "Local Equity": grant.get("Local Equity", "N/A"),
             "Proposal Type": grant.get("Proposal Type", "N/A"),
             "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
             "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
-            "Baseline Energy Expenditure": grant["Baseline Energy Expenditure"],
-            "Estimated Retrofit Cost": grant["Estimated Retrofit Cost"],
+            "Baseline Energy Expenditure": grant.get("Baseline Energy Expenditure", "N/A"),
+            "Estimated Retrofit Cost": grant.get("Estimated Retrofit Cost", "N/A"),
             "Reporting Advisory Fee": grant.get("Reporting Advisory Fee", 0.0),
         }
         lines.extend(format_pairs(details, indent="   "))
@@ -761,6 +782,7 @@ def display_applied_grants(scheme_grant_records, key):
 # Reporting Advisory Fee directly on the record, so no extra
 # parameters are needed here.
 def convert_record_to_profile(record):
+    record = flat_record(record)
     return {
         "company_name": record.get("Company Name", ""),
         "company_industry": record.get("Company Industry", ""),
