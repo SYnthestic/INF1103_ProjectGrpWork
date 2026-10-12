@@ -141,6 +141,10 @@ while running:
                 result = logic.evaluate_grant_application(user_profile, ai_audit_data)
                 in_and_out.display_grant_decision(result)
 
+                # Every completed audit is kept in the user's history.
+                saved_audit = dm.append_user_audit(current_user, scheme_grant_records[-1], ai_audit_data, result)
+                in_and_out.show_audit_saved_to_history(saved_audit)
+
                 # end of case 1
                 if in_and_out.confirm_save_to_json():
                     jsonfile_name = in_and_out.save_records(scheme_grant_records, jsonfile_name)

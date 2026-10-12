@@ -391,6 +391,16 @@ def show_logged_out(username):
     print(f"\n{username} has been logged out.\n")
 
 
+# ========================================================
+# Audit history
+# ========================================================
+def show_audit_saved_to_history(audit_record):
+    if audit_record is None:
+        print("Warning: this audit could not be saved to your history.")
+    else:
+        print(f"Audit #{audit_record['audit_id']} saved to your history.")
+
+
 # Display Company Profile
 def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, sustainability_grant, proposal_narrative, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
     print(f"Company Name: {company_name}")

@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 
-# Local user accounts (contain password hashes)
+# Local user accounts (contain password hashes) and audit history
 users.json
+audit_history.json
 *.json.tmp

@@ -7,4 +7,5 @@ venv/
 .gitignore
 data/
 users.json
+audit_history.json
 *.json.tmp

@@ -261,9 +261,10 @@ def save_data_to_json(data, jsonfile_name):
 
 
 # ---------------------------------------------------------------------------
-# User accounts
+# User accounts and per-user audit history
 # ---------------------------------------------------------------------------
 # users.json         -> {username: {password_hash, salt, ...}}
+# audit_history.json -> {username: [audit_record, audit_record, ...]}
 #
 # The Data Manager only reads and writes these files. It never hashes or
 # checks passwords (Logic Manager's job) and never prints prompts (I/O
@@ -271,6 +272,7 @@ def save_data_to_json(data, jsonfile_name):
 # only the passwords are protected (by hashing).
 
 USERS_FILE = "users.json"
+AUDIT_HISTORY_FILE = "audit_history.json"
 
 
 def read_json_file(filename, default):
@@ -351,6 +353,44 @@ def save_new_user(user_record):
     stored["created_at"] = datetime.now().isoformat(timespec="seconds")
     users[username] = stored
     return write_json_file(USERS_FILE, users)
+
+
+# ---------- Audit history ----------
+def load_audit_history():
+    """All saved audits as {username: [audit, ...]}, or None if unreadable."""
+    return read_json_file(AUDIT_HISTORY_FILE, {})
+
+
+def get_user_audits(username):
+    """All audits saved by `username`, oldest first."""
+    history = load_audit_history()
+    audits = history.get(username, []) if history else []
+    return audits if isinstance(audits, list) else []
+
+
+def append_user_audit(username, application, ai_audit, result):
+    """Saves one completed audit (inputs + AI output + decision) under the
+    logged-in user. Returns the saved record, or None on failure."""
+    history = load_audit_history()
+    if history is None:
+        return None
+    user_audits = history.get(username)
+    if not isinstance(user_audits, list):
+        user_audits = []
+        history[username] = user_audits
+
+    audit_record = {
+        "audit_id": generate_audit_id(user_audits),
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "application": application,
+        "ai_audit": ai_audit,
+        "result": result,
+    }
+    user_audits.append(audit_record)
+
+    if write_json_file(AUDIT_HISTORY_FILE, history):
+        return audit_record
+    return None
 
 
 # ---------------------------------------------------------------------------
