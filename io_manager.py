@@ -407,6 +407,26 @@ def show_audit_saved_to_history(audit_record):
         print(f"Audit #{audit_record['audit_id']} saved to your history.")
 
 
+# Helpers so one damaged field in audit_history.json (null, wrong type)
+# cannot crash the history screens.
+def _as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _as_text(value, default=""):
+    return default if value is None else str(value)
+
+
+def _as_money(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return 0.0
+    return float(value)
+
+
+def _audit_stamp(audit):
+    return _as_text(audit.get("timestamp")).replace("T", " ")
+
+
 # Summary table of every audit the user has done.
 def display_audit_history(audits, username):
     if len(audits) == 0:
@@ -416,13 +436,14 @@ def display_audit_history(audits, username):
 
     lines = []
     for audit in audits:
-        application = audit.get("application", {})
-        result = audit.get("result", {})
+        audit = _as_dict(audit)
+        application = _as_dict(audit.get("application"))
+        result = _as_dict(audit.get("result"))
         lines.append(
-            f"#{audit.get('audit_id', '?')}  {audit.get('timestamp', '').replace('T', ' ')}  |  "
-            f"{application.get('Company Name', 'N/A')}  |  "
-            f"{result.get('decision_status', 'N/A')}  |  "
-            f"SGD {result.get('approved_subsidy_sgd', 0.0):,.2f}"
+            f"#{_as_text(audit.get('audit_id'), '?')}  {_audit_stamp(audit)}  |  "
+            f"{_as_text(application.get('Company Name'), 'N/A')}  |  "
+            f"{_as_text(result.get('decision_status'), 'N/A')}  |  "
+            f"SGD {_as_money(result.get('approved_subsidy_sgd')):,.2f}"
         )
 
     count = len(audits)
@@ -436,7 +457,7 @@ def display_audit_history(audits, username):
 
 # Asks which audit to open in full. Returns a list index, or None to go back.
 def select_audit_record(audits):
-    valid_ids = [audit.get("audit_id") for audit in audits]
+    valid_ids = [_as_dict(audit).get("audit_id") for audit in audits]
     while True:
         choice = input("Enter an audit # to view in full (or press Enter to return): ").strip().lstrip("#")
         if choice == "":
@@ -448,14 +469,22 @@ def select_audit_record(audits):
 
 # Full view of one saved audit, reusing the existing report layouts.
 def display_audit_detail(audit):
-    application = audit.get("application", {})
-    print(f"\nAudit #{audit.get('audit_id', '?')} - {audit.get('timestamp', '').replace('T', ' ')}")
+    audit = _as_dict(audit)
+    application = _as_dict(audit.get("application"))
+    ai_audit = _as_dict(audit.get("ai_audit"))
+    result = _as_dict(audit.get("result"))
+
+    print(f"\nAudit #{_as_text(audit.get('audit_id'), '?')} - {_audit_stamp(audit)}")
     if application:
         print_on_paper(format_pairs(application), title="APPLICATION DETAILS")
-    if audit.get("ai_audit"):
-        display_ai_audit(audit["ai_audit"])
-    if audit.get("result"):
-        display_grant_decision(audit["result"])
+    if ai_audit:
+        display_ai_audit(ai_audit)
+    if result:
+        try:
+            display_grant_decision(result)
+        except (KeyError, TypeError, ValueError):
+            # Saved decision is missing fields: show what is there instead.
+            print_on_paper(format_pairs(result), title="GRANT ELIGIBILITY DECISION")
     gui.return_button()
 
 
