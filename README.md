@@ -212,6 +212,29 @@ Files saved by an older version directly in the folder are not shown to any user
 
 ---
 
+## Tests and continuous integration
+
+The project has an automated test suite (Python's built-in `unittest`, so nothing extra to install) that covers the grant rules, the AI output cleaning, accounts and saved files. It never calls the AI or touches your real data.
+
+```
+python -m unittest discover -s tests -t . -v
+```
+
+To check the code style as well, install [ruff](https://docs.astral.sh/ruff/) (`pip install ruff`) and run `ruff check .`.
+
+Every push and pull request on GitHub runs the same checks automatically (`.github/workflows/ci.yml`): lint, the tests on Python 3.11, 3.12 and 3.13, then a Docker build whose image runs the tests again. A red cross on a commit means a check failed; click it to see which one.
+
+You can also run the tests inside the Docker image:
+
+```
+docker build -t sme-grant-auditor .
+docker run --rm sme-grant-auditor python -m unittest discover -s tests -t .
+```
+
+The tests live in `tests/`, one file per layer (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`). When you change a rule, change or add the matching test in the same commit.
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -226,3 +249,4 @@ Files saved by an older version directly in the folder are not shown to any user
 | Accounts or saved files disappear in Docker, or no `.json` files appear in your folder | The files were saved inside the container. Recreate the container with `-v "<your folder>:/app/data"` (Step 3, Option A, item 3). A container created earlier without it must be removed with `docker rm sme-auditor` first, and the image rebuilt if your Dockerfile is old. |
 | `Could not save the new account` / an audit is not saved | Another copy of the app is writing at the same moment, or the data folder is not writable. Try again; if it keeps failing, check the folder's permissions (and delete a stale `*.lock` file in it). |
 | Filename rejected when saving | Use a plain name such as `Save1`, with no `/`, `\` or other special characters. |
+| Docker on Linux: `Permission denied` writing to the data folder | The container runs as a normal user (id 1000), not root. Make your data folder writable by it (`sudo chown 1000 <folder>`), or add `--user "$(id -u):$(id -g)"` to `docker run`. Docker Desktop on Windows/Mac needs nothing extra. |
