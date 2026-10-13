@@ -229,10 +229,13 @@ To check the code style as well, install [ruff](https://docs.astral.sh/ruff/) (`
 
 Every push and pull request on GitHub runs the same checks automatically (`.github/workflows/ci.yml`): lint, the tests on Python 3.11, 3.12 and 3.13, then a Docker build whose image runs the tests again. A red cross on a commit means a check failed; click it to see which one. When everything passes on `main`, a final job publishes the Docker image to the GitHub Container Registry as `ghcr.io/<owner>/<repo>` (tags `latest` and the commit id); pull requests never publish. `requirements.txt` gives each package a version range (a lower and an upper bound) so a future major release cannot break a fresh install.
 
-You can also run the tests inside the Docker image:
+`tests/test_logic_sample_ai_responses.py` is the stand-alone check of the Logic Manager: it feeds hardcoded sample AI responses (raw JSON text) to `logic_manager`, needs no API key or internet (a guard fails the test if a network connection is attempted), and can be run on its own with `python tests/test_logic_sample_ai_responses.py`.
+
+You can also run the tests inside the Docker image. Build it first, then run either the stand-alone Logic Manager script or all the tests:
 
 ```
 docker build -t sme-grant-auditor .
+docker run --rm sme-grant-auditor python tests/test_logic_sample_ai_responses.py
 docker run --rm sme-grant-auditor python tests/run_tests.py
 ```
 
