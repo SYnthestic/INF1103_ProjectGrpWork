@@ -1,3 +1,6 @@
+from typing import Any
+from collections.abc import Callable
+from types import TracebackType
 import sys
 
 
@@ -15,6 +18,12 @@ import data_manager as dm
 import ai_manager as ai
 import logic_manager as logic
 
+# Type aliases (plain dicts/lists - the project uses no classes)
+Record = dict[str, Any]
+Records = list[Record]
+AiAudit = dict[str, Any]
+Session = dict[str, Any]
+
 
 # ========================================================
 # Clean exit on Ctrl+C / end of input
@@ -22,7 +31,7 @@ import logic_manager as logic
 # Without this, pressing Ctrl+C at any prompt (or running Docker without
 # -it, so there is no keyboard input) ends the program with a long
 # traceback. Every other error still shows its normal traceback.
-def _handle_uncaught(exc_type, exc, tb):
+def _handle_uncaught(exc_type: type[BaseException], exc: BaseException, tb: TracebackType | None) -> None:
     if issubclass(exc_type, KeyboardInterrupt):
         in_and_out.show_interrupted()
     elif issubclass(exc_type, EOFError):
@@ -35,7 +44,7 @@ def _handle_uncaught(exc_type, exc, tb):
 # ========================================================
 # Account flows: I/O collects -> Logic hashes/verifies -> Data stores
 # ========================================================
-def create_account_flow():
+def create_account_flow() -> None:
     username = in_and_out.retrieve_new_username()
     while dm.user_exists(username):
         in_and_out.show_username_taken(username)
@@ -50,7 +59,7 @@ def create_account_flow():
         in_and_out.show_account_save_failed()
 
 
-def login_flow():
+def login_flow() -> str | None:
     """Returns the logged-in username, or None if login failed."""
     username = in_and_out.retrieve_username()
     password = in_and_out.retrieve_password()
@@ -66,7 +75,7 @@ def login_flow():
     return None
 
 
-def attempt(step, *args):
+def attempt(step: Callable[..., Any], *args: Any) -> tuple[bool, Any]:
     """Runs one risky step (AI call, grant logic). Returns (True, result), or
     (False, None) after showing a short message if it raised, so one
     unexpected error can no longer end the whole program. Ctrl+C and end of
@@ -80,13 +89,13 @@ def attempt(step, *args):
         return False, None
 
 
-def ask_ai(narrative):
+def ask_ai(narrative: str) -> AiAudit:
     """AI Manager call. The waiting screen belongs to the I/O Manager, so it
     is handed over as a function and the AI Manager never prints."""
     return ai.get_ai_response(narrative, in_and_out.run_ai_analysis_bar)
 
 
-def run_audit(record):
+def run_audit(record: Record) -> tuple[AiAudit, dict[str, Any] | None]:
     """AI Manager -> Logic Manager for one record, displaying both results.
     Returns (ai_audit, result); result is None if a step failed."""
     narrative = in_and_out.flat_record(record).get("Proposal Narrative", "")
@@ -104,7 +113,7 @@ def run_audit(record):
     return ai_audit, result
 
 
-def apply_history_filter(audits):
+def apply_history_filter(audits: list[Record]) -> list[Record] | None:
     """Asks the user for a filter; the Data Manager does the filtering.
     Returns the matching audits, or None if cancelled / nothing matched."""
     statuses = dm.available_audit_statuses(audits)
@@ -122,14 +131,14 @@ def apply_history_filter(audits):
     return matches
 
 
-def export_audit_flow(audit):
+def export_audit_flow(audit: Record) -> None:
     """Offers a PDF report for one audit, built from the saved history entry."""
     if in_and_out.confirm_export_pdf():
         file_name, status = dm.export_audit_to_pdf(audit)
         in_and_out.show_pdf_result(status, file_name, dm.get_records_folder())
 
 
-def audit_history_flow(username):
+def audit_history_flow(username: str) -> None:
     audits = dm.get_user_audits(username)
     shown = audits
     while True:
@@ -150,7 +159,7 @@ def audit_history_flow(username):
 # ========================================================
 # Saving and loading records: I/O asks -> Data stores/reads -> I/O reports
 # ========================================================
-def save_records_flow(records, jsonfile_name):
+def save_records_flow(records: Records, jsonfile_name: str) -> str:
     """Asks for a file name if needed, merges with an existing file if the
     user agrees, saves, and returns the (possibly updated) jsonfile_name."""
     if not jsonfile_name:
@@ -179,7 +188,7 @@ def save_records_flow(records, jsonfile_name):
     return saved_name or clean_name
 
 
-def load_records_flow(records, jsonfile_name):
+def load_records_flow(records: Records, jsonfile_name: str) -> tuple[Records, str]:
     """Confirms before replacing records in memory, loads, shows the result,
     and returns (records, jsonfile_name). On failure both are unchanged."""
     if dm.is_data_loaded(records, jsonfile_name) and not in_and_out.confirm_overwrite_records():
@@ -197,7 +206,7 @@ def load_records_flow(records, jsonfile_name):
 # ========================================================
 # Menu option 1: collect a new application and audit it
 # ========================================================
-def collect_application():
+def collect_application() -> Record:
     """Asks the I/O Manager for every field and returns one record."""
     company_name = in_and_out.retrieve_company_name()
     company_industry = in_and_out.retrieve_company_industry()
@@ -238,7 +247,7 @@ def collect_application():
     }
 
 
-def new_application_flow(session, key):
+def new_application_flow(session: Session, key: int) -> None:
     """Menu option 1: collect, audit with AI + Logic, keep in history, and
     offer to save the record to a JSON file."""
     session["records"].append(collect_application())
@@ -265,7 +274,7 @@ def new_application_flow(session, key):
         session["jsonfile_name"] = save_records_flow(session["records"], session["jsonfile_name"])
 
 
-def update_record_flow(session):
+def update_record_flow(session: Session) -> None:
     """Menu option 5: change one detail of one record in memory."""
     records = session["records"]
     if not records:
@@ -289,7 +298,7 @@ def update_record_flow(session):
         in_and_out.show_record_not_changed()
 
 
-def delete_record_flow(session):
+def delete_record_flow(session: Session) -> None:
     """Menu option 6: remove one record from memory."""
     records = session["records"]
     if not records:
@@ -312,7 +321,7 @@ def delete_record_flow(session):
         in_and_out.show_record_not_changed()
 
 
-def rerun_ai_flow(session):
+def rerun_ai_flow(session: Session) -> None:
     """Menu option 7: run the AI Manager again on the latest record."""
     if not session["records"]:
         in_and_out.display_no_records_message()
@@ -324,7 +333,7 @@ def rerun_ai_flow(session):
         in_and_out.display_ai_audit(new_audit)
 
 
-def rerun_logic_flow(session):
+def rerun_logic_flow(session: Session) -> None:
     """Menu option 8: run the Logic Manager again on the latest record."""
     if not session["records"]:
         in_and_out.display_no_records_message()
@@ -340,7 +349,7 @@ def rerun_logic_flow(session):
 # ========================================================
 # One logged-in session
 # ========================================================
-def run_session(username):
+def run_session(username: str) -> bool:
     """Shows the main menu until the user logs out (returns True, so the
     login screen comes back) or exits the program (returns False)."""
     # Saved record files (options 2/3) live in this user's own folder.
@@ -383,7 +392,7 @@ def run_session(username):
                 in_and_out.show_wrong_option_error()
 
 
-def login_screen():
+def login_screen() -> str | None:
     """Shows the login screen until someone logs in. Returns the username,
     or None if the user chose to exit."""
     while True:
@@ -401,7 +410,7 @@ def login_screen():
                 in_and_out.show_wrong_option_error()
 
 
-def main():
+def main() -> None:
     sys.excepthook = _handle_uncaught
     dm.setup_logging()
     in_and_out.show_welcome_sequence()

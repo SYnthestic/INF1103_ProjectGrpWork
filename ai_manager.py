@@ -1,3 +1,5 @@
+from typing import Any
+from collections.abc import Callable
 import copy
 import os
 import json
@@ -6,6 +8,11 @@ import math
 import re
 import threading
 from openai import OpenAI
+
+# Type aliases (plain dicts/lists - the project uses no classes)
+Record = dict[str, Any]
+Records = list[Record]
+AiAudit = dict[str, Any]
 
 # Stay silent unless the app (main.py via the Data Manager) sets up a log file;
 # otherwise Python's default handler would print warnings into the terminal screens.
@@ -16,7 +23,7 @@ logger.addHandler(logging.NullHandler())
 AI_TIMEOUT_SECONDS = 60
 
 
-def setup_ai_client():
+def setup_ai_client() -> OpenAI:
 
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
@@ -53,7 +60,7 @@ DEFAULT_AI_AUDIT = {
 VALID_SCOPE_NAMES = ("Scope-1", "Scope-2", "Scope-3")
 
 
-def default_ai_audit():
+def default_ai_audit() -> AiAudit:
     """A fresh copy of the fallback audit. A deep copy, so changing the
     keyword list of one result can never change the shared defaults."""
     return copy.deepcopy(DEFAULT_AI_AUDIT)
@@ -74,7 +81,7 @@ containing EXACTLY these keys:
 Do not perform any financial calculations or eligibility decisions. Only classify and extract."""
 
 
-def get_ai_response(proposal_narrative, show_progress=None):
+def get_ai_response(proposal_narrative: str, show_progress: Callable[[threading.Event, int], None] | None = None) -> AiAudit:
     """
     Sends the proposal narrative to the LLM and returns a validated
     ai_audit dict matching the schema logic_manager.py expects.
@@ -91,7 +98,7 @@ def get_ai_response(proposal_narrative, show_progress=None):
     # Storage container for thread safe return values / errors
     thread_results = {"output": None, "error": None}
 
-    def worker_api_call():
+    def worker_api_call() -> None:
         """Background thread worker to execute the blocking network call."""
         try:
             client = setup_ai_client()
@@ -139,14 +146,14 @@ def get_ai_response(proposal_narrative, show_progress=None):
     return parse_ai_audit(raw_content)
 
 
-def unusable_answer(reason):
+def unusable_answer(reason: str) -> AiAudit:
     """Logs why the model's answer could not be used and returns the safe
     fallback audit (the app carries on and sends the case to manual review)."""
     logger.warning("AI answer could not be used (%s); using fallback defaults.", reason)
     return default_ai_audit()
 
 
-def parse_ai_audit(raw_content):
+def parse_ai_audit(raw_content: Any) -> AiAudit:
     """
     Parses raw AI text into a validated ai_audit dict, filling in any
     missing keys with safe defaults so downstream layers always
@@ -186,7 +193,7 @@ def parse_ai_audit(raw_content):
     return sanitise_ai_audit(parsed)
 
 
-def ai_call_failed(ai_audit):
+def ai_call_failed(ai_audit: Any) -> bool:
     """True when the audit is the fallback default (the AI call errored or
     its answer could not be used), so callers can avoid treating it as a
     real audit."""
@@ -200,7 +207,7 @@ def ai_call_failed(ai_audit):
 # expects, falling back to the safe defaults field by field.
 # ---------------------------------------------------------------------------
 
-def _to_number(value, default=0.0, minimum=None, maximum=None):
+def _to_number(value: Any, default: float = 0.0, minimum: float | None = None, maximum: float | None = None) -> float:
     """Converts numbers and strings like "30", "30%" or "1,200" to a finite
     float, clamped to [minimum, maximum]. Anything else -> default."""
     if isinstance(value, bool):
@@ -225,13 +232,13 @@ def _to_number(value, default=0.0, minimum=None, maximum=None):
     return number
 
 
-def _to_text(value, default=""):
+def _to_text(value: Any, default: str = "") -> str:
     if value is None:
         return default
     return value.strip() if isinstance(value, str) else str(value)
 
 
-def _to_scope(value):
+def _to_scope(value: Any) -> str:
     """"scope-1", "Scope 1" and "scope1" all become "Scope-1"."""
     if isinstance(value, str):
         match = re.fullmatch(r"\s*scope[\s_-]*([123])\s*", value, re.IGNORECASE)
@@ -249,12 +256,12 @@ PLACEHOLDER_KEYWORDS = {
 }
 
 
-def is_placeholder_keyword(text):
+def is_placeholder_keyword(text: Any) -> bool:
     lowered = str(text).strip().lower().strip(".")
     return lowered in PLACEHOLDER_KEYWORDS or lowered.startswith("none ")
 
 
-def _to_string_list(value):
+def _to_string_list(value: Any) -> list[str]:
     """A list of non-empty strings. A single string is split on commas,
     semicolons and new lines; None or other types give an empty list."""
     if isinstance(value, str):
@@ -271,7 +278,7 @@ def _to_string_list(value):
     return items
 
 
-def sanitise_ai_audit(parsed):
+def sanitise_ai_audit(parsed: Any) -> AiAudit:
     """Builds a complete, correctly typed ai_audit dict from parsed JSON."""
     ai_audit = default_ai_audit()
     ai_audit["scope_category"] = _to_scope(parsed.get("scope_category"))

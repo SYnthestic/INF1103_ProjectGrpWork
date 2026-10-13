@@ -1,3 +1,6 @@
+import threading
+from typing import Any
+from collections.abc import Iterator
 from sme_interface_stores import sme_interface_gui as gui
 import sys
 import os
@@ -7,6 +10,11 @@ import codecs
 import getpass
 import math
 from contextlib import contextmanager
+
+# Type aliases (plain dicts/lists - the project uses no classes)
+Record = dict[str, Any]
+Records = list[Record]
+AiAudit = dict[str, Any]
 
 # ========================================================
 # Platform setup (done once)
@@ -24,11 +32,11 @@ if is_windows:
     ENABLE_EXTENDED_FLAGS = 0x0080
     _saved_console_mode = wintypes.DWORD()
 
-    def _getb():
+    def _getb() -> bytes:
         """Read one raw byte (blocks, no CPU spinning)."""
         return msvcrt.getch()
 
-    def _pending(timeout=0.02):
+    def _pending(timeout: float = 0.02) -> bool:
         """Is another byte already waiting?"""
         end = time.monotonic() + timeout
         while time.monotonic() < end:
@@ -42,15 +50,15 @@ else:
     import termios
     import tty
 
-    def _getb():
+    def _getb() -> bytes:
         return os.read(sys.stdin.fileno(), 1)
 
-    def _pending(timeout=0.02):
+    def _pending(timeout: float = 0.02) -> bool:
         return bool(select.select([sys.stdin.fileno()], [], [], timeout)[0])
 
 
 @contextmanager
-def _raw_input():
+def _raw_input() -> Iterator[None]:
     """Raw terminal mode on Unix, set once and restored after. No-op on Windows."""
     if is_windows:
         yield
@@ -67,7 +75,7 @@ def _raw_input():
 # ========================================================
 # Mouse tracking
 # ========================================================
-def enable_mouse_tracking():
+def enable_mouse_tracking() -> None:
     sys.stdout.write("\033[?1000h\033[?25l")  # mouse on, hide cursor
     sys.stdout.flush()
     if is_windows:
@@ -77,7 +85,7 @@ def enable_mouse_tracking():
         kernel32.SetConsoleMode(hInput, (mode & ~ENABLE_EXTENDED_FLAGS) | ENABLE_MOUSE_INPUT)
 
 
-def disable_mouse_tracking():
+def disable_mouse_tracking() -> None:
     sys.stdout.write("\033[?1000l\033[?25h\n")  # mouse off, show cursor
     sys.stdout.flush()
     if is_windows:
@@ -88,7 +96,7 @@ def disable_mouse_tracking():
 # ========================================================
 # One event reader shared by every button/choice prompt
 # ========================================================
-def _read_event():
+def _read_event() -> tuple[str, Any] | None:
     """Return ("key", char), ("click", column), or None for anything ignorable."""
     b = _getb()
 
@@ -112,7 +120,7 @@ def _read_event():
     return None
 
 
-def wait_for_choice(art, regions, keys):
+def wait_for_choice(art: str, regions: dict[Any, tuple[int, int]], keys: dict[str, Any]) -> Any:
     """Show `art`, then wait for a mapped key or a left click inside a region.
 
     regions: {value: (min_x, max_x)}    keys: {"y": value, "\\r": value, ...}
@@ -141,11 +149,11 @@ def wait_for_choice(art, regions, keys):
 
 
 # Thin wrappers so existing callers don't change
-def execute_button_interaction(button_art, min_x=5, max_x=35):
+def execute_button_interaction(button_art: str, min_x: int = 5, max_x: int = 35) -> None:
     wait_for_choice(button_art, {True: (min_x, max_x)}, {"\r": True, "\n": True})
 
 
-def execute_choice_interaction(art, regions, keys):
+def execute_choice_interaction(art: str, regions: dict[Any, tuple[int, int]], keys: dict[str, Any]) -> Any:
     return wait_for_choice(art, regions, keys)
 
 
@@ -155,7 +163,7 @@ def execute_choice_interaction(art, regions, keys):
 _decoder = codecs.getincrementaldecoder("utf-8")("ignore")
 
 
-def _read_key():
+def _read_key() -> str:
     """Read one character without waiting for Enter."""
     if is_windows:
         ch = msvcrt.getwch()
@@ -169,7 +177,7 @@ def _read_key():
             return s
 
 
-def read_limited(max_len, blocked=""):
+def read_limited(max_len: int, blocked: str = "") -> str:
     """Read a line, silently ignoring keys once max_len characters are typed."""
     buf = []
     with _raw_input():                            # set once, not per keystroke
@@ -201,7 +209,7 @@ def read_limited(max_len, blocked=""):
 
 
 # Shows welcome sequence with ASCII art and sustainability banner
-def show_welcome_sequence():
+def show_welcome_sequence() -> None:
     print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
     print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
     print()
@@ -211,7 +219,7 @@ def show_welcome_sequence():
     print(gui.framed_sustainability_banner())
 
 # Verifies that the input is a valid integer key for the menu options.
-def key_verifier(key, max_digits=2):
+def key_verifier(key: Any, max_digits: int = 2) -> int | None:
     if not isinstance(key, str):
         return None
 
@@ -230,7 +238,7 @@ def key_verifier(key, max_digits=2):
     return int(key)
 
 # Menu Options
-def get_menu_choice(username=None):
+def get_menu_choice(username: str | None = None) -> int:
     key = None
     while key is None: #Prints the menu and then asks you to get the key
         print(gui.boxed_menu(username))
@@ -253,7 +261,7 @@ PASSWORD_MAX_LEN = 64
 
 
 # Login screen shown before the main menu.
-def get_auth_choice():
+def get_auth_choice() -> int:
     key = None
     while key is None:
         lines = [
@@ -266,7 +274,7 @@ def get_auth_choice():
     return key
 
 
-def is_valid_username(username):
+def is_valid_username(username: Any) -> bool:
     """3-20 characters: letters, digits and underscores only."""
     return (
         USERNAME_MIN_LEN <= len(username) <= USERNAME_MAX_LEN
@@ -277,7 +285,7 @@ def is_valid_username(username):
 
 # New account: username format check (whether it is taken is checked
 # against stored data in main.py via the Data Manager).
-def retrieve_new_username():
+def retrieve_new_username() -> str:
     while True:
         username = input(
             f"Choose a username ({USERNAME_MIN_LEN}-{USERNAME_MAX_LEN} characters, "
@@ -292,7 +300,7 @@ def retrieve_new_username():
 
 
 # Login: just needs something typed in; the Logic Manager decides if it's right.
-def retrieve_username():
+def retrieve_username() -> str:
     while True:
         username = input("Username: ").strip().lower()
         if username == "":
@@ -301,7 +309,7 @@ def retrieve_username():
             return username
 
 
-def password_problems(password):
+def password_problems(password: str) -> list[str]:
     """Returns a list of rules the password breaks (empty if it's fine)."""
     problems = []
     if len(password) < PASSWORD_MIN_LEN:
@@ -318,7 +326,7 @@ def password_problems(password):
 
 
 # New account: hidden input, strength rules, typed twice to confirm.
-def retrieve_new_password():
+def retrieve_new_password() -> str:
     while True:
         password = getpass.getpass(
             f"Choose a password (min {PASSWORD_MIN_LEN} chars, letters and digits, hidden): "
@@ -336,7 +344,7 @@ def retrieve_new_password():
 
 
 # Login: hidden input.
-def retrieve_password():
+def retrieve_password() -> str:
     while True:
         password = getpass.getpass("Password (hidden): ")
         if password == "":
@@ -349,50 +357,50 @@ def retrieve_password():
             return password
 
 
-def show_username_taken(username):
+def show_username_taken(username: str) -> None:
     print(f"The username '{username}' is already taken. Please choose another.")
 
 
-def show_account_created(username):
+def show_account_created(username: str) -> None:
     green = "\033[92m"
     reset = "\033[0m"
     print(f"\n{green}Account '{username}' created. You can now login.{reset}\n")
 
 
-def show_account_save_failed():
+def show_account_save_failed() -> None:
     red = "\033[91m"
     reset = "\033[0m"
     print(f"\n{red}Could not save the new account. Please try again.{reset}\n")
 
 
-def show_login_success(username):
+def show_login_success(username: str) -> None:
     green = "\033[92m"
     reset = "\033[0m"
     print(f"\n{green}Welcome back, {username}!{reset}\n")
 
 
-def show_login_failed():
+def show_login_failed() -> None:
     red = "\033[91m"
     reset = "\033[0m"
     # Deliberately vague: don't reveal whether the username exists.
     print(f"\n{red}Invalid username or password.{reset}\n")
 
 
-def show_logged_out(username):
+def show_logged_out(username: str) -> None:
     print(f"\n{username} has been logged out.\n")
 
 
 # ========================================================
 # Audit history
 # ========================================================
-def show_audit_saved_to_history(audit_record):
+def show_audit_saved_to_history(audit_record: Record) -> None:
     if audit_record is None:
         print("Warning: this audit could not be saved to your history.")
     else:
         print(f"Audit #{audit_record['audit_id']} saved to your history.")
 
 
-def show_unexpected_error(error):
+def show_unexpected_error(error: BaseException) -> None:
     red = "\033[91m"
     reset = "\033[0m"
     print(f"\n{red}Something went wrong and this step was skipped "
@@ -400,7 +408,7 @@ def show_unexpected_error(error):
     print(f"Nothing was saved. Please try again.{reset}\n")
 
 
-def show_audit_not_saved_ai_failed():
+def show_audit_not_saved_ai_failed() -> None:
     yellow = "\033[93m"
     reset = "\033[0m"
     print(f"{yellow}The AI analysis failed, so this audit was NOT added to your history.")
@@ -409,26 +417,26 @@ def show_audit_not_saved_ai_failed():
 
 # Helpers so one damaged field in audit_history.json (null, wrong type)
 # cannot crash the history screens.
-def _as_dict(value):
+def _as_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _as_text(value, default=""):
+def _as_text(value: Any, default: str = "") -> str:
     return default if value is None else str(value)
 
 
-def _as_money(value):
+def _as_money(value: Any) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         return 0.0
     return float(value)
 
 
-def _audit_stamp(audit):
+def _audit_stamp(audit: Any) -> str:
     return _as_text(audit.get("timestamp")).replace("T", " ")
 
 
 # Summary table of every audit the user has done.
-def display_audit_history(audits, username, filtered=False):
+def display_audit_history(audits: list[Record], username: str, filtered: bool = False) -> bool:
     if len(audits) == 0:
         print(f"\nNo past audits found for '{username}'. Choose option 1 to start one.\n")
         gui.return_button()
@@ -456,7 +464,7 @@ def display_audit_history(audits, username, filtered=False):
 
 
 # Asks which audit to open in full. Returns a list index, or None to go back.
-def select_audit_record(audits):
+def select_audit_record(audits: list[Record]) -> int | None:
     valid_ids = [_as_dict(audit).get("audit_id") for audit in audits]
     while True:
         choice = input("Enter an audit # to view in full (or press Enter to return): ").strip().lstrip("#")
@@ -469,7 +477,7 @@ def select_audit_record(audits):
 
 # What to do next on the past-audits screen. Returns ("open", list index),
 # ("filter", None) or ("back", None).
-def choose_history_action(audits):
+def choose_history_action(audits: list[Record]) -> tuple[str, int | None]:
     valid_ids = [_as_dict(audit).get("audit_id") for audit in audits]
     while True:
         choice = input(
@@ -487,7 +495,7 @@ def choose_history_action(audits):
 
 # Asks how to filter the history. Returns ("status", decision status),
 # ("company", text) or None to cancel.
-def retrieve_history_filter(statuses):
+def retrieve_history_filter(statuses: list[str]) -> tuple[str, str] | None:
     print("\nFilter your past audits by:")
     for number, status in enumerate(statuses, start=1):
         print(f"  {number}. Decision: {status}")
@@ -507,11 +515,11 @@ def retrieve_history_filter(statuses):
             print("Invalid choice. Please try again.")
 
 
-def show_no_matching_audits():
+def show_no_matching_audits() -> None:
     print("\nNo audits match that filter. Showing all of your audits again.\n")
 
 
-def confirm_export_pdf():
+def confirm_export_pdf() -> bool:
     while True:
         choice = input("Export this audit as a PDF report? (y/n): ").strip().lower()
         if choice in ("y", "n"):
@@ -519,7 +527,7 @@ def confirm_export_pdf():
         print("Invalid input. Please enter 'y' or 'n'.")
 
 
-def show_pdf_result(status, file_name, folder):
+def show_pdf_result(status: str, file_name: str | None, folder: str) -> None:
     messages = {
         "exported": f"PDF report saved as '{file_name}' in {folder}",
         "missing_dependency": "PDF export needs the 'reportlab' package: pip install reportlab",
@@ -529,16 +537,16 @@ def show_pdf_result(status, file_name, folder):
     print(messages.get(status, f"PDF export failed ({status})."))
 
 
-def wait_for_return():
+def wait_for_return() -> None:
     gui.return_button()
 
 
-def wait_for_continue():
+def wait_for_continue() -> None:
     gui.continue_button()
 
 
 # Shown right after login so the user sees their saved history is loaded.
-def show_audit_count(count):
+def show_audit_count(count: int) -> None:
     if count:
         print(f"You have {count} saved audit{'s' if count != 1 else ''} (menu option 9).\n")
     else:
@@ -546,17 +554,17 @@ def show_audit_count(count):
 
 
 # Messages for a clean exit (main.py cannot print; only this layer does).
-def show_interrupted():
+def show_interrupted() -> None:
     print("\n\nInterrupted. Goodbye!")
 
 
-def show_input_ended():
+def show_input_ended() -> None:
     print("\n\nNo more input available. If you run the app in Docker, "
           "start it with 'docker run -it ...' so you can type into it.")
 
 
 # Full view of one saved audit, reusing the existing report layouts.
-def display_audit_detail(audit):
+def display_audit_detail(audit: Record) -> None:
     audit = _as_dict(audit)
     application = _as_dict(audit.get("application"))
     ai_audit = _as_dict(audit.get("ai_audit"))
@@ -576,7 +584,7 @@ def display_audit_detail(audit):
 
 
 # Display Company Profile
-def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, sustainability_grant, proposal_narrative, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
+def display_company_profile(company_name: str, company_industry: str, total_revenue: float, total_employees: int, local_equity: float, proposal_type: str, sustainability_grant: str, proposal_narrative: str, baseline_energy_expenditure: float, estimated_retrofit_cost: float, reporting_advisory_fee: float) -> None:
     print(f"Company Name: {company_name}")
     print(f"Company Industry: {company_industry}")
     print(f"Company Total Revenue: {total_revenue}")
@@ -595,7 +603,7 @@ NARRATIVE_MAX_LEN = 3000
 OTHER_TEXT_MAX_LEN = 60
 
 
-def retrieve_company_name():
+def retrieve_company_name() -> str:
     while True:
         company_name = input("Enter your Company's Name: ").strip()
         if company_name == "":
@@ -606,7 +614,7 @@ def retrieve_company_name():
             return company_name
 
 # input of Company's industry
-def retrieve_company_industry():
+def retrieve_company_industry() -> str:
     valid_industries = ["Logistics", "Manufacturing", "Retail", "Food & Beverage", "Healthcare", "Information Technology", "Construction", "Education", "Finance", "Hospitality", "Aerospace", "Others"]
 
     while True:
@@ -621,7 +629,7 @@ def retrieve_company_industry():
         else:
             return company_industry
 
-def get_valid_other_industry():
+def get_valid_other_industry() -> str:
     while True:
         other_industry = input("Please specify your Company's Industry Sector: ").strip().title()
         if other_industry == "":
@@ -635,7 +643,7 @@ def get_valid_other_industry():
 
 # Like float(), but also rejects "nan" and "inf", which float() accepts and
 # which slip past <= / >= range checks. Raises ValueError like float().
-def finite_float(text):
+def finite_float(text: Any) -> float | None:
     number = float(text)
     if not math.isfinite(number):
         raise ValueError("number must be finite")
@@ -643,7 +651,7 @@ def finite_float(text):
 
 
 # input of Company's Total Revenue
-def retrieve_total_revenue():
+def retrieve_total_revenue() -> float:
     while True:
         try:
             total_revenue = finite_float(input("Enter your Company's Total Revenue (in SGD): "))
@@ -657,7 +665,7 @@ def retrieve_total_revenue():
             print("Invalid input. Please enter a numeric value for total revenue.")
 
 # input of Company's Total Number of Employees
-def retrieve_total_employees():
+def retrieve_total_employees() -> int:
     while True:
         try:
             total_employees = int(input("Enter your Company's Total Number of Employees: "))
@@ -671,7 +679,7 @@ def retrieve_total_employees():
             print("Invalid input. Please enter a numeric value for total number of employees.")
 
 # input of Company's Local Equity
-def retrieve_local_equity():
+def retrieve_local_equity() -> float:
     while True:
         raw_value = input("Enter equity % owned by Singapore Citizens/PRs: ").strip()
         if raw_value == "":
@@ -691,7 +699,7 @@ def retrieve_local_equity():
 # only collect the cost fields that are actually relevant, and so
 # ai_manager.py gets a strong prior instead of guessing purely from
 # free-text narrative.
-def retrieve_proposal_type():
+def retrieve_proposal_type() -> str:
     valid_types = {
         "1": "Equipment / Energy Upgrade",
         "2": "ESG Reporting / Advisory",
@@ -709,7 +717,7 @@ def retrieve_proposal_type():
             print("Invalid choice. Please enter 1 or 2.")
 
 # Input of Baseline Annual Energy Expenditure
-def retrieve_baseline_energy_expenditure():
+def retrieve_baseline_energy_expenditure() -> float:
     while True:
         raw_value = input("Enter baseline annual energy expenditure (in SGD): ").strip()
         if raw_value == "":
@@ -726,7 +734,7 @@ def retrieve_baseline_energy_expenditure():
             print("Invalid input. Please enter a numeric value for baseline annual energy expenditure.")
 
 # Input of Estimated Retrofit Cost
-def retrieve_estimated_retrofit_cost():
+def retrieve_estimated_retrofit_cost() -> float:
     while True:
         raw_value = input("Enter estimated retrofit cost (in SGD): ").strip()
         if raw_value == "":
@@ -746,7 +754,7 @@ def retrieve_estimated_retrofit_cost():
 # narrative ai_manager.py needs in order to classify GHG scope, detect
 # exclusion keywords, and estimate abatement — currently nothing in
 # main.py or io_manager.py collects this at all.
-def retrieve_proposal_narrative():
+def retrieve_proposal_narrative() -> str:
     print("Describe your proposed sustainability/energy upgrade in your own words.")
     print("(e.g. what equipment is being replaced, the fuel/energy source involved,")
     print(" and whether any components are second-hand, refurbished, or modified.)")
@@ -761,7 +769,7 @@ def retrieve_proposal_narrative():
             return narrative
 
 # Input of Reporting/Advisory Fee (only collected for ESG Reporting / Advisory proposals)
-def retrieve_reporting_advisory_fee():
+def retrieve_reporting_advisory_fee() -> float:
     while True:
         raw_value = input("Enter estimated external ESG reporting/advisory fee (in SGD): ").strip()
         if raw_value == "":
@@ -778,7 +786,7 @@ def retrieve_reporting_advisory_fee():
             print("Invalid input. Please enter a numeric value for the reporting/advisory fee.")
 
 # Sustainability Grant that Company's want to apply
-def retrieve_sustainability_grant():
+def retrieve_sustainability_grant() -> str:
     valid_grants = ['1. Energy Efficiency Grant (EEG) -Base Tier', '2. Energy Efficiency Grant (EEG) -Advanced Tier', '3. Enterprise Development Grant (EDG)', '4. Sustainability Reporting Programme (SRP)', '5. Others']
     while True:
         print('\nWhich Sustainability Grant would your company like to apply for?')
@@ -818,7 +826,7 @@ def retrieve_sustainability_grant():
 # (company_profile / proposal / ...) or be missing fields. This turns any
 # record into the flat, capitalised layout the screens and main.py use, so
 # a file that doesn't match exactly shows "N/A" instead of crashing.
-def flat_record(record):
+def flat_record(record: Any) -> Record:
     if not isinstance(record, dict):
         return {}
     if isinstance(record.get("company_profile"), dict):
@@ -826,12 +834,12 @@ def flat_record(record):
     return record
 
 
-def _section(record, name):
+def _section(record: Any, name: str) -> dict[str, Any]:
     section = record.get(name)
     return section if isinstance(section, dict) else {}
 
 
-def audit_record_to_display_format(audit_record):
+def audit_record_to_display_format(audit_record: Record) -> Record:
     """Turns a saved (nested) audit record into the capitalised keys the
     screens use, so records loaded from JSON are listed exactly like the
     ones entered in this session."""
@@ -851,7 +859,7 @@ def audit_record_to_display_format(audit_record):
     }
 
 
-def display_applied_grants(scheme_grant_records, key):
+def display_applied_grants(scheme_grant_records: Records, key: int) -> Records | None:
     red = "\033[91m"
     reset = "\033[0m"
 
@@ -899,7 +907,7 @@ def display_applied_grants(scheme_grant_records, key):
 # actually reads. main.py's case 1 now stores Proposal Type and
 # Reporting Advisory Fee directly on the record, so no extra
 # parameters are needed here.
-def convert_record_to_profile(record):
+def convert_record_to_profile(record: Record) -> dict[str, Any]:
     record = flat_record(record)
     return {
         "company_name": record.get("Company Name", ""),
@@ -921,7 +929,7 @@ def convert_record_to_profile(record):
 
 # Asks for a save/load file name using the floppy-disk label prompt.
 # Re-prompts until a non-empty name is entered.
-def retrieve_json_filename(blocked_chars="", *args):
+def retrieve_json_filename(blocked_chars: str = "", *args: Any) -> str:
     """blocked_chars: characters the typed name may not contain (supplied
     by main.py from the Data Manager, which owns the file-name rules).
     Extra args are passed on to the disk prompt; a first value of 3 shows
@@ -940,7 +948,7 @@ def retrieve_json_filename(blocked_chars="", *args):
         print("File name cannot be empty. Please try again.")
 
 
-def confirm_overwrite_records():
+def confirm_overwrite_records() -> bool:
     while True:
         choice = input("This will replace the records currently in memory. Continue? (y/n): ").strip().lower()
         if choice == "y":
@@ -950,7 +958,7 @@ def confirm_overwrite_records():
         print("Invalid input. Please enter 'y' or 'n'.")
 
 
-def ask_existing_file_action(file_name):
+def ask_existing_file_action(file_name: str) -> str:
     """The file already exists: returns "add", "replace" or "cancel"."""
     while True:
         choice = input(
@@ -962,7 +970,7 @@ def ask_existing_file_action(file_name):
         print("Invalid input. Please enter 'a', 'r' or 'c'.")
 
 
-def display_save_result(status, file_name):
+def display_save_result(status: str | None, file_name: str) -> None:
     messages = {
         "saved": f"Data successfully saved to {file_name}.",
         "no_name": "No file name was given.",
@@ -974,7 +982,7 @@ def display_save_result(status, file_name):
         print(gui.save_disk_block_deep_blue())
 
 
-def display_load_result(status, file_name):
+def display_load_result(status: str, file_name: str) -> None:
     messages = {
         "loaded": f"Records loaded successfully from {file_name}.",
         "no_name": "No file name was given.",
@@ -987,12 +995,12 @@ def display_load_result(status, file_name):
     print(messages.get(status, f"Unknown load status: {status}"))
 
 
-def confirm_save_to_json():
+def confirm_save_to_json() -> bool:
     art, regions = gui.yes_no_buttons("Save this record to JSON now?")
     return execute_choice_interaction(art, regions, {"y": True, "n": False})
 
 # Shows the floppy disk and lets the user type the file name on its label.
-def prompt_filename_on_disk(*args, max_len=50, blocked=""):
+def prompt_filename_on_disk(*args: Any, max_len: int = 50, blocked: str = "") -> str:
     key = args[0] if args else None   # first extra value, or None if nothing was passed
 
     if key == 3: #When loading the file
@@ -1017,11 +1025,11 @@ def prompt_filename_on_disk(*args, max_len=50, blocked=""):
 PAPER_WIDTH = 110
 
 
-def print_on_paper(lines, title="REPORT", footer="End of report", width=PAPER_WIDTH):
+def print_on_paper(lines: list[str], title: str = "REPORT", footer: str = "End of report", width: int = PAPER_WIDTH) -> None:
     """Print a list of text lines inside a paper-style frame."""
     inner = width - 4  # usable space between "| " and " |"
 
-    def row(text=""):
+    def row(text: str = "") -> None:
         print(f"| {text:<{inner}} |")
 
     print()
@@ -1047,7 +1055,7 @@ def print_on_paper(lines, title="REPORT", footer="End of report", width=PAPER_WI
     print(("\\/" * width)[:width])  # torn paper edge
 
 
-def format_pairs(data, width=PAPER_WIDTH, indent=""):
+def format_pairs(data: Any, width: int = PAPER_WIDTH, indent: str = "") -> list[str]:
     """Turn a dict into aligned 'key : value' lines with a hanging indent."""
     inner = width - 4 - len(indent)
     key_w = max(len(str(k)) for k in data)
@@ -1064,11 +1072,11 @@ def format_pairs(data, width=PAPER_WIDTH, indent=""):
 # print statements in the codebase belong in io_manager.py per the
 # architecture, so ai_manager.py and logic_manager.py never print
 # directly — they just return data for this layer to display.
-def display_ai_audit(ai_audit):
+def display_ai_audit(ai_audit: AiAudit) -> None:
     print_on_paper(format_pairs(ai_audit), title="AI AUDIT REPORT")
 
 # Runs whenever AI Manager is using the get_ai_response() function. It gives one bar for every second passed
-def run_ai_analysis_bar(stop_event, timeout_seconds=60):
+def run_ai_analysis_bar(stop_event: threading.Event, timeout_seconds: int = 60) -> None:
     """
     Animates the progress bar. Stops instantly if stop_event is flagged 
     or when it hits the maximum timeout.
@@ -1100,7 +1108,7 @@ def run_ai_analysis_bar(stop_event, timeout_seconds=60):
 
 
 # Renders the Logic Manager's decision for the CLI.
-def display_grant_decision(result):
+def display_grant_decision(result: dict[str, Any]) -> None:
     lines = [
         f"SME Eligible     : {'YES' if result['is_sme'] else 'NO'}",
         f"Decision Status  : {result['decision_status']}",
@@ -1144,7 +1152,7 @@ COMMON_FIELDS = (
 )
 
 
-def fields_for(record):
+def fields_for(record: Record) -> tuple[str, ...]:
     """The fields that make sense for this record: equipment proposals have
     a baseline spend and retrofit cost, reporting proposals have a fee."""
     if flat_record(record).get("Proposal Type") == "ESG Reporting / Advisory":
@@ -1152,7 +1160,7 @@ def fields_for(record):
     return COMMON_FIELDS + ("Baseline Energy Expenditure", "Estimated Retrofit Cost")
 
 
-def _choose_number(prompt, highest):
+def _choose_number(prompt: str, highest: int) -> int | None:
     """Asks for a whole number from 0 to highest. Returns None if invalid."""
     answer = key_verifier(input(prompt), max_digits=len(str(highest)))
     if answer is None or answer > highest:
@@ -1160,7 +1168,7 @@ def _choose_number(prompt, highest):
     return answer
 
 
-def select_record_index(records, action):
+def select_record_index(records: Records, action: str) -> int | None:
     """Lists the records and asks which to `action` ("update"/"delete").
     Returns the 0-based index, or None if the user cancels."""
     print(f"\nWhich record do you want to {action}?")
@@ -1180,7 +1188,7 @@ def select_record_index(records, action):
             return number - 1
 
 
-def select_field_to_edit(record):
+def select_field_to_edit(record: Record) -> str | None:
     """Asks which field of `record` to change. Returns the field name or None."""
     fields = fields_for(record)
     flat = flat_record(record)
@@ -1201,12 +1209,12 @@ def select_field_to_edit(record):
             return fields[number - 1]
 
 
-def retrieve_field_value(field):
+def retrieve_field_value(field: str) -> Any:
     """Prompts for a new value of `field` with the original validation."""
     return FIELD_PROMPTS[field]()
 
 
-def confirm_delete_record(company_name):
+def confirm_delete_record(company_name: str) -> bool:
     while True:
         choice = input(f"Delete the record for '{company_name}'? (y/n): ").strip().lower()
         if choice in ("y", "n"):
@@ -1214,37 +1222,37 @@ def confirm_delete_record(company_name):
         print("Invalid input. Please enter 'y' or 'n'.")
 
 
-def show_record_updated(company_name, field):
+def show_record_updated(company_name: str, field: str) -> None:
     print(f"Updated '{field}' for '{company_name}'. Use option 2 to save the change.")
     gui.return_button()
 
 
-def show_record_deleted(company_name):
+def show_record_deleted(company_name: str) -> None:
     print(f"Deleted the record for '{company_name}'. "
           "Use option 2 (choose replace) to remove it from a saved file too.")
     gui.return_button()
 
 
-def show_record_not_changed():
+def show_record_not_changed() -> None:
     print("Nothing was changed.")
     gui.return_button()
 
 
-def display_no_records_message():
+def display_no_records_message() -> None:
     print("No records yet. Please select option 1 first.")
     gui.return_button()
 
 # When AI hasn't yet audited the machine. The AI will audit right after finishing the input for the company grant so it only activates in practice when no data exists
-def display_no_ai_audit():
+def display_no_ai_audit() -> None:
     print("No AI audit yet. Please run option 7 first.")
     gui.return_button()
 
 # ASCII related
 # io_manager.py
-def show_wrong_option_error():
+def show_wrong_option_error() -> None:
     print(gui.wrong_sign_red())
     gui.return_button()
 
 # 
-def show_goodbye():
+def show_goodbye() -> None:
     print(gui.goodbye_art())

@@ -1,3 +1,5 @@
+from typing import Any
+from collections.abc import Iterator
 import json
 import logging
 import os
@@ -5,6 +7,11 @@ import re
 import time
 from contextlib import contextmanager
 from datetime import datetime
+
+# Type aliases (plain dicts/lists - the project uses no classes)
+Record = dict[str, Any]
+Records = list[Record]
+AiAudit = dict[str, Any]
 
 # Stay silent unless someone configures logging (otherwise Python's default
 # handler would write warnings straight to the terminal).
@@ -31,7 +38,7 @@ REQUIRED_RECORD_SECTIONS = ("company_profile", "proposal", "ai_audit", "evaluati
 # Logging
 # ---------------------------------------------------------------------------
 
-def setup_logging():
+def setup_logging() -> bool:
     """Sends the app's log messages (AI failures, unreadable files, ...) to
     DATA_DIR/app.log so problems can be looked into afterwards while the app
     carries on. Safe to call more than once. Returns True if logging to the
@@ -56,7 +63,7 @@ def setup_logging():
 # Filename helpers
 # ---------------------------------------------------------------------------
 
-def normalise_filename(jsonfile_name):
+def normalise_filename(jsonfile_name: str) -> str:
     """Strips whitespace and makes sure the name ends with .json
     (any capitalisation of the extension is accepted)."""
     jsonfile_name = str(jsonfile_name).strip()
@@ -65,7 +72,7 @@ def normalise_filename(jsonfile_name):
     return jsonfile_name
 
 
-def is_valid_filename(jsonfile_name):
+def is_valid_filename(jsonfile_name: str) -> bool:
     """A bare filename only: no folders, control characters, or empty stem."""
     if any(char in jsonfile_name for char in INVALID_FILENAME_CHARS):
         return False
@@ -76,7 +83,7 @@ def is_valid_filename(jsonfile_name):
     return stem.strip(" .") != ""
 
 
-def _full_path(jsonfile_name):
+def _full_path(jsonfile_name: str) -> str:
     """Path of a shared file in DATA_DIR (users.json, audit_history.json)."""
     return os.path.join(DATA_DIR, jsonfile_name)
 
@@ -95,7 +102,7 @@ _USERNAME_FOR_PATH = re.compile(r"[a-z0-9_]{1,64}")
 _active_user = None
 
 
-def set_active_user(username):
+def set_active_user(username: str | None) -> None:
     """Chooses whose folder the record files are saved to / loaded from.
     Pass None to go back to no active user."""
     global _active_user
@@ -108,21 +115,21 @@ def set_active_user(username):
     _active_user = username
 
 
-def get_active_user():
+def get_active_user() -> str | None:
     return _active_user
 
 
-def _records_dir():
+def _records_dir() -> str:
     if _active_user is None:
         return DATA_DIR
     return os.path.join(DATA_DIR, RECORDS_DIR_NAME, _active_user)
 
 
-def _record_path(jsonfile_name):
+def _record_path(jsonfile_name: str) -> str:
     return os.path.join(_records_dir(), jsonfile_name)
 
 
-def generate_company_save_filename(company_name):
+def generate_company_save_filename(company_name: str) -> str:
     """Return a stable, safe JSON filename for one company.
 
     Repeated assessments for the same company use this same JSON/PDF pair;
@@ -143,7 +150,7 @@ def generate_company_save_filename(company_name):
 # Record helpers
 # ---------------------------------------------------------------------------
 
-def is_valid_audit_record(record):
+def is_valid_audit_record(record: Any) -> bool:
     """Accept both canonical audit records and the current IO Manager record shape."""
     if not isinstance(record, dict):
         return False
@@ -158,7 +165,7 @@ def is_valid_audit_record(record):
     )
 
 
-def _section(record, section_name):
+def _section(record: Any, section_name: str) -> dict[str, Any]:
     """Safe access to a record section: always returns a dict."""
     if not isinstance(record, dict):
         return {}
@@ -170,7 +177,7 @@ def _section(record, section_name):
 # Audit record management
 # ---------------------------------------------------------------------------
 
-def generate_audit_id(records):
+def generate_audit_id(records: Any) -> int:
     """Return the next ID for either nested or flat audit records."""
     if not isinstance(records, list) or not records:
         return 1
@@ -185,7 +192,7 @@ def generate_audit_id(records):
     return highest_id + 1
 
 
-def create_audit_record(audit_id, user_profile, proposal, ai_audit, evaluation):
+def create_audit_record(audit_id: int, user_profile: dict[str, Any], proposal: dict[str, Any], ai_audit: AiAudit, evaluation: dict[str, Any]) -> Record:
     """Combine all assessment information into one audit record."""
     return {
         "audit_id": audit_id,
@@ -199,7 +206,7 @@ def create_audit_record(audit_id, user_profile, proposal, ai_audit, evaluation):
     }
 
 
-def add_audit_record(records, audit_record):
+def add_audit_record(records: Records, audit_record: Record) -> Records:
     """Add a completed audit record to the current record list."""
     if not isinstance(records, list):
         records = []
@@ -211,7 +218,7 @@ def add_audit_record(records, audit_record):
 # Loading
 # ---------------------------------------------------------------------------
 
-def inspect_save_file(jsonfile_name):
+def inspect_save_file(jsonfile_name: str) -> tuple[str, str]:
     """
     Checks a filename WITHOUT reading the file.
 
@@ -231,7 +238,7 @@ def inspect_save_file(jsonfile_name):
     return name, "not_found"
 
 
-def _backup_corrupt_file(path):
+def _backup_corrupt_file(path: str) -> None:
     """Moves a bad file aside so a later save cannot silently destroy it."""
     try:
         os.replace(path, path + ".corrupt")
@@ -239,7 +246,7 @@ def _backup_corrupt_file(path):
         logger.error("Could not back up corrupt file %s: %s", path, err)
 
 
-def load_data_from_json(jsonfile_name):
+def load_data_from_json(jsonfile_name: str) -> tuple[Records, str, str]:
     """
     Loads records from a JSON save file.
 
@@ -285,7 +292,7 @@ def load_data_from_json(jsonfile_name):
 
     return data, name, "loaded"
 
-def is_data_loaded(data, jsonfile_name):
+def is_data_loaded(data: Records, jsonfile_name: str) -> bool:
     """True if there is already data/filename in memory (io_manager should
     then ask the user before overwriting it)."""
     return not (data == [] and jsonfile_name == "")
@@ -295,7 +302,7 @@ def is_data_loaded(data, jsonfile_name):
 # Saving
 # ---------------------------------------------------------------------------
 
-def save_data_to_json(data, jsonfile_name):
+def save_data_to_json(data: Records, jsonfile_name: str) -> tuple[str | None, str]:
     """
     Saves records to a JSON file.
 
@@ -345,7 +352,7 @@ USERS_FILE = "users.json"
 AUDIT_HISTORY_FILE = "audit_history.json"
 
 
-def read_json_file(filename, default):
+def read_json_file(filename: str, default: Any) -> Any:
     """Returns the parsed contents of a data file, or `default` if the file
     does not exist yet. Returns None if the file exists but cannot be read,
     so callers never overwrite data they failed to load. A corrupt file is
@@ -370,7 +377,7 @@ def read_json_file(filename, default):
     return data
 
 
-def write_json_file(filename, data):
+def write_json_file(filename: str, data: Any) -> bool:
     """Writes data to a temporary file first and then swaps it in, so a crash
     midway can never leave a half-written file behind.
     Returns True on success, False otherwise."""
@@ -401,7 +408,7 @@ LOCK_STALE_SECONDS = 30.0
 
 
 @contextmanager
-def _file_lock(filename):
+def _file_lock(filename: str) -> Iterator[bool]:
     """Yields True once this process holds the lock for `filename`, or
     False if it could not be obtained within LOCK_TIMEOUT_SECONDS (the
     caller then reports a failed save instead of risking a lost update).
@@ -441,12 +448,12 @@ def _file_lock(filename):
 
 
 # ---------- Users ----------
-def load_users():
+def load_users() -> dict[str, Any]:
     """All stored users as {username: record}, or None if unreadable."""
     return read_json_file(USERS_FILE, {})
 
 
-def get_user(username):
+def get_user(username: str) -> dict[str, Any] | None:
     """Returns the stored user record for `username`, or None."""
     users = load_users()
     if users is None:
@@ -455,14 +462,14 @@ def get_user(username):
     return record if isinstance(record, dict) else None
 
 
-def user_exists(username):
+def user_exists(username: str) -> bool:
     """True if the username is already in users.json (even if its record
     is damaged, so it can never be silently overwritten)."""
     users = load_users()
     return users is not None and username in users
 
 
-def save_new_user(user_record):
+def save_new_user(user_record: dict[str, Any]) -> bool:
     """Adds a new user (built by logic_manager.build_new_user_record).
     Returns False if the username is already taken or the write failed."""
     with _file_lock(USERS_FILE) as locked:
@@ -482,12 +489,12 @@ def save_new_user(user_record):
 
 
 # ---------- Audit history ----------
-def load_audit_history():
+def load_audit_history() -> dict[str, Any]:
     """All saved audits as {username: [audit, ...]}, or None if unreadable."""
     return read_json_file(AUDIT_HISTORY_FILE, {})
 
 
-def get_user_audits(username):
+def get_user_audits(username: str) -> list[Record]:
     """All audits saved by `username`, oldest first."""
     history = load_audit_history()
     audits = history.get(username, []) if history else []
@@ -497,7 +504,7 @@ def get_user_audits(username):
     return [audit for audit in audits if isinstance(audit, dict)]
 
 
-def append_user_audit(username, application, ai_audit, result):
+def append_user_audit(username: str, application: Record, ai_audit: AiAudit, result: dict[str, Any] | None) -> Record | None:
     """Saves one completed audit (inputs + AI output + decision) under the
     logged-in user. Returns the saved record, or None on failure."""
     with _file_lock(AUDIT_HISTORY_FILE) as locked:
@@ -529,7 +536,7 @@ def append_user_audit(username, application, ai_audit, result):
 # Filtering / querying
 # ---------------------------------------------------------------------------
 
-def filter_by_decision_status(records, decision_status):
+def filter_by_decision_status(records: Records, decision_status: str) -> Records:
     """Records whose evaluation decision_status matches exactly.
     Example: filter_by_decision_status(records, "PRE_APPROVED_TIER_1")"""
     return [
@@ -538,7 +545,7 @@ def filter_by_decision_status(records, decision_status):
     ]
 
 
-def filter_approved_records(records):
+def filter_approved_records(records: Records) -> Records:
     """Records where the audit passed."""
     return [
         r for r in records
@@ -546,7 +553,7 @@ def filter_approved_records(records):
     ]
 
 
-def find_records_by_company(records, company_name):
+def find_records_by_company(records: Records, company_name: str) -> Records:
     """Case-insensitive exact match on company name."""
     wanted = str(company_name).strip().lower()
     return [
@@ -555,7 +562,7 @@ def find_records_by_company(records, company_name):
     ]
 
 
-def available_decision_statuses(records):
+def available_decision_statuses(records: Records) -> list[str]:
     """Sorted list of the distinct decision statuses present in the records
     (lets io_manager offer only filters that can match something)."""
     statuses = {
@@ -564,7 +571,7 @@ def available_decision_statuses(records):
     }
     return sorted(status for status in statuses if isinstance(status, str) and status)
 
-def merge_records(existing, new_records):
+def merge_records(existing: Records, new_records: Records) -> Records:
     """Existing records first, then any new ones not already present."""
     return existing + [r for r in new_records if r not in existing]
 
@@ -590,7 +597,7 @@ EDITABLE_RECORD_FIELDS = (
 )
 
 
-def _valid_index(records, index):
+def _valid_index(records: Any, index: Any) -> bool:
     return (
         isinstance(records, list)
         and isinstance(index, int)
@@ -599,7 +606,7 @@ def _valid_index(records, index):
     )
 
 
-def update_record_field(records, index, field, value):
+def update_record_field(records: Records, index: int, field: str, value: Any) -> tuple[Records, str]:
     """Returns (new_records, status). status is "updated", "bad_index",
     "bad_field" or "not_editable" (the record is not in the display layout)."""
     if not _valid_index(records, index):
@@ -614,7 +621,7 @@ def update_record_field(records, index, field, value):
     return records[:index] + [changed] + records[index + 1:], "updated"
 
 
-def delete_record(records, index):
+def delete_record(records: Records, index: int) -> tuple[Records, str]:
     """Returns (new_records, status). status is "deleted" or "bad_index"."""
     if not _valid_index(records, index):
         return records, "bad_index"
@@ -625,24 +632,24 @@ def delete_record(records, index):
 # Filtering the audit history (option 9)
 # ---------------------------------------------------------------------------
 
-def audit_decision_status(audit):
+def audit_decision_status(audit: Any) -> str:
     """The decision status stored in one history entry, or "" if missing."""
     status = _section(audit, "result").get("decision_status")
     return status if isinstance(status, str) else ""
 
 
-def available_audit_statuses(audits):
+def available_audit_statuses(audits: list[Record]) -> list[str]:
     """Sorted distinct decision statuses in the history (so the I/O Manager
     only offers filters that can match something)."""
     return sorted({audit_decision_status(audit) for audit in audits} - {""})
 
 
-def filter_audits_by_status(audits, decision_status):
+def filter_audits_by_status(audits: list[Record], decision_status: str) -> list[Record]:
     """History entries whose decision status matches exactly."""
     return [audit for audit in audits if audit_decision_status(audit) == decision_status]
 
 
-def search_audits_by_company(audits, text):
+def search_audits_by_company(audits: list[Record], text: str) -> list[Record]:
     """History entries whose company name contains `text` (ignoring case)."""
     wanted = str(text).strip().lower()
     return [
@@ -655,7 +662,7 @@ def search_audits_by_company(audits, text):
 # PDF export of one saved audit (option 9)
 # ---------------------------------------------------------------------------
 
-def audit_to_report_record(audit):
+def audit_to_report_record(audit: Record) -> Record:
     """Turns one audit-history entry into the flat record layout the PDF
     report already understands: the application's own keys plus the AI result
     and the grant decision, so the report shows the full, final outcome."""
@@ -667,7 +674,7 @@ def audit_to_report_record(audit):
     return report
 
 
-def audit_pdf_filename(audit):
+def audit_pdf_filename(audit: Record) -> str:
     """A safe default PDF name such as 'audit_3_Apex Haulage.pdf'."""
     company = _section(audit, "application").get("Company Name", "")
     safe_company = generate_company_save_filename(company)[len("audit_"):-len(".json")]
@@ -675,7 +682,7 @@ def audit_pdf_filename(audit):
     return f"audit_{audit_id}_{safe_company}.pdf"
 
 
-def export_audit_to_pdf(audit):
+def export_audit_to_pdf(audit: Record) -> tuple[str | None, str]:
     """Writes the PDF report for one history entry into the user's records
     folder. Returns (pdf_filename, status), as export_records_to_pdf does."""
     if not isinstance(audit, dict) or not audit:
@@ -683,7 +690,7 @@ def export_audit_to_pdf(audit):
     return export_records_to_pdf([audit_to_report_record(audit)], "audit", audit_pdf_filename(audit))
 
 
-def get_records_folder():
+def get_records_folder() -> str:
     """Folder the active user's saved files and PDFs go into (for messages)."""
     return os.path.abspath(_records_dir())
 
@@ -692,7 +699,7 @@ def get_records_folder():
 # PDF export
 # ---------------------------------------------------------------------------
 
-def export_json_to_pdf(jsonfile_name, pdf_filename=None):
+def export_json_to_pdf(jsonfile_name: str, pdf_filename: str | None = None) -> tuple[str | None, str]:
     """Create a polished, company-facing assessment report from saved JSON.
 
     The report includes every audit record in the source file. It is saved in
@@ -707,7 +714,7 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
     return export_records_to_pdf(records, clean_json_name, pdf_filename)
 
 
-def export_records_to_pdf(records, source_name, pdf_filename=None):
+def export_records_to_pdf(records: Records, source_name: str, pdf_filename: str | None = None) -> tuple[str | None, str]:
     """Builds the PDF report for a list of audit records (nested or flat) and
     saves it next to the user's other record files. `source_name` is only used
     to pick the default PDF name and in log messages.
@@ -878,11 +885,11 @@ def export_records_to_pdf(records, source_name, pdf_filename=None):
             "raw_narrative": "Proposal narrative",
         }
 
-        def nice_label(value):
+        def nice_label(value: Any) -> str:
             key = str(value)
             return label_names.get(key, key.replace("_", " ").strip().capitalize())
 
-        def readable_value(value, key=""):
+        def readable_value(value: Any, key: str = "") -> str:
             """Format common values as prose, never as JSON source text."""
             if value is None or value == "":
                 return "Not provided"
@@ -921,11 +928,11 @@ def export_records_to_pdf(records, source_name, pdf_filename=None):
                 return status_labels.get(text, text.replace("_", " ").title())
             return text
 
-        def para(value, style=body_style):
+        def para(value: Any, style: Any = body_style) -> Any:
             safe = escape(str(value)).replace("\r\n", "\n").replace("\r", "\n")
             return Paragraph(safe.replace("\n", "<br/>"), style)
 
-        def add_detail_table(story, items):
+        def add_detail_table(story: list[Any], items: list[tuple[str, Any]]) -> None:
             if not items:
                 story.append(para("No information was recorded for this section.", small_style))
                 return
@@ -948,7 +955,7 @@ def export_records_to_pdf(records, source_name, pdf_filename=None):
             ]))
             story.extend([table, Spacer(1, 2 * mm)])
 
-        def add_bullets(story, heading, items, color=ink):
+        def add_bullets(story: list[Any], heading: str, items: Any, color: Any = ink) -> None:
             if not items:
                 return
             story.append(Paragraph(escape(heading), section_style))
@@ -961,7 +968,7 @@ def export_records_to_pdf(records, source_name, pdf_filename=None):
             for item in items:
                 story.append(para(f"- {readable_value(item)}", bullet_style))
 
-        def outcome_for(evaluation):
+        def outcome_for(evaluation: dict[str, Any]) -> tuple[str, Any, Any, str]:
             status = str(evaluation.get("decision_status", ""))
             if status.startswith("MANUAL"):
                 return (
@@ -991,7 +998,7 @@ def export_records_to_pdf(records, source_name, pdf_filename=None):
                 "The saved assessment does not record a positive eligibility result. Review the details below.",
             )
 
-        def screening_result_for(evaluation):
+        def screening_result_for(evaluation: dict[str, Any]) -> str:
             """Translate the logic status into a clear reader-facing outcome."""
             status = str(evaluation.get("decision_status", "")).upper()
             if status.startswith("MANUAL"):
@@ -1006,7 +1013,7 @@ def export_records_to_pdf(records, source_name, pdf_filename=None):
             # a rejection or a pass; route it to review in the report wording.
             return "Further review required"
 
-        def add_page_chrome(canvas, doc):
+        def add_page_chrome(canvas: Any, doc: Any) -> None:
             canvas.saveState()
             canvas.setFillColor(navy)
             canvas.rect(0, A4[1] - 5 * mm, A4[0], 5 * mm, fill=1, stroke=0)
