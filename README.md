@@ -55,7 +55,7 @@ cd INF1103_ProjectGrpWork
 
 ## Step 2: Create your `.env` file
 
-In the project folder (next to `main.py`), create a file named exactly `.env` containing one line:
+In the project folder (next to `main.py`), copy `.env.example` to a new file named exactly `.env` (or create it yourself) containing one line:
 
 ```
 OPENROUTER_API_KEY=sk-or-v1-paste-your-full-key-here
