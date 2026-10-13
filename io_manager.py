@@ -8,9 +8,6 @@ import codecs
 import getpass
 import math
 from contextlib import contextmanager
-import textwrap
-import codecs
-from contextlib import contextmanager
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
@@ -18,10 +15,6 @@ print()
 print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
 print()
 
-# ========================================================
-# Platform setup (done once)
-# ========================================================
-is_windows = os.name == "nt"
 # ========================================================
 # Platform setup (done once)
 # ========================================================
@@ -54,33 +47,6 @@ if is_windows:
 else:
     import select
     import termios
-    import tty
-
-    def _getb():
-        return os.read(sys.stdin.fileno(), 1)
-
-    def _pending(timeout=0.02):
-        return bool(select.select([sys.stdin.fileno()], [], [], timeout)[0])
-
-
-@contextmanager
-def _raw_input():
-    """Raw terminal mode on Unix, set once and restored after. No-op on Windows."""
-    if is_windows:
-        yield
-        return
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        yield
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
-
-# ========================================================
-# Mouse tracking
-# ========================================================
     import tty
 
     def _getb():
