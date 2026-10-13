@@ -612,6 +612,7 @@ def retrieve_company_industry():
     while True:
         company_industry = input(f"Enter your Company's Industry Sector (choose from {', '.join(valid_industries)}): ").strip().title()
 
+
         if company_industry.strip() == "":
             print("Company Industry Sector cannot be empty. Please try again.")
         elif company_industry not in valid_industries:
@@ -687,6 +688,26 @@ def retrieve_local_equity():
         except ValueError:
             print("Invalid input. Please enter a numeric value for your local equity.")
 
+# NEW: applicant self-declares which kind of proposal this is, so we
+# only collect the cost fields that are actually relevant, and so
+# ai_manager.py gets a strong prior instead of guessing purely from
+# free-text narrative.
+def retrieve_proposal_type():
+    valid_types = {
+        "1": "Equipment / Energy Upgrade",
+        "2": "ESG Reporting / Advisory",
+    }
+
+    while True:
+        choice = input('''What type of proposal is this?\n
+                1. Equipment / Energy Upgrade (e.g. fleet electrification, HVAC retrofit, lighting)\n
+                2. ESG Reporting / Advisory (e.g. inaugural sustainability report, external assurance)\n
+                    Enter 1 or 2: ''').strip()
+
+        if choice in valid_types:
+            return valid_types[choice]
+        else:
+            print("Invalid choice. Please enter 1 or 2.")
 # NEW: applicant self-declares which kind of proposal this is, so we
 # only collect the cost fields that are actually relevant, and so
 # ai_manager.py gets a strong prior instead of guessing purely from
