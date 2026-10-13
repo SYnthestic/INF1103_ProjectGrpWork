@@ -98,27 +98,42 @@ while key != 0:
         case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
                     #Display part is IO job. Editing and deleting them is Data Manager's job
                     in_and_out.display_applied_grants(scheme_grant_records, key)
-        case 5: #Update. Tia, this is your target
-            print("Update Function U/C")
-        case 6: #Delete. Tia's target no.2
-            print("Delete Function U/C")
-        case 7: #AI Processor
-            if len(scheme_grant_records) == 0:
-                in_and_out.display_no_records_message() 
-            else:
-                current_record = scheme_grant_records[-1]
-                narrative = current_record.get("Proposal Narrative", "")
+        case 5:  # Update
+            index = in_and_out.select_record(scheme_grant_records, key, "update")
+            if index is not None:
+                updated = in_and_out.retrieve_updated_record(scheme_grant_records[index - 1])
+                scheme_grant_records, jsonfile_name, status = dm.update_record_by_index(
+                    scheme_grant_records, index, updated, jsonfile_name
+                )
+                in_and_out.display_edit_result(status, updated.get("Company Name", "Unknown"))
+
+        case 6:  # Delete
+            index = in_and_out.select_record(scheme_grant_records, key, "delete")
+            if index is not None:
+                name = scheme_grant_records[index - 1].get("Company Name", "Unknown")
+                if in_and_out.confirm_delete(name):
+                    scheme_grant_records, jsonfile_name, status = dm.delete_record_by_index(
+                        scheme_grant_records, index, jsonfile_name
+                    )
+                    in_and_out.display_edit_result(status, name)
+        case 7:  # AI Manager
+            index = in_and_out.select_record(scheme_grant_records, key, "analyse")
+            if index is not None:
+                narrative = scheme_grant_records[index - 1].get("Proposal Narrative", "")
                 ai_audit_data = ai.get_ai_response(narrative)
+                scheme_grant_records[index - 1]["AI Audit"] = ai_audit_data 
                 in_and_out.display_ai_audit(ai_audit_data)
-        case 8: # For the Logic Manager
-            if len(scheme_grant_records) == 0:
-                in_and_out.display_no_records_message()
-            elif not ai_audit_data:
-                in_and_out.display_no_ai_audit()
-            else:
-                current_record = scheme_grant_records[-1]
-                user_profile = in_and_out.convert_record_to_profile(current_record)
-                result = logic.evaluate_grant_application(user_profile, ai_audit_data)
-                in_and_out.display_grant_decision(result)
+
+        case 8:  # Logic Manager
+            index = in_and_out.select_record(scheme_grant_records, key, "evaluate")
+            if index is not None:
+                ai_audit_data = scheme_grant_records[index - 1].get("AI Audit", {})
+                if not ai_audit_data:
+                    in_and_out.display_no_ai_audit()
+                else:
+                    user_profile = in_and_out.convert_record_to_profile(scheme_grant_records[index - 1])
+                    result = logic.evaluate_grant_application(user_profile, ai_audit_data)
+                    scheme_grant_records[index - 1]["Grant Decision"] = result
+                    in_and_out.display_grant_decision(result)
         case _:
             in_and_out.show_wrong_option_error()

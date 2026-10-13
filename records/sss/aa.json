@@ -1,0 +1,41 @@
+[
+    {
+        "Company Name": "AA11",
+        "Company Industry": "Aerospace",
+        "Company Total Revenue": 1.0,
+        "Total Employees": 2,
+        "Local Equity": 4.0,
+        "Proposal Type": "ESG Reporting / Advisory",
+        "Sustainability Grant": "1. Energy Efficiency Grant (EEG) -Base Tier",
+        "Proposal Narrative": "1",
+        "Baseline Energy Expenditure": 0.0,
+        "Estimated Retrofit Cost": 0.0,
+        "Reporting Advisory Fee": 1.0
+    },
+    {
+        "Company Name": "AA11",
+        "Company Industry": "Aerospace",
+        "Company Total Revenue": 2.0,
+        "Total Employees": 2,
+        "Local Equity": 2.0,
+        "Proposal Type": "Equipment / Energy Upgrade",
+        "Sustainability Grant": "1. Energy Efficiency Grant (EEG) -Base Tier",
+        "Proposal Narrative": "1",
+        "Baseline Energy Expenditure": 1.0,
+        "Estimated Retrofit Cost": 1.0,
+        "Reporting Advisory Fee": 0.0
+    },
+    {
+        "Company Name": "asa",
+        "Company Industry": "Retail",
+        "Company Total Revenue": 2.0,
+        "Total Employees": 2,
+        "Local Equity": 2.0,
+        "Proposal Type": "ESG Reporting / Advisory",
+        "Sustainability Grant": "2. Energy Efficiency Grant (EEG) -Advanced Tier",
+        "Proposal Narrative": "2",
+        "Baseline Energy Expenditure": 0.0,
+        "Estimated Retrofit Cost": 0.0,
+        "Reporting Advisory Fee": 2.0
+    }
+]

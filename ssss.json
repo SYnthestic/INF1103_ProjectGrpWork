@@ -1,0 +1,53 @@
+[
+    {
+        "Company Name": "AA11",
+        "Company Industry": "Aerospace",
+        "Company Total Revenue": 1.0,
+        "Total Employees": 1,
+        "Local Equity": 1.0,
+        "Proposal Type": "Equipment / Energy Upgrade",
+        "Proposal Narrative": "1",
+        "Baseline Energy Expenditure": 1.0,
+        "Estimated Retrofit Cost": 1.0,
+        "Reporting Advisory Fee": 0.0,
+        "AI Audit": {
+            "scope_category": "Unknown",
+            "primary_intervention_type": "",
+            "estimated_energy_reduction_pct": 0.0,
+            "estimated_lifetime_abatement_tonnes": 0.0,
+            "detected_exclusion_keywords": [],
+            "implementation_bottleneck": "",
+            "ai_reasoning_summary": "AI call failed (KeyError: 'OPENROUTER_API_KEY'); manual review recommended."
+        },
+        "Grant Decision": {
+            "is_sme": false,
+            "decision_status": "REJECT_NON_SME",
+            "reasons": [
+                "Local shareholding is only 1.0%, below the required minimum of 30%."
+            ],
+            "recommendations": [
+                "Review the company's local shareholding structure and SME size criteria.",
+                "Increase local shareholding to at least 30% if commercially and legally appropriate.",
+                "Consider the Enterprise Financing Scheme – Green (EFS-Green) as an alternative financing route."
+            ],
+            "matched_schemes": [
+                "Enterprise Financing Scheme – Green (EFS-Green)"
+            ],
+            "approved_subsidy_sgd": 0.0,
+            "audit_passed": false
+        }
+    },
+    {
+        "Company Name": "SIT Matters",
+        "Company Industry": "Finance",
+        "Company Total Revenue": 1.0,
+        "Total Employees": 1,
+        "Local Equity": 1.0,
+        "Proposal Type": "Equipment / Energy Upgrade",
+        "Sustainability Grant": "3. Enterprise Development Grant (EDG)",
+        "Proposal Narrative": "1",
+        "Baseline Energy Expenditure": 1.0,
+        "Estimated Retrofit Cost": 1.0,
+        "Reporting Advisory Fee": 0.0
+    }
+]

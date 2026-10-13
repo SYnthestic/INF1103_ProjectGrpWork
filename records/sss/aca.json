@@ -1,0 +1,28 @@
+[
+    {
+        "Company Name": "SS",
+        "Company Industry": "Logistics",
+        "Company Total Revenue": 1.0,
+        "Total Employees": 1,
+        "Local Equity": 1.0,
+        "Proposal Type": "Equipment / Energy Upgrade",
+        "Sustainability Grant": "1. Energy Efficiency Grant (EEG) -Base Tier",
+        "Proposal Narrative": "1",
+        "Baseline Energy Expenditure": 1.0,
+        "Estimated Retrofit Cost": 1.0,
+        "Reporting Advisory Fee": 0.0
+    },
+    {
+        "Company Name": "DLLM",
+        "Company Industry": "Retail",
+        "Company Total Revenue": 10000.0,
+        "Total Employees": 10,
+        "Local Equity": 50.0,
+        "Proposal Type": "Equipment / Energy Upgrade",
+        "Sustainability Grant": "4. Sustainability Reporting Programme (SRP)",
+        "Proposal Narrative": "wek flf leqkfnoqel",
+        "Baseline Energy Expenditure": 29930.0,
+        "Estimated Retrofit Cost": 20.0,
+        "Reporting Advisory Fee": 0.0
+    }
+]

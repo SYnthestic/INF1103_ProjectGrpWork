@@ -8,6 +8,9 @@ import time
 import textwrap
 import codecs
 from contextlib import contextmanager
+import textwrap
+import codecs
+from contextlib import contextmanager
 
 print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
 print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
@@ -15,6 +18,10 @@ print()
 print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
 print()
 
+# ========================================================
+# Platform setup (done once)
+# ========================================================
+is_windows = os.name == "nt"
 # ========================================================
 # Platform setup (done once)
 # ========================================================
@@ -47,6 +54,33 @@ if is_windows:
 else:
     import select
     import termios
+    import tty
+
+    def _getb():
+        return os.read(sys.stdin.fileno(), 1)
+
+    def _pending(timeout=0.02):
+        return bool(select.select([sys.stdin.fileno()], [], [], timeout)[0])
+
+
+@contextmanager
+def _raw_input():
+    """Raw terminal mode on Unix, set once and restored after. No-op on Windows."""
+    if is_windows:
+        yield
+        return
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        yield
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
+# ========================================================
+# Mouse tracking
+# ========================================================
     import tty
 
     def _getb():
@@ -480,6 +514,28 @@ def display_applied_grants(scheme_grant_records, key):
             "Total Employees": grant["Total Employees"],
             "Local Equity": grant["Local Equity"],
             "Proposal Type": grant.get("Proposal Type", "N/A"),
+            "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
+            "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
+            "Baseline Energy Expenditure": grant["Baseline Energy Expenditure"],
+            "Estimated Retrofit Cost": grant["Estimated Retrofit Cost"],
+            "Reporting Advisory Fee": grant.get("Reporting Advisory Fee", 0.0),
+        }
+        lines.extend(format_pairs(details, indent="   "))
+
+    count = len(scheme_grant_records)
+    footer = f"{count} record{'s' if count != 1 else ''}"
+
+    # Build the paper contents: one block per grant
+    lines = []
+    for i, grant in enumerate(scheme_grant_records, start=1):
+        if i > 1:
+            lines.append("")
+        lines.append(f"{i}. {grant['Company Name']} - {grant['Company Industry']}")
+        details = {
+            "Total Revenue": grant["Company Total Revenue"],
+            "Total Employees": grant["Total Employees"],
+            "Local Equity": grant["Local Equity"],
+            "Proposal Type": grant.get("Proposal Type", "N/A"),
             "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
             "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
             "Baseline Energy Expenditure": grant["Baseline Energy Expenditure"],
@@ -494,9 +550,10 @@ def display_applied_grants(scheme_grant_records, key):
     if key == 1:
         print_on_paper(lines, title="SCHEME GRANT RECORDS", footer=footer)
         gui.ai_button()
-    else: # When key = 4
+    elif key in (4, 5, 6):
         print_on_paper(lines, title="GRANTS ALREADY APPLIED FOR", footer=footer)
-        gui.return_button()
+        if key == 4:
+            gui.return_button()
 
     return scheme_grant_records
 
@@ -655,6 +712,71 @@ def prompt_filename_on_disk(max_len=50, blocked=""):
 def print_save_disk_block_deep_blue():
     print(gui.save_disk_block_deep_blue())
 
+# For update, delete, and AI and Logic Managers
+def select_record(records, key, action):
+    """Shows the records and asks which one to work on.
+    Returns the 1-based index, or None if there are no records."""
+    if not records:
+        display_no_records_message()
+        return None
+    display_applied_grants(records, key)
+    return retrieve_record_index(records, action)
+
+#For option 5
+def edit_record(records, jsonfile_name, key, action):
+    index = select_record(records, key, action)
+    if index is None:
+        return records, jsonfile_name
+
+    name = records[index - 1].get("Company Name", "Unknown")
+    if action == "update":
+        updated = retrieve_updated_record(records[index - 1])
+        records, jsonfile_name, status = dm.update_record_by_index(records, index, updated, jsonfile_name)
+        name = updated.get("Company Name", name)
+    else:
+        if not confirm_delete(name):
+            return records, jsonfile_name
+        records, jsonfile_name, status = dm.delete_record_by_index(records, index, jsonfile_name)
+
+    display_edit_result(status, name)
+    return records, jsonfile_name
+
+# For updating or deleting a record, we need to ask the user which record they want to change. This function prompts for a 1-based index and validates it.
+def retrieve_record_index(records, action="update"):
+    while True:
+        choice = input(f"Enter the record number to {action} (1-{len(records)}): ").strip()
+        if choice.isdigit() and 1 <= int(choice) <= len(records):
+            return int(choice)          # 1-based, matches the functions above
+        print(f"Invalid choice. Please enter a number from 1 to {len(records)}.")
+
+# io_manager.py
+def retrieve_updated_record(record):
+    updated = dict(record)   # copy, so the original isn't modified until the update succeeds
+    # ask only for the fields the user wants to change, e.g.:
+    updated["Company Name"] = retrieve_company_name()
+    updated["Sustainability Grant"] = retrieve_sustainability_grant()
+    return updated
+
+
+def confirm_delete(company_name):
+    while True:
+        choice = input(f"Delete the record for {company_name}? (y/n): ").strip().lower()
+        if choice in ("y", "n"):
+            return choice == "y"
+        print("Invalid input. Please enter 'y' or 'n'.")
+
+
+def display_edit_result(status, company_name):
+    messages = {
+        "updated": f"Successfully updated record for: {company_name}",
+        "deleted": f"Successfully deleted record for: {company_name}",
+        "invalid_index": "That record number does not exist.",
+        "no_name": "Record changed in memory, but no file name is set.",
+        "invalid_name": "Record changed in memory, but the file name is invalid.",
+        "io_error": "Record changed in memory, but the file could not be written.",
+    }
+    print(messages.get(status, f"Unknown status: {status}"))
+
 # Enables paper format
 #So it looks abit like you are reading your work on paper while also looking at a command console
 PAPER_WIDTH = 110
@@ -743,7 +865,6 @@ def run_ai_analysis_bar(stop_event, timeout_seconds=60):
 
 
 # Renders the Logic Manager's decision for the CLI.
-# Renders the Logic Manager's decision for the CLI.
 def display_grant_decision(result):
     lines = [
         f"SME Eligible     : {'YES' if result['is_sme'] else 'NO'}",
@@ -762,7 +883,25 @@ def display_grant_decision(result):
             lines.append("")
             lines.append(heading)
             lines.extend(f"  - {item}" for item in items)
+    lines = [
+        f"SME Eligible     : {'YES' if result['is_sme'] else 'NO'}",
+        f"Decision Status  : {result['decision_status']}",
+        f"Audit Passed     : {result['audit_passed']}",
+        f"Approved Subsidy : SGD {result['approved_subsidy_sgd']:,.2f}",
+    ]
 
+    sections = [
+        ("Matched Schemes:", result["matched_schemes"]),
+        ("Reasons:", result["reasons"]),
+        ("Recommendations:", result["recommendations"]),
+    ]
+    for heading, items in sections:
+        if items:
+            lines.append("")
+            lines.append(heading)
+            lines.extend(f"  - {item}" for item in items)
+
+    print_on_paper(lines, title="GRANT ELIGIBILITY DECISION")
     print_on_paper(lines, title="GRANT ELIGIBILITY DECISION")
 
 # Coordinator that collects every input and maps it onto the exact dict
@@ -807,7 +946,7 @@ def display_no_records_message():
 
 # When AI hasn't yet audited the machine. The AI will audit right after finishing the input for the company grant so it only activates in practice when no data exists
 def display_no_ai_audit():
-    print("No AI audit yet. Please run option 5 first.")
+    print("No AI audit yet. Please run option 7 first.")
     gui.return_button()
 
 # ASCII related
