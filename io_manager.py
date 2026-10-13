@@ -584,17 +584,16 @@ def convert_record_to_profile(record):
 
 # Asks for a save/load file name using the floppy-disk label prompt.
 # Re-prompts until a non-empty name is entered.
-def retrieve_json_filename():
+def retrieve_json_filename(*args):
     while True:
         if sys.stdin.isatty():
             name = prompt_filename_on_disk(
+                *args,
                 max_len=50,
                 blocked=dm.INVALID_FILENAME_CHARS,
             )
         else:
-            # Fallback for piped input or terminals without cursor control
             name = input("Enter JSON file name (e.g. grants): ").strip()
-
         if name:
             return name
         print("File name cannot be empty. Please try again.")
@@ -649,11 +648,11 @@ def confirm_save_to_json():
     art, regions = gui.yes_no_buttons("Save this record to JSON now?")
     return execute_choice_interaction(art, regions, {"y": True, "n": False})
 
-def save_records(records, jsonfile_name):
+def save_records(records, jsonfile_name, *args):
     """Asks for a file name if needed, merges with an existing file if the
     user agrees, saves, and returns the (possibly updated) jsonfile_name."""
     if not jsonfile_name:
-        jsonfile_name = retrieve_json_filename()
+        jsonfile_name = retrieve_json_filename(*args)
 
     clean_name, status = dm.inspect_save_file(jsonfile_name)
     if status in ("no_name", "invalid_name"):
@@ -675,13 +674,13 @@ def save_records(records, jsonfile_name):
     return saved_name or clean_name
 
 
-def load_records(records, jsonfile_name):
+def load_records(records, jsonfile_name, key):
     """Confirms before replacing records in memory, loads, shows the result,
     and returns (records, jsonfile_name). On failure both are unchanged."""
     if dm.is_data_loaded(records, jsonfile_name) and not confirm_overwrite_records():
         return records, jsonfile_name
 
-    name = retrieve_json_filename()
+    name = retrieve_json_filename(key)
     loaded, clean_name, status = dm.load_data_from_json(name)
     display_load_result(status, clean_name or name)
 
@@ -694,8 +693,13 @@ def print_jsonfilename(jsonfile_name):
     print(f"Data successfully saved to {jsonfile_name}.")
 
 # Shows the floppy disk and lets the user type the file name on its label.
-def prompt_filename_on_disk(max_len=50, blocked=""):
-    art, rows_up, col = gui.save_disk_prompt_art(max_len=max_len)
+def prompt_filename_on_disk(*args, max_len=50, blocked=""):
+    key = args[0] if args else None   # first extra value, or None if nothing was passed
+
+    if key == 3: #When loading the file
+        art, rows_up, col = gui.load_disk_prompt_art(max_len=max_len)
+    else: #When saving the file
+        art, rows_up, col = gui.save_disk_prompt_art(max_len=max_len)
     print(art)
 
     # Jump back up into the label and start typing there
@@ -708,6 +712,7 @@ def prompt_filename_on_disk(max_len=50, blocked=""):
         # (no newline is echoed now, so move down the full rows_up)
         sys.stdout.write(f"{gui.RESET}\033[{rows_up}B\r")
         sys.stdout.flush()
+        
 # Just an icon to let you know the save was successful, without having to print the full path every time.
 def print_save_disk_block_deep_blue():
     print(gui.save_disk_block_deep_blue())

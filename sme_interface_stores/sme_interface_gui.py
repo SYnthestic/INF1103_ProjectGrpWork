@@ -202,6 +202,34 @@ def save_disk_prompt_art(prompt=" Name: ", max_len=50):
     col = 7 + len(prompt)
     return "\n".join(lines), rows_up, col
 
+def load_disk_prompt_art(prompt=" Name: ", max_len=50):
+    """Floppy disk with an input slot sized to fit max_len characters."""
+    w = len(prompt) + max_len  # label/shutter width
+    inner = w + 4
+    body = inner + 4
+
+    def label_row(text=""):
+        return f"  {BLUE}██{RESET}  {LABEL}{text:<{w}}{RESET}  {BLUE}██ █{RESET}"
+
+    lines = [
+        f"  {BLUE}{'█' * body}▀▄{RESET}",
+        f"  {BLUE}{'█' * body} █{RESET}",
+        f"  {BLUE}██{RESET}  {'▀' * w}  {BLUE}██ █{RESET}",
+        f"  {BLUE}██{RESET}  {'█' * w}  {BLUE}██ █{RESET}",
+        f"  {BLUE}██{RESET}  {'█' * w}  {BLUE}██ █{RESET}",
+        f"  {BLUE}██{' ' * inner}██ █{RESET}",
+        label_row(f"LOAD FROM DISC (max {max_len} chars)".center(w)),
+        label_row(prompt),  # <- input row (index 7)
+        label_row(),
+        f"  {BLUE}{'█' * body}▀{RESET}",
+        f"   {BLUE}{'▀' * (body + 1)}{RESET}",
+    ]
+
+    input_row = 7
+    rows_up = len(lines) - input_row
+    col = 7 + len(prompt)
+    return "\n".join(lines), rows_up, col
+
 def save_disk_block_deep_blue():
     # Terminal Color Codes
     blue = "\033[34m"   # Deep classic blue

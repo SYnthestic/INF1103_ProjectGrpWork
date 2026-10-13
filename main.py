@@ -93,7 +93,7 @@ while key != 0:
             jsonfile_name = in_and_out.save_records(scheme_grant_records, jsonfile_name)
         case 3:  # Pull from JSON
             scheme_grant_records, jsonfile_name = in_and_out.load_records(
-                scheme_grant_records, jsonfile_name
+                scheme_grant_records, jsonfile_name, key
             )
         case 4: #Display current scheme grant records. Definitely I/O Manager's job. Can try editing and deleting records too. 
                     #Display part is IO job. Editing and deleting them is Data Manager's job
