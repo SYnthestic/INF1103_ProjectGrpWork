@@ -401,3 +401,44 @@ def test_logging_setup_fails_quietly_when_the_folder_cannot_be_used():
             file.write("a file where a folder is needed")
         dm.DATA_DIR = os.path.join(blocker, "inside")
         assert dm.setup_logging() is False
+
+
+# --- PDF report helpers (the pure-text parts, no ReportLab needed) ---
+
+def test_pdf_name_defaults_to_the_source_name():
+    assert dm._resolve_pdf_name("audits.json", None) == "audits.pdf"
+    assert dm._resolve_pdf_name("audits.json", "report") == "report.pdf"
+
+
+def test_pdf_name_rejects_unsafe_names():
+    for bad in ("../x.pdf", "a/b.pdf", "bad*.pdf", "tab\t.pdf"):
+        assert dm._resolve_pdf_name("audits.json", bad) is None
+
+
+def test_outcome_wording_follows_the_decision_status():
+    assert dm._outcome_for({"decision_status": "MANUAL_REVIEW"})[1] == "amber"
+    assert dm._outcome_for({"decision_status": "REJECT_NON_SME"})[1] == "red"
+    assert dm._outcome_for({"audit_passed": True})[1] == "teal"
+    assert dm._outcome_for({})[1] == "amber"
+
+
+def test_screening_result_for_unknown_status_goes_to_review():
+    assert dm._screening_result_for({}) == "Not recorded"
+    assert dm._screening_result_for({"decision_status": "ODD"}) == "Further review required"
+    assert dm._screening_result_for({"decision_status": "X", "audit_passed": True}) == "Passed"
+
+
+def test_report_values_are_written_as_prose():
+    assert dm._readable_value(1234.5, "annual_revenue_sgd") == "SGD 1,234.50"
+    assert dm._readable_value(True) == "Yes"
+    assert dm._readable_value([], "x") == "None recorded"
+    assert dm._readable_value("REJECT_NON_SME", "decision_status").startswith("Did not qualify")
+
+
+def test_report_sections_handle_both_record_layouts():
+    flat = {"Company Name": "Flat Co", "Audit ID": 7}
+    profile, proposal, ai_audit, evaluation, record_id, _ = dm._report_sections(flat, 0)
+    assert profile["company_name"] == "Flat Co" and record_id == 7
+    assert ai_audit == {} and evaluation == {}
+    assert dm._report_company_name([flat]) == "Flat Co"
+    assert dm._report_company_name([]) == "the named company"
