@@ -1,9 +1,8 @@
+import copy
 import os
 import json
 import math
 import re
-import sys
-import time
 import threading
 from openai import OpenAI
 import io_manager as in_and_out
@@ -44,6 +43,12 @@ DEFAULT_AI_AUDIT = {
 }
 
 VALID_SCOPE_NAMES = ("Scope-1", "Scope-2", "Scope-3")
+
+
+def default_ai_audit():
+    """A fresh copy of the fallback audit. A deep copy, so changing the
+    keyword list of one result can never change the shared defaults."""
+    return copy.deepcopy(DEFAULT_AI_AUDIT)
 
 SYSTEM_PROMPT = """You are a compliance-classification assistant for a Singapore SME green grant auditor.
 Given a free-text proposal narrative describing an energy or sustainability upgrade, classify it
@@ -108,7 +113,7 @@ def get_ai_response(proposal_narrative):
     # 4. Handle Fallbacks if an error was caught inside the background worker
     if thread_results["error"] is not None:
         error = thread_results["error"]
-        fallback = dict(DEFAULT_AI_AUDIT)
+        fallback = default_ai_audit()
         fallback["ai_reasoning_summary"] = (
             f"AI call failed ({type(error).__name__}: {error}); "
             "manual review recommended."
@@ -130,7 +135,7 @@ def parse_ai_audit(raw_content):
 
     # Some models return a list of content parts (or nothing usable).
     if not isinstance(raw_content, str):
-        return dict(DEFAULT_AI_AUDIT)
+        return default_ai_audit()
 
     cleaned = raw_content.strip()
 
@@ -148,14 +153,14 @@ def parse_ai_audit(raw_content):
         # between the first "{" and the last "}".
         start, end = cleaned.find("{"), cleaned.rfind("}")
         if start == -1 or end <= start:
-            return dict(DEFAULT_AI_AUDIT)
+            return default_ai_audit()
         try:
             parsed = json.loads(cleaned[start:end + 1])
         except (json.JSONDecodeError, ValueError):
-            return dict(DEFAULT_AI_AUDIT)
+            return default_ai_audit()
 
     if not isinstance(parsed, dict):
-        return dict(DEFAULT_AI_AUDIT)
+        return default_ai_audit()
 
     return sanitise_ai_audit(parsed)
 
@@ -247,7 +252,7 @@ def _to_string_list(value):
 
 def sanitise_ai_audit(parsed):
     """Builds a complete, correctly typed ai_audit dict from parsed JSON."""
-    ai_audit = dict(DEFAULT_AI_AUDIT)
+    ai_audit = default_ai_audit()
     ai_audit["scope_category"] = _to_scope(parsed.get("scope_category"))
     ai_audit["primary_intervention_type"] = _to_text(parsed.get("primary_intervention_type"))
     ai_audit["estimated_energy_reduction_pct"] = _to_number(

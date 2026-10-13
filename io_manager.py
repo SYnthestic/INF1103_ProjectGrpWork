@@ -1,7 +1,5 @@
 from sme_interface_stores import sme_interface_gui as gui
 import data_manager as dm
-import logic_manager as logic
-import random
 import sys
 import os
 import time
@@ -690,7 +688,7 @@ def retrieve_sustainability_grant():
         for grant in valid_grants:
             print(grant)
 
-        grant_choice = input(f"Enter the number corresponding to your choice (1-5): ").strip()
+        grant_choice = input("Enter the number corresponding to your choice (1-5): ").strip()
 
         if grant_choice == "":
             print("Sustainability Grant choice cannot be empty. Please select a valid option from 1 to 5.")

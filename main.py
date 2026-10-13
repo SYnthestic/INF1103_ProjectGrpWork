@@ -1,8 +1,4 @@
 import sys
-import time
-import os
-import json
-from openai import OpenAI
 
 # Load OPENROUTER_API_KEY from a local .env file when running outside
 # Docker. Inside Docker the variable is injected via --env-file instead.
@@ -17,7 +13,7 @@ import io_manager as in_and_out
 import data_manager as dm
 import ai_manager as ai
 import logic_manager as logic
-from sme_interface_stores.sme_interface_gui import *
+from sme_interface_stores.sme_interface_gui import continue_button
 
 
 # ========================================================
