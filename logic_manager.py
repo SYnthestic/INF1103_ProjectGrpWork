@@ -20,6 +20,15 @@ def module_description():
 
 VALID_SCOPES = ["Scope-1", "Scope-2", "Scope-3"]
 
+# Energy-reduction thresholds (percent), as in the project's rule set:
+#   >= 20  Scope-1 fast-track (EEG Base Tier)
+#   >= 15  provisional approval for any scope (ESP, 50% co-funding)
+#   >= 10  below 15 but at least 10: referred to a person for review
+#   <  10  rejected as insufficient decarbonisation yield
+FAST_TRACK_MIN_PCT = 20.0
+PROVISIONAL_MIN_PCT = 15.0
+MINIMUM_IMPACT_PCT = 10.0
+
 
 def _number(value, default=0.0):
     """A finite float, or `default` for None, text, NaN or infinity.
@@ -143,26 +152,28 @@ def verify_password(password, user_record):
         return False
 
 
+SME_MIN_LOCAL_EQUITY_PCT = 30.0
+SME_MAX_REVENUE_SGD = 100_000_000.0
+
+
 def check_sme_status(local_equity_pct, annual_revenue, headcount):
     """
     Checks whether the company meets the statutory SME requirements.
 
     Requirements:
     - At least 30% local shareholding
-    - Annual group revenue <= S$100 million OR
-      group employment size <= 200 employees
+    - Annual group revenue of at most S$100 million (a company above the
+      revenue cap is rejected whatever its headcount; `headcount` is kept
+      as a parameter for callers but no longer affects the result)
 
     Returns:
         bool: True if the company qualifies as an SME.
     """
 
-    has_local_equity = local_equity_pct >= 30.0
-    within_size_caps = (
-        annual_revenue <= 100_000_000.0
-        or headcount <= 200
-    )
+    has_local_equity = local_equity_pct >= SME_MIN_LOCAL_EQUITY_PCT
+    within_revenue_cap = annual_revenue <= SME_MAX_REVENUE_SGD
 
-    return has_local_equity and within_size_caps
+    return has_local_equity and within_revenue_cap
 
 
 def get_sme_fail_reasons(local_equity_pct, annual_revenue, headcount):
@@ -175,17 +186,16 @@ def get_sme_fail_reasons(local_equity_pct, annual_revenue, headcount):
 
     reasons = []
 
-    if local_equity_pct < 30.0:
+    if local_equity_pct < SME_MIN_LOCAL_EQUITY_PCT:
         reasons.append(
             f"Local shareholding is only {local_equity_pct:.1f}%, "
             f"below the required minimum of 30%."
         )
 
-    if annual_revenue > 100_000_000.0 and headcount > 200:
+    if annual_revenue > SME_MAX_REVENUE_SGD:
         reasons.append(
-            f"Both size limits are exceeded: annual revenue is "
-            f"S${annual_revenue:,.2f} and group employment is "
-            f"{headcount} employees."
+            f"Annual revenue of S${annual_revenue:,.2f} exceeds the "
+            f"S$100,000,000 SME revenue cap."
         )
 
     return reasons
@@ -237,10 +247,12 @@ def evaluate_grant_application(user_profile, ai_audit):
         3. ESG Reporting / Advisory proposals -> SRG (self-declared by
            applicant, doesn't depend on GHG scope classification)
         4. Unclassifiable GHG scope on an equipment proposal -> manual review
-        5. EEG-Advanced Tier (lifetime abatement > 350 tonnes)
-        6. EEG-Base Tier (Scope-1, abatement >= 20%)
-        7. ESP (Scope-2/3, abatement >= 10%)
-        8. Reject - low impact
+        5. EEG-Advanced Tier (lifetime abatement > 350 tonnes and
+           energy reduction >= 10%)
+        6. EEG-Base Tier (Scope-1, energy reduction >= 20%)
+        7. ESP provisional approval (any scope, energy reduction >= 15%)
+        8. Manual review (energy reduction 10% to under 15%)
+        9. Reject - low impact (energy reduction under 10%)
     """
 
     # ---------------------------------------------------------
@@ -406,9 +418,9 @@ def evaluate_grant_application(user_profile, ai_audit):
                 "if commercially and legally appropriate."
             )
 
-        if annual_revenue > 100_000_000.0 and headcount > 200:
+        if annual_revenue > SME_MAX_REVENUE_SGD:
             recommendations.append(
-                "The company exceeds both SME size limits. "
+                "The company's revenue exceeds the SME cap of S$100 million. "
                 "SME-targeted co-funding is therefore unavailable "
                 "under these criteria."
             )
@@ -504,9 +516,11 @@ def evaluate_grant_application(user_profile, ai_audit):
     # ---------------------------------------------------------
     # Requires >350 tonnes of independently-verified lifetime carbon
     # abatement. Checked before the Base Tier since it supersedes it
-    # when the higher threshold is met.
+    # when the higher threshold is met. The AI's tonnes figure is only an
+    # estimate, so the proposal must also reach the minimum energy
+    # reduction (a claimed 400 tonnes with 0% reduction does not qualify).
 
-    elif lifetime_abatement_tonnes > 350.0:
+    elif lifetime_abatement_tonnes > 350.0 and abatement >= MINIMUM_IMPACT_PCT:
 
         decision_status = "PRE_APPROVED_TIER_1_ADVANCED"
 
@@ -539,7 +553,7 @@ def evaluate_grant_application(user_profile, ai_audit):
     # 11. Energy Efficiency Grant - Base Tier
     # ---------------------------------------------------------
 
-    elif scope == "Scope-1" and abatement >= 20.0:
+    elif scope == "Scope-1" and abatement >= FAST_TRACK_MIN_PCT:
 
         decision_status = "PRE_APPROVED_TIER_1"
 
@@ -571,8 +585,10 @@ def evaluate_grant_application(user_profile, ai_audit):
     # ---------------------------------------------------------
     # 12. Enterprise Sustainability Programme
     # ---------------------------------------------------------
+    # Any valid scope that misses the Scope-1 fast track but still reaches
+    # 15% (so Scope-1 at 15-20% lands here too).
 
-    elif scope in ["Scope-2", "Scope-3"] and abatement >= 10.0:
+    elif abatement >= PROVISIONAL_MIN_PCT:
 
         decision_status = "PROVISIONAL_APPROVAL_TIER_2"
 
@@ -596,8 +612,8 @@ def evaluate_grant_application(user_profile, ai_audit):
 
         reasons.append(
             f"Estimated energy reduction of {abatement:.1f}% "
-            "meets the minimum threshold for this system's "
-            "capability-support rule."
+            "meets the 15% threshold for provisional "
+            "capability-support approval."
         )
 
         recommendations.append(
@@ -606,7 +622,33 @@ def evaluate_grant_application(user_profile, ai_audit):
         )
 
     # ---------------------------------------------------------
-    # 13. Low-impact proposal
+    # 13. Borderline impact: 10% to under 15%
+    # ---------------------------------------------------------
+    # Above the rejection line but below the provisional-approval line, so
+    # neither an automatic approval nor an automatic rejection is fair.
+
+    elif abatement >= MINIMUM_IMPACT_PCT:
+
+        decision_status = "MANUAL_REVIEW"
+
+        reasons.append(
+            f"Estimated energy reduction of {abatement:.1f}% meets the "
+            f"minimum of {MINIMUM_IMPACT_PCT:.0f}% but is below the "
+            f"{PROVISIONAL_MIN_PCT:.0f}% needed for provisional approval."
+        )
+
+        recommendations.append(
+            "Submit supporting baseline and measurement data so a "
+            "reviewer can assess the proposal."
+        )
+
+        recommendations.append(
+            "Consider measures that raise the projected energy reduction "
+            f"to at least {PROVISIONAL_MIN_PCT:.0f}%."
+        )
+
+    # ---------------------------------------------------------
+    # 14. Low-impact proposal
     # ---------------------------------------------------------
 
     else:
@@ -615,13 +657,13 @@ def evaluate_grant_application(user_profile, ai_audit):
 
         reasons.append(
             f"Estimated energy reduction of {abatement:.1f}% "
-            "is below the minimum threshold of 10.0% used "
-            "by this system."
+            f"is below the minimum threshold of {MINIMUM_IMPACT_PCT:.1f}% "
+            "used by this system."
         )
 
         recommendations.append(
             "Consider increasing the projected energy-efficiency "
-            "improvement to at least 10%."
+            "improvement to at least 15%."
         )
 
         recommendations.append(
@@ -636,7 +678,7 @@ def evaluate_grant_application(user_profile, ai_audit):
         )
 
     # ---------------------------------------------------------
-    # 14. Determine whether audit passed
+    # 15. Determine whether audit passed
     # ---------------------------------------------------------
 
     audit_passed = decision_status in [
@@ -647,7 +689,7 @@ def evaluate_grant_application(user_profile, ai_audit):
     ]
 
     # ---------------------------------------------------------
-    # 15. Return structured result
+    # 16. Return structured result
     # ---------------------------------------------------------
 
     return {
