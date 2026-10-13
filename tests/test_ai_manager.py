@@ -122,3 +122,34 @@ def test_missing_key_gives_a_clear_error():
     finally:
         if saved is not None:
             os.environ["OPENROUTER_API_KEY"] = saved
+
+
+def capture_ai_log():
+    """Returns (stream, handler): everything ai_manager logs goes into stream."""
+    import io
+    import logging
+
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    ai.logger.addHandler(handler)
+    return stream, handler
+
+
+def test_an_unusable_answer_is_logged_and_replaced_by_defaults():
+    stream, handler = capture_ai_log()
+    try:
+        audit = ai.parse_ai_audit("this is not json")
+    finally:
+        ai.logger.removeHandler(handler)
+    assert ai.ai_call_failed(audit)
+    assert "could not be used" in stream.getvalue()
+    assert "no JSON object found" in stream.getvalue()
+
+
+def test_a_good_answer_logs_nothing():
+    stream, handler = capture_ai_log()
+    try:
+        ai.parse_ai_audit('{"scope_category": "Scope-1"}')
+    finally:
+        ai.logger.removeHandler(handler)
+    assert stream.getvalue() == ""

@@ -372,3 +372,32 @@ def test_export_of_nothing_fails_cleanly():
     with temp_data_dir():
         assert dm.export_audit_to_pdf({}) == (None, "pdf_error")
         assert dm.export_audit_to_pdf(None) == (None, "pdf_error")
+
+
+def test_logging_goes_to_the_data_folder_and_is_set_up_once():
+    import logging
+
+    with temp_data_dir() as folder:
+        assert dm.setup_logging() is True
+        assert dm.setup_logging() is True
+        root = logging.getLogger()
+        handlers = [h for h in root.handlers if getattr(h, "baseFilename", "").startswith(folder)]
+        try:
+            assert len(handlers) == 1
+            logging.getLogger("some.layer").error("something went wrong")
+            handlers[0].flush()
+            with open(os.path.join(folder, "app.log"), encoding="utf-8") as file:
+                assert "something went wrong" in file.read()
+        finally:
+            for handler in handlers:
+                root.removeHandler(handler)
+                handler.close()
+
+
+def test_logging_setup_fails_quietly_when_the_folder_cannot_be_used():
+    with temp_data_dir() as folder:
+        blocker = os.path.join(folder, "blocker")
+        with open(blocker, "w", encoding="utf-8") as file:
+            file.write("a file where a folder is needed")
+        dm.DATA_DIR = os.path.join(blocker, "inside")
+        assert dm.setup_logging() is False

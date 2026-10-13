@@ -11,6 +11,8 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+LOG_FILE = "app.log"
+
 # Invalid characters for filenames
 INVALID_FILENAME_CHARS = '/\\:*?"<>|'
 
@@ -23,6 +25,31 @@ DEFAULT_SAVE_FILE = "audit_records.json"
 
 # Every saved audit record must contain these sections, each as a dict.
 REQUIRED_RECORD_SECTIONS = ("company_profile", "proposal", "ai_audit", "evaluation")
+
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+def setup_logging():
+    """Sends the app's log messages (AI failures, unreadable files, ...) to
+    DATA_DIR/app.log so problems can be looked into afterwards while the app
+    carries on. Safe to call more than once. Returns True if logging to the
+    file is on; if the file cannot be opened the app simply runs without it."""
+    root = logging.getLogger()
+    path = os.path.abspath(_full_path(LOG_FILE))
+    for handler in root.handlers:
+        if getattr(handler, "baseFilename", None) == path:
+            return True
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        handler = logging.FileHandler(path, encoding="utf-8")
+    except OSError:
+        return False
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    root.addHandler(handler)
+    root.setLevel(logging.WARNING)
+    return True
 
 
 # ---------------------------------------------------------------------------

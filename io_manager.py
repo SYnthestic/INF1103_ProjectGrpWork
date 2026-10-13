@@ -533,6 +533,10 @@ def wait_for_return():
     gui.return_button()
 
 
+def wait_for_continue():
+    gui.continue_button()
+
+
 # Shown right after login so the user sees their saved history is loaded.
 def show_audit_count(count):
     if count:
@@ -586,11 +590,18 @@ def display_company_profile(company_name, company_industry, total_revenue, total
     print(f"Reporting Advisory Fee: {reporting_advisory_fee}")
 
 # input of Company's name
+COMPANY_NAME_MAX_LEN = 100
+NARRATIVE_MAX_LEN = 3000
+OTHER_TEXT_MAX_LEN = 60
+
+
 def retrieve_company_name():
     while True:
-        company_name = input("Enter your Company's Name: ")
-        if company_name.strip() == "":
+        company_name = input("Enter your Company's Name: ").strip()
+        if company_name == "":
             print("Company Name cannot be empty. Please try again.")
+        elif len(company_name) > COMPANY_NAME_MAX_LEN:
+            print(f"Company Name must be at most {COMPANY_NAME_MAX_LEN} characters. Please try again.")
         else:
             return company_name
 
@@ -615,6 +626,8 @@ def get_valid_other_industry():
         other_industry = input("Please specify your Company's Industry Sector: ").strip().title()
         if other_industry == "":
             print("Industry Sector cannot be empty. Please try again.")
+        elif len(other_industry) > OTHER_TEXT_MAX_LEN:
+            print(f"Industry Sector must be at most {OTHER_TEXT_MAX_LEN} characters.")
         elif not other_industry.replace(" ", "").isalpha():
             print("Invalid. Please provide a valid Industry Sector containing only alphabetic characters.")
         else:
@@ -741,6 +754,9 @@ def retrieve_proposal_narrative():
         narrative = input("Proposal Description: ").strip()
         if narrative == "":
             print("Proposal description cannot be empty. Please try again.")
+        elif len(narrative) > NARRATIVE_MAX_LEN:
+            print(f"Please keep the description under {NARRATIVE_MAX_LEN} characters "
+                  f"(yours has {len(narrative)}).")
         else:
             return narrative
 
@@ -785,6 +801,8 @@ def retrieve_sustainability_grant():
                 other_grant = input("Please specify the Sustainability Grant that is not stated in the options: ").strip()
                 if other_grant == "":
                     print("Sustainability Grant cannot be empty. Please provide a valid grant name.")
+                elif len(other_grant) > OTHER_TEXT_MAX_LEN:
+                    print(f"Grant name must be at most {OTHER_TEXT_MAX_LEN} characters.")
                 elif not other_grant.replace(" ", "").isalpha():
                     print("Invalid input. Please enter a valid grant name.")
                 else:
@@ -794,11 +812,6 @@ def retrieve_sustainability_grant():
         else:
                 selected_grant = valid_grants[int(grant_choice) - 1]
                 return selected_grant
-
-if __name__ == "__main__":
-    sustainability_grant = retrieve_sustainability_grant()
-    print(f"Sustainability Grant selected: {sustainability_grant}")
-
 
 # For displaying list of grants already applied for by the company
 # Records loaded from a file can be in the newer nested layout
@@ -978,10 +991,6 @@ def confirm_save_to_json():
     art, regions = gui.yes_no_buttons("Save this record to JSON now?")
     return execute_choice_interaction(art, regions, {"y": True, "n": False})
 
-# Prints the JSON filename to the console after saving, so main.py doesn't have to know the details of how io_manager.py handles the display.
-def print_jsonfilename(jsonfile_name):
-    print(f"Data successfully saved to {jsonfile_name}.")
-
 # Shows the floppy disk and lets the user type the file name on its label.
 def prompt_filename_on_disk(*args, max_len=50, blocked=""):
     key = args[0] if args else None   # first extra value, or None if nothing was passed
@@ -1003,10 +1012,6 @@ def prompt_filename_on_disk(*args, max_len=50, blocked=""):
         sys.stdout.write(f"{gui.RESET}\033[{rows_up}B\r")
         sys.stdout.flush()
         
-# Just an icon to let you know the save was successful, without having to print the full path every time.
-def print_save_disk_block_deep_blue():
-    print(gui.save_disk_block_deep_blue())
-
 # Enables paper format
 #So it looks abit like you are reading your work on paper while also looking at a command console
 PAPER_WIDTH = 110
@@ -1114,41 +1119,6 @@ def display_grant_decision(result):
             lines.append(heading)
             lines.extend(f"  - {item}" for item in items)
     print_on_paper(lines, title="GRANT ELIGIBILITY DECISION")
-
-# Coordinator that collects every input and maps it onto the exact dict
-# keys logic_manager.py's evaluate_grant_application() expects.
-# Cost fields are now collected conditionally based on proposal_type,
-# so applicants aren't asked for costs that don't apply to their case.
-def build_user_profile():
-    company_name = retrieve_company_name()
-    company_industry = retrieve_company_industry()
-    total_revenue = retrieve_total_revenue()
-    total_employees = retrieve_total_employees()
-    local_equity = retrieve_local_equity()
-    proposal_type = retrieve_proposal_type()
-
-    if proposal_type == "Equipment / Energy Upgrade":
-        baseline_energy_expenditure = retrieve_baseline_energy_expenditure()
-        estimated_retrofit_cost = retrieve_estimated_retrofit_cost()
-        reporting_advisory_fee = 0.0
-    else:
-        baseline_energy_expenditure = 0.0
-        estimated_retrofit_cost = 0.0
-        reporting_advisory_fee = retrieve_reporting_advisory_fee()
-
-    user_profile = {
-        "company_name": company_name,
-        "company_industry": company_industry,
-        "annual_revenue_sgd": total_revenue,
-        "group_employment_size": total_employees,
-        "local_shareholding_pct": local_equity,
-        "proposal_type": proposal_type,
-        "baseline_annual_energy_expenditure_sgd": baseline_energy_expenditure,
-        "estimated_retrofit_cost_sgd": estimated_retrofit_cost,
-        "reporting_advisory_fee_sgd": reporting_advisory_fee,
-    }
-
-    return user_profile
 
 # When there is no records
 # ---------- Menu options 5 and 6: pick, edit and delete records ----------
@@ -1278,11 +1248,3 @@ def show_wrong_option_error():
 # 
 def show_goodbye():
     print(gui.goodbye_art())
-
-
-if __name__ == "__main__":
-    user_profile = build_user_profile()
-    print()
-    print("Profile collected:")
-    for key, value in user_profile.items():
-        print(f"  {key}: {value}")

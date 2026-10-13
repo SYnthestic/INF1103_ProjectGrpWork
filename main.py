@@ -14,7 +14,6 @@ import io_manager as in_and_out
 import data_manager as dm
 import ai_manager as ai
 import logic_manager as logic
-from sme_interface_stores.sme_interface_gui import continue_button
 
 
 # ========================================================
@@ -404,8 +403,9 @@ def login_screen():
 
 def main():
     sys.excepthook = _handle_uncaught
+    dm.setup_logging()
     in_and_out.show_welcome_sequence()
-    continue_button()
+    in_and_out.wait_for_continue()
 
     while True:
         username = login_screen()

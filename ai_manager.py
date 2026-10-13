@@ -1,10 +1,16 @@
 import copy
 import os
 import json
+import logging
 import math
 import re
 import threading
 from openai import OpenAI
+
+# Stay silent unless the app (main.py via the Data Manager) sets up a log file;
+# otherwise Python's default handler would print warnings into the terminal screens.
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # Seconds to wait for the model before giving up.
 AI_TIMEOUT_SECONDS = 60
@@ -120,6 +126,7 @@ def get_ai_response(proposal_narrative, show_progress=None):
     # 4. Handle Fallbacks if an error was caught inside the background worker
     if thread_results["error"] is not None:
         error = thread_results["error"]
+        logger.error("AI call failed (%s: %s); using fallback defaults.", type(error).__name__, error)
         fallback = default_ai_audit()
         fallback["ai_reasoning_summary"] = (
             f"AI call failed ({type(error).__name__}: {error}); "
@@ -132,6 +139,13 @@ def get_ai_response(proposal_narrative, show_progress=None):
     return parse_ai_audit(raw_content)
 
 
+def unusable_answer(reason):
+    """Logs why the model's answer could not be used and returns the safe
+    fallback audit (the app carries on and sends the case to manual review)."""
+    logger.warning("AI answer could not be used (%s); using fallback defaults.", reason)
+    return default_ai_audit()
+
+
 def parse_ai_audit(raw_content):
     """
     Parses raw AI text into a validated ai_audit dict, filling in any
@@ -142,7 +156,7 @@ def parse_ai_audit(raw_content):
 
     # Some models return a list of content parts (or nothing usable).
     if not isinstance(raw_content, str):
-        return default_ai_audit()
+        return unusable_answer("the answer was not text")
 
     cleaned = raw_content.strip()
 
@@ -160,14 +174,14 @@ def parse_ai_audit(raw_content):
         # between the first "{" and the last "}".
         start, end = cleaned.find("{"), cleaned.rfind("}")
         if start == -1 or end <= start:
-            return default_ai_audit()
+            return unusable_answer("no JSON object found")
         try:
             parsed = json.loads(cleaned[start:end + 1])
         except (json.JSONDecodeError, ValueError):
-            return default_ai_audit()
+            return unusable_answer("invalid JSON")
 
     if not isinstance(parsed, dict):
-        return default_ai_audit()
+        return unusable_answer("JSON was not an object")
 
     return sanitise_ai_audit(parsed)
 

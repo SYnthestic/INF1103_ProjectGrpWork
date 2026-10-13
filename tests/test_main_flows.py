@@ -491,3 +491,18 @@ def test_login_shows_how_many_audits_are_saved():
         ):
             main.run_session("alice")
         count.assert_called_once_with(0)
+
+
+def test_main_starts_with_the_welcome_screen_through_the_io_layer():
+    io = main.in_and_out
+    with (
+        mock.patch.object(dm, "setup_logging") as logging_on,
+        mock.patch.object(io, "show_welcome_sequence") as welcome,
+        mock.patch.object(io, "wait_for_continue") as wait,
+        mock.patch.object(main, "login_screen", return_value=None),
+        mock.patch.object(main.sys, "excepthook", main.sys.excepthook),
+    ):
+        main.main()
+    logging_on.assert_called_once()
+    welcome.assert_called_once()
+    wait.assert_called_once()

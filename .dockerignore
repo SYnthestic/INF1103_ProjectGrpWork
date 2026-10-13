@@ -11,3 +11,4 @@ audit_history.json
 *.json.tmp
 records/
 *.lock
+app.log

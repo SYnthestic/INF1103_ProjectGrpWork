@@ -219,3 +219,20 @@ def test_pdf_result_messages_name_the_file_and_the_failures():
     assert "reportlab" in shown("missing_dependency")
     assert "could not be created" in shown("pdf_error")
     assert "failed" in shown("something_new")
+
+
+def test_company_name_and_narrative_have_length_limits():
+    too_long_name = "x" * (io_mgr.COMPANY_NAME_MAX_LEN + 1)
+    assert run_with_answers(io_mgr.retrieve_company_name, [too_long_name, "  Apex  "]) == "Apex"
+    too_long_text = "y" * (io_mgr.NARRATIVE_MAX_LEN + 1)
+    assert run_with_answers(io_mgr.retrieve_proposal_narrative, [too_long_text, "EV vans"]) == (
+        "EV vans"
+    )
+
+
+def test_other_industry_and_grant_have_length_limits():
+    long_text = "a" * (io_mgr.OTHER_TEXT_MAX_LEN + 1)
+    assert run_with_answers(io_mgr.get_valid_other_industry, [long_text, "mining"]) == "Mining"
+    assert run_with_answers(
+        io_mgr.retrieve_sustainability_grant, ["5", long_text, "Green Fund"]
+    ) == ("Green Fund")

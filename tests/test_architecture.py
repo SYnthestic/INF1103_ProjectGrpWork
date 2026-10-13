@@ -75,3 +75,8 @@ def test_no_class_definitions_anywhere():
                     if isinstance(node, ast.ClassDef)
                 ]
     assert offenders == [], f"classes found: {offenders}"
+
+
+def test_the_controller_does_not_import_the_screen_art_directly():
+    """main.py talks to the screens only through io_manager."""
+    assert "sme_interface_stores" not in imported_modules("main")
