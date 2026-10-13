@@ -573,30 +573,6 @@ def merge_records(existing, new_records):
 
 
 # ---------------------------------------------------------------------------
-# Bridge back to io_manager's display format
-# ---------------------------------------------------------------------------
-
-def audit_record_to_display_format(audit_record):
-    """
-    Converts a saved audit record into the capitalised keys that
-    io_manager.display_applied_grants() uses. Needed so records loaded from
-    JSON can be listed exactly like records entered in the current session.
-    """
-    profile = _section(audit_record, "company_profile")
-    return {
-        "Company Name": profile.get("company_name", ""),
-        "Company Industry": profile.get("company_industry", ""),
-        "Company Total Revenue": profile.get("annual_revenue_sgd", 0.0),
-        "Total Employees": profile.get("group_employment_size", 0),
-        "Local Equity": profile.get("local_shareholding_pct", 0.0),
-        "Proposal Type": profile.get("proposal_type", ""),
-        "Sustainability Grant": profile.get("sustainability_grant", ""),
-        "Proposal Narrative": _section(audit_record, "proposal").get("raw_narrative", ""),
-        "Baseline Energy Expenditure": profile.get("baseline_annual_energy_expenditure_sgd", 0.0),
-        "Estimated Retrofit Cost": profile.get("estimated_retrofit_cost_sgd", 0.0),
-        "Reporting Advisory Fee": profile.get("reporting_advisory_fee_sgd", 0.0),
-    }
-# ---------------------------------------------------------------------------
 # PDF export
 # ---------------------------------------------------------------------------
 

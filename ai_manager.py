@@ -5,7 +5,9 @@ import math
 import re
 import threading
 from openai import OpenAI
-import io_manager as in_and_out
+
+# Seconds to wait for the model before giving up.
+AI_TIMEOUT_SECONDS = 60
 
 
 def setup_ai_client():
@@ -19,7 +21,7 @@ def setup_ai_client():
         base_url="https://openrouter.ai/api/v1",
         api_key=api_key,
         max_retries=0,
-        timeout=60 # Otherwise, say AI not responding
+        timeout=AI_TIMEOUT_SECONDS  # Otherwise, say AI not responding
     )
     return client
 
@@ -66,12 +68,16 @@ containing EXACTLY these keys:
 Do not perform any financial calculations or eligibility decisions. Only classify and extract."""
 
 
-def get_ai_response(proposal_narrative):
+def get_ai_response(proposal_narrative, show_progress=None):
     """
     Sends the proposal narrative to the LLM and returns a validated
     ai_audit dict matching the schema logic_manager.py expects.
-    
-    Runs a thread-safe ASCII animation bar concurrently with the API call.
+
+    show_progress is an optional function(stop_event, timeout_seconds) that
+    the caller supplies to animate a waiting screen on the main thread
+    while the call runs; it must return once stop_event is set. The AI
+    Manager never prints anything itself. Without it, the call is simply
+    waited for.
     """
     # Create an event flag to signal when the API process completes
     api_done_event = threading.Event()
@@ -89,7 +95,7 @@ def get_ai_response(proposal_narrative):
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": proposal_narrative}
                 ],
-                timeout=60
+                timeout=AI_TIMEOUT_SECONDS
             )
             thread_results["output"] = response.choices[0].message.content
         except Exception as error:
@@ -104,10 +110,11 @@ def get_ai_response(proposal_narrative):
     api_thread = threading.Thread(target=worker_api_call, daemon=True)
     api_thread.start()
 
-    # 2. Run the ASCII progress bar on the main UI thread immediately
-    in_and_out.run_ai_analysis_bar(api_done_event, timeout_seconds=60)
+    # 2. Let the caller show its waiting screen on the main thread
+    if show_progress is not None:
+        show_progress(api_done_event, AI_TIMEOUT_SECONDS)
 
-    # 3. Ensure background thread wraps up completely before processing results
+    # 3. Wait for the background thread (the client's own timeout ends it)
     api_thread.join()
 
     # 4. Handle Fallbacks if an error was caught inside the background worker

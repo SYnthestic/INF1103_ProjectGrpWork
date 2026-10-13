@@ -1,5 +1,4 @@
 from sme_interface_stores import sme_interface_gui as gui
-import data_manager as dm
 import sys
 import os
 import time
@@ -8,12 +7,6 @@ import codecs
 import getpass
 import math
 from contextlib import contextmanager
-
-print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
-print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
-print()
-print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
-print()
 
 # ========================================================
 # Platform setup (done once)
@@ -209,6 +202,11 @@ def read_limited(max_len, blocked=""):
 
 # Shows welcome sequence with ASCII art and sustainability banner
 def show_welcome_sequence():
+    print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
+    print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
+    print()
+    print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
+    print()
     print(gui.hello())
     print(gui.framed_sustainability_banner())
 
@@ -728,8 +726,33 @@ def flat_record(record):
     if not isinstance(record, dict):
         return {}
     if isinstance(record.get("company_profile"), dict):
-        return dm.audit_record_to_display_format(record)
+        return audit_record_to_display_format(record)
     return record
+
+
+def _section(record, name):
+    section = record.get(name)
+    return section if isinstance(section, dict) else {}
+
+
+def audit_record_to_display_format(audit_record):
+    """Turns a saved (nested) audit record into the capitalised keys the
+    screens use, so records loaded from JSON are listed exactly like the
+    ones entered in this session."""
+    profile = _section(audit_record, "company_profile")
+    return {
+        "Company Name": profile.get("company_name", ""),
+        "Company Industry": profile.get("company_industry", ""),
+        "Company Total Revenue": profile.get("annual_revenue_sgd", 0.0),
+        "Total Employees": profile.get("group_employment_size", 0),
+        "Local Equity": profile.get("local_shareholding_pct", 0.0),
+        "Proposal Type": profile.get("proposal_type", ""),
+        "Sustainability Grant": profile.get("sustainability_grant", ""),
+        "Proposal Narrative": _section(audit_record, "proposal").get("raw_narrative", ""),
+        "Baseline Energy Expenditure": profile.get("baseline_annual_energy_expenditure_sgd", 0.0),
+        "Estimated Retrofit Cost": profile.get("estimated_retrofit_cost_sgd", 0.0),
+        "Reporting Advisory Fee": profile.get("reporting_advisory_fee_sgd", 0.0),
+    }
 
 
 def display_applied_grants(scheme_grant_records, key):
@@ -802,13 +825,17 @@ def convert_record_to_profile(record):
 
 # Asks for a save/load file name using the floppy-disk label prompt.
 # Re-prompts until a non-empty name is entered.
-def retrieve_json_filename(*args):
+def retrieve_json_filename(blocked_chars="", *args):
+    """blocked_chars: characters the typed name may not contain (supplied
+    by main.py from the Data Manager, which owns the file-name rules).
+    Extra args are passed on to the disk prompt; a first value of 3 shows
+    the 'load' disk instead of the 'save' disk."""
     while True:
         if sys.stdin.isatty():
             name = prompt_filename_on_disk(
                 *args,
                 max_len=50,
-                blocked=dm.INVALID_FILENAME_CHARS,
+                blocked=blocked_chars,
             )
         else:
             name = input("Enter JSON file name (e.g. grants): ").strip()
@@ -866,46 +893,6 @@ def confirm_save_to_json():
     art, regions = gui.yes_no_buttons("Save this record to JSON now?")
     return execute_choice_interaction(art, regions, {"y": True, "n": False})
 
-def save_records(records, jsonfile_name, *args):
-    """Asks for a file name if needed, merges with an existing file if the
-    user agrees, saves, and returns the (possibly updated) jsonfile_name."""
-    if not jsonfile_name:
-        jsonfile_name = retrieve_json_filename(*args)
-
-    clean_name, status = dm.inspect_save_file(jsonfile_name)
-    if status in ("no_name", "invalid_name"):
-        display_save_result(status, jsonfile_name)
-        return ""
-
-    to_save = records
-    if status == "exists":
-        if not confirm_append_to_existing_file(clean_name):
-            return clean_name
-        existing, _, load_status = dm.load_data_from_json(clean_name)
-        if load_status != "loaded":
-            display_load_result(load_status, clean_name)
-            return clean_name
-        to_save = dm.merge_records(existing, records)
-
-    saved_name, save_status = dm.save_data_to_json(to_save, clean_name)
-    display_save_result(save_status, clean_name)
-    return saved_name or clean_name
-
-
-def load_records(records, jsonfile_name, key):
-    """Confirms before replacing records in memory, loads, shows the result,
-    and returns (records, jsonfile_name). On failure both are unchanged."""
-    if dm.is_data_loaded(records, jsonfile_name) and not confirm_overwrite_records():
-        return records, jsonfile_name
-
-    name = retrieve_json_filename(key)
-    loaded, clean_name, status = dm.load_data_from_json(name)
-    display_load_result(status, clean_name or name)
-
-    if status == "loaded":
-        return loaded, clean_name
-    return records, jsonfile_name
-
 # Prints the JSON filename to the console after saving, so main.py doesn't have to know the details of how io_manager.py handles the display.
 def print_jsonfilename(jsonfile_name):
     print(f"Data successfully saved to {jsonfile_name}.")
@@ -944,25 +931,6 @@ def select_record(records, key, action):
         return None
     display_applied_grants(records, key)
     return retrieve_record_index(records, action)
-
-#For option 5
-def edit_record(records, jsonfile_name, key, action):
-    index = select_record(records, key, action)
-    if index is None:
-        return records, jsonfile_name
-
-    name = records[index - 1].get("Company Name", "Unknown")
-    if action == "update":
-        updated = retrieve_updated_record(records[index - 1])
-        records, jsonfile_name, status = dm.update_record_by_index(records, index, updated, jsonfile_name)
-        name = updated.get("Company Name", name)
-    else:
-        if not confirm_delete(name):
-            return records, jsonfile_name
-        records, jsonfile_name, status = dm.delete_record_by_index(records, index, jsonfile_name)
-
-    display_edit_result(status, name)
-    return records, jsonfile_name
 
 # For updating or deleting a record, we need to ask the user which record they want to change. This function prompts for a 1-based index and validates it.
 def retrieve_record_index(records, action="update"):
