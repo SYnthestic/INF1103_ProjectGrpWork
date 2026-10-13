@@ -237,6 +237,52 @@ class RobustnessTests(unittest.TestCase):
             self.assertEqual(set(decide(audit=audit)), keys)
 
 
+class RuleEngineTests(unittest.TestCase):
+    """The decision engine is a list of small rules; these test them one by one."""
+
+    def case(self, profile=None, audit=None):
+        return logic.build_case(profile or make_profile(), audit or make_audit())
+
+    def test_rules_run_in_priority_order(self):
+        names = [rule.__name__ for rule in logic.DECISION_RULES]
+        self.assertEqual(names[0], "rule_exclusion_keywords")
+        self.assertLess(names.index("rule_fossil_fuel_modification"), names.index("rule_not_an_sme"))
+        self.assertLess(names.index("rule_not_an_sme"), names.index("rule_reporting_grant"))
+        self.assertLess(names.index("rule_reporting_grant"), names.index("rule_unclassified_scope"))
+        self.assertLess(names.index("rule_eeg_advanced_tier"), names.index("rule_eeg_base_tier"))
+        self.assertLess(names.index("rule_eeg_base_tier"), names.index("rule_esp_provisional"))
+        self.assertEqual(names[-1], "rule_low_impact")
+
+    def test_last_rule_always_gives_a_decision(self):
+        self.assertIsNotNone(logic.rule_low_impact(self.case()))
+
+    def test_a_rule_that_does_not_apply_returns_none(self):
+        clean = self.case()
+        self.assertIsNone(logic.rule_exclusion_keywords(clean))
+        self.assertIsNone(logic.rule_fossil_fuel_modification(clean))
+        self.assertIsNone(logic.rule_not_an_sme(clean))
+        self.assertIsNone(logic.rule_reporting_grant(clean))
+        self.assertIsNone(logic.rule_unclassified_scope(clean))
+        self.assertIsNone(logic.rule_borderline_impact(clean))
+
+    def test_each_rule_returns_a_complete_decision(self):
+        keys = {"decision_status", "reasons", "recommendations", "matched_schemes", "approved_subsidy_sgd"}
+        decision = logic.rule_eeg_base_tier(self.case())
+        self.assertEqual(set(decision), keys)
+
+    def test_build_case_cleans_bad_values(self):
+        case = logic.build_case({"annual_revenue_sgd": "lots", "group_employment_size": 12.7},
+                                {"detected_exclusion_keywords": "None"})
+        self.assertEqual(case["annual_revenue"], 0.0)
+        self.assertEqual(case["headcount"], 12)
+        self.assertEqual(case["exclusions"], [])
+
+    def test_retrofit_cap_ignores_non_subsidy_decisions(self):
+        decision = logic._decision("MANUAL_REVIEW", subsidy=500.0)
+        logic.cap_subsidy_at_retrofit_cost(decision, {"retrofit_cost": 10.0})
+        self.assertEqual(decision["approved_subsidy_sgd"], 500.0)
+
+
 class PasswordTests(unittest.TestCase):
     def test_correct_password_verifies(self):
         record = logic.build_new_user_record("alice", "correct horse")
