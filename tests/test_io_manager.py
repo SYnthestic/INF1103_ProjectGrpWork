@@ -167,3 +167,55 @@ def test_existing_file_choices():
 def test_delete_confirmation():
     assert record_picker_pick(io_mgr.confirm_delete_record, ["maybe", "y"], "A")
     assert not record_picker_pick(io_mgr.confirm_delete_record, ["n"], "A")
+
+
+def run_with_answers(function, answers, *args):
+    with (
+        mock.patch("builtins.input", side_effect=answers),
+        contextlib.redirect_stdout(io.StringIO()),
+    ):
+        return function(*args)
+
+
+def test_history_action_choices():
+    audits = [{"audit_id": 1}, {"audit_id": 5}]
+    assert run_with_answers(io_mgr.choose_history_action, [""], audits) == ("back", None)
+    assert run_with_answers(io_mgr.choose_history_action, ["f"], audits) == ("filter", None)
+    assert run_with_answers(io_mgr.choose_history_action, ["#5"], audits) == ("open", 1)
+    assert run_with_answers(io_mgr.choose_history_action, ["9", "x", "1"], audits) == ("open", 0)
+
+
+def test_history_filter_choices():
+    statuses = ["MANUAL_REVIEW", "REJECT_LOW_IMPACT"]
+    assert run_with_answers(io_mgr.retrieve_history_filter, [""], statuses) is None
+    assert run_with_answers(io_mgr.retrieve_history_filter, ["2"], statuses) == (
+        "status",
+        "REJECT_LOW_IMPACT",
+    )
+    assert run_with_answers(io_mgr.retrieve_history_filter, ["c", "apex"], statuses) == (
+        "company",
+        "apex",
+    )
+    assert run_with_answers(io_mgr.retrieve_history_filter, ["9", "1"], statuses) == (
+        "status",
+        "MANUAL_REVIEW",
+    )
+    assert run_with_answers(io_mgr.retrieve_history_filter, ["c", "", ""], statuses) is None
+
+
+def test_export_confirmation_only_accepts_y_or_n():
+    assert run_with_answers(io_mgr.confirm_export_pdf, ["maybe", "Y"]) is True
+    assert run_with_answers(io_mgr.confirm_export_pdf, ["n"]) is False
+
+
+def test_pdf_result_messages_name_the_file_and_the_failures():
+    def shown(status):
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            io_mgr.show_pdf_result(status, "a.pdf", "/data/records/alice")
+        return buffer.getvalue()
+
+    assert "a.pdf" in shown("exported") and "/data/records/alice" in shown("exported")
+    assert "reportlab" in shown("missing_dependency")
+    assert "could not be created" in shown("pdf_error")
+    assert "failed" in shown("something_new")

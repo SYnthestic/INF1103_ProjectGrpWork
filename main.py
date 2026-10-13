@@ -25,10 +25,9 @@ from sme_interface_stores.sme_interface_gui import continue_button
 # traceback. Every other error still shows its normal traceback.
 def _handle_uncaught(exc_type, exc, tb):
     if issubclass(exc_type, KeyboardInterrupt):
-        print("\n\nInterrupted. Goodbye!")
+        in_and_out.show_interrupted()
     elif issubclass(exc_type, EOFError):
-        print("\n\nNo more input available. If you run the app in Docker, "
-              "start it with 'docker run -it ...' so you can type into it.")
+        in_and_out.show_input_ended()
     else:
         sys.__excepthook__(exc_type, exc, tb)
 
@@ -106,13 +105,47 @@ def run_audit(record):
     return ai_audit, result
 
 
+def apply_history_filter(audits):
+    """Asks the user for a filter; the Data Manager does the filtering.
+    Returns the matching audits, or None if cancelled / nothing matched."""
+    statuses = dm.available_audit_statuses(audits)
+    chosen = in_and_out.retrieve_history_filter(statuses)
+    if chosen is None:
+        return None
+    kind, value = chosen
+    if kind == "status":
+        matches = dm.filter_audits_by_status(audits, value)
+    else:
+        matches = dm.search_audits_by_company(audits, value)
+    if not matches:
+        in_and_out.show_no_matching_audits()
+        return None
+    return matches
+
+
+def export_audit_flow(audit):
+    """Offers a PDF report for one audit, built from the saved history entry."""
+    if in_and_out.confirm_export_pdf():
+        file_name, status = dm.export_audit_to_pdf(audit)
+        in_and_out.show_pdf_result(status, file_name, dm.get_records_folder())
+
+
 def audit_history_flow(username):
     audits = dm.get_user_audits(username)
-    if not in_and_out.display_audit_history(audits, username):
+    shown = audits
+    while True:
+        if not in_and_out.display_audit_history(shown, username, filtered=shown is not audits):
+            return
+        action, index = in_and_out.choose_history_action(shown)
+        if action == "back":
+            return
+        if action == "filter":
+            shown = apply_history_filter(audits) or audits
+            continue
+        in_and_out.display_audit_detail(shown[index])
+        export_audit_flow(shown[index])
+        in_and_out.wait_for_return()
         return
-    index = in_and_out.select_audit_record(audits)
-    if index is not None:
-        in_and_out.display_audit_detail(audits[index])
 
 
 # ========================================================
@@ -313,6 +346,7 @@ def run_session(username):
     login screen comes back) or exits the program (returns False)."""
     # Saved record files (options 2/3) live in this user's own folder.
     dm.set_active_user(username)
+    in_and_out.show_audit_count(len(dm.get_user_audits(username)))
     session = {"username": username, "records": [], "ai_audit": {}, "jsonfile_name": ""}
 
     while True:

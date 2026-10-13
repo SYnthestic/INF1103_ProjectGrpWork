@@ -288,3 +288,87 @@ def test_available_statuses():
         "PRE_APPROVED_TIER_1",
         "REJECT_NON_SME",
     ]
+
+
+def history_audit(audit_id, company, status):
+    return {
+        "audit_id": audit_id,
+        "timestamp": "2026-10-13T10:00:00",
+        "application": {
+            "Company Name": company,
+            "Company Industry": "Logistics",
+            "Company Total Revenue": 8450000.0,
+            "Total Employees": 38,
+            "Local Equity": 85.0,
+            "Proposal Type": "Equipment / Energy Upgrade",
+            "Sustainability Grant": "EEG",
+            "Proposal Narrative": "Replace 6 diesel vans.",
+            "Baseline Energy Expenditure": 120000.0,
+            "Estimated Retrofit Cost": 150000.0,
+            "Reporting Advisory Fee": 0.0,
+        },
+        "ai_audit": {
+            "scope_category": "Scope-1",
+            "estimated_energy_reduction_pct": 25.0,
+            "ai_reasoning_summary": "EV vans.",
+            "ai_status": "ok",
+        },
+        "result": {
+            "decision_status": status,
+            "is_sme": True,
+            "audit_passed": True,
+            "approved_subsidy_sgd": 30000.0,
+            "reasons": ["Meets SME criteria."],
+            "recommendations": [],
+            "matched_schemes": ["EEG"],
+        },
+    }
+
+
+def test_audit_history_filters():
+    audits = [
+        history_audit(1, "Apex Haulage", "PRE_APPROVED_TIER_1"),
+        history_audit(2, "Bolt Foods", "MANUAL_REVIEW"),
+        {"audit_id": 3},
+    ]
+    assert dm.available_audit_statuses(audits) == ["MANUAL_REVIEW", "PRE_APPROVED_TIER_1"]
+    assert dm.filter_audits_by_status(audits, "MANUAL_REVIEW") == [audits[1]]
+    assert dm.search_audits_by_company(audits, " APEX ") == [audits[0]]
+    assert dm.search_audits_by_company(audits, "nothing") == []
+
+
+def test_history_entry_becomes_a_complete_report_record():
+    audit = history_audit(4, "Apex", "PRE_APPROVED_TIER_1")
+    record = dm.audit_to_report_record(audit)
+    assert record["Company Name"] == "Apex"
+    assert record["Grant Decision"]["decision_status"] == "PRE_APPROVED_TIER_1"
+    assert record["AI Audit"]["scope_category"] == "Scope-1"
+    assert record["Audit ID"] == 4
+    assert dm.is_valid_audit_record(record)
+
+
+def test_pdf_file_name_is_safe():
+    audit = history_audit(7, 'A/B: "Co"', "MANUAL_REVIEW")
+    name = dm.audit_pdf_filename(audit)
+    assert name == "audit_7_A_B_ _Co_.pdf"
+    assert dm.is_valid_filename(name)
+    assert dm.audit_pdf_filename({"audit_id": 1}) == "audit_1_Company.pdf"
+
+
+def test_export_audit_to_pdf_writes_a_pdf_with_the_decision():
+    with temp_data_dir() as folder:
+        dm.set_active_user("alice")
+        name, status = dm.export_audit_to_pdf(history_audit(1, "Apex", "PRE_APPROVED_TIER_1"))
+        if status == "missing_dependency":
+            return  # reportlab is not installed on this machine
+        assert status == "exported"
+        path = os.path.join(folder, "records", "alice", name)
+        with open(path, "rb") as file:
+            assert file.read(5) == b"%PDF-"
+        assert dm.get_records_folder() == os.path.abspath(os.path.dirname(path))
+
+
+def test_export_of_nothing_fails_cleanly():
+    with temp_data_dir():
+        assert dm.export_audit_to_pdf({}) == (None, "pdf_error")
+        assert dm.export_audit_to_pdf(None) == (None, "pdf_error")

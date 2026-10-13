@@ -160,7 +160,7 @@ Once logged in, choose **1 (Start)** at the menu and enter:
 
 The app then shows the AI audit and the grant decision, and asks whether to save. Because the AI estimates the energy reduction, exact figures can vary from run to run.
 
-Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **5** change one detail of a record, **6** delete a record, **9** view your past audits, **10** logout. Options 5 and 6 change the records in memory only; use option 2 to save. If the file already exists, option 2 asks whether to **add** to it, **replace** it (use this after deleting a record) or cancel.
+Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **5** change one detail of a record, **6** delete a record, **9** view your past audits (filter them, open one in full and export it as a PDF report), **10** logout. Options 5 and 6 change the records in memory only; use option 2 to save. If the file already exists, option 2 asks whether to **add** to it, **replace** it (use this after deleting a record) or cancel.
 
 ## How grant decisions are made
 
@@ -189,7 +189,7 @@ When the app starts you must log in (option **1**) or create an account (option 
 
 - Usernames: 3-20 characters, letters/digits/underscore, not case-sensitive.
 - Passwords: 8 to 64 characters, with at least one letter and one digit. Typing is hidden.
-- Every audit completed with option **1** is saved automatically to your history. Option **9** lists your past audits and lets you open one in full. You only ever see your own audits. If the AI call fails (for example a missing API key or no internet), the result is shown but is **not** added to your history, so just run option **1** again.
+- Every audit completed with option **1** is saved automatically to your history. Option **9** lists your past audits, lets you filter the list (by decision, or by company name), and open one in full. After opening one you can export it as a PDF report (final decision, AI analysis and reasons) saved in your own `records/<your username>/` folder; this needs `reportlab`, which is in `requirements.txt`. The number of saved audits is shown right after you log in. You only ever see your own audits. If the AI call fails (for example a missing API key or no internet), the result is shown but is **not** added to your history, so just run option **1** again.
 
 Passwords are never stored. Each account stores a random salt and a salted SHA-256 hash (PBKDF2-HMAC-SHA256, 200,000 iterations), checked with a constant-time comparison.
 

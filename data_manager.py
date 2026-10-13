@@ -595,6 +595,73 @@ def delete_record(records, index):
 
 
 # ---------------------------------------------------------------------------
+# Filtering the audit history (option 9)
+# ---------------------------------------------------------------------------
+
+def audit_decision_status(audit):
+    """The decision status stored in one history entry, or "" if missing."""
+    status = _section(audit, "result").get("decision_status")
+    return status if isinstance(status, str) else ""
+
+
+def available_audit_statuses(audits):
+    """Sorted distinct decision statuses in the history (so the I/O Manager
+    only offers filters that can match something)."""
+    return sorted({audit_decision_status(audit) for audit in audits} - {""})
+
+
+def filter_audits_by_status(audits, decision_status):
+    """History entries whose decision status matches exactly."""
+    return [audit for audit in audits if audit_decision_status(audit) == decision_status]
+
+
+def search_audits_by_company(audits, text):
+    """History entries whose company name contains `text` (ignoring case)."""
+    wanted = str(text).strip().lower()
+    return [
+        audit for audit in audits
+        if wanted in str(_section(audit, "application").get("Company Name", "")).lower()
+    ]
+
+
+# ---------------------------------------------------------------------------
+# PDF export of one saved audit (option 9)
+# ---------------------------------------------------------------------------
+
+def audit_to_report_record(audit):
+    """Turns one audit-history entry into the flat record layout the PDF
+    report already understands: the application's own keys plus the AI result
+    and the grant decision, so the report shows the full, final outcome."""
+    report = dict(_section(audit, "application"))
+    report["AI Audit"] = _section(audit, "ai_audit")
+    report["Grant Decision"] = _section(audit, "result")
+    report["Audit ID"] = audit.get("audit_id", 1) if isinstance(audit, dict) else 1
+    report["Created At"] = audit.get("timestamp", "") if isinstance(audit, dict) else ""
+    return report
+
+
+def audit_pdf_filename(audit):
+    """A safe default PDF name such as 'audit_3_Apex Haulage.pdf'."""
+    company = _section(audit, "application").get("Company Name", "")
+    safe_company = generate_company_save_filename(company)[len("audit_"):-len(".json")]
+    audit_id = audit.get("audit_id", "") if isinstance(audit, dict) else ""
+    return f"audit_{audit_id}_{safe_company}.pdf"
+
+
+def export_audit_to_pdf(audit):
+    """Writes the PDF report for one history entry into the user's records
+    folder. Returns (pdf_filename, status), as export_records_to_pdf does."""
+    if not isinstance(audit, dict) or not audit:
+        return None, "pdf_error"
+    return export_records_to_pdf([audit_to_report_record(audit)], "audit", audit_pdf_filename(audit))
+
+
+def get_records_folder():
+    """Folder the active user's saved files and PDFs go into (for messages)."""
+    return os.path.abspath(_records_dir())
+
+
+# ---------------------------------------------------------------------------
 # PDF export
 # ---------------------------------------------------------------------------
 
@@ -606,6 +673,20 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
 
     Returns (pdf_filename, status). A successful export returns "exported".
     Requires ReportLab: python -m pip install reportlab
+    """
+    records, clean_json_name, load_status = load_data_from_json(jsonfile_name)
+    if load_status != "loaded":
+        return None, load_status
+    return export_records_to_pdf(records, clean_json_name, pdf_filename)
+
+
+def export_records_to_pdf(records, source_name, pdf_filename=None):
+    """Builds the PDF report for a list of audit records (nested or flat) and
+    saves it next to the user's other record files. `source_name` is only used
+    to pick the default PDF name and in log messages.
+
+    Returns (pdf_filename, status): "exported", "missing_dependency",
+    "invalid_pdf_name" or "pdf_error".
     """
     try:
         from reportlab.lib import colors
@@ -622,12 +703,8 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
         logger.error("PDF export requires ReportLab. Install it with: python -m pip install reportlab")
         return None, "missing_dependency"
 
-    records, clean_json_name, load_status = load_data_from_json(jsonfile_name)
-    if load_status != "loaded":
-        return None, load_status
-
     if pdf_filename is None or not str(pdf_filename).strip():
-        pdf_name = os.path.splitext(clean_json_name)[0] + ".pdf"
+        pdf_name = os.path.splitext(source_name)[0] + ".pdf"
     else:
         pdf_name = str(pdf_filename).strip()
         if not pdf_name.lower().endswith(".pdf"):
@@ -1087,7 +1164,7 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
         document.build(story, onFirstPage=add_page_chrome, onLaterPages=add_page_chrome)
         return pdf_name, "exported"
     except Exception as err:
-        logger.exception("Could not export audit records from %s to PDF: %s", clean_json_name, err)
+        logger.exception("Could not export audit records from %s to PDF: %s", source_name, err)
         return None, "pdf_error"
 
 

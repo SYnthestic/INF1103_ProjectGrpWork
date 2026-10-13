@@ -428,7 +428,7 @@ def _audit_stamp(audit):
 
 
 # Summary table of every audit the user has done.
-def display_audit_history(audits, username):
+def display_audit_history(audits, username, filtered=False):
     if len(audits) == 0:
         print(f"\nNo past audits found for '{username}'. Choose option 1 to start one.\n")
         gui.return_button()
@@ -450,7 +450,7 @@ def display_audit_history(audits, username):
     print_on_paper(
         lines,
         title=f"PAST AUDITS - {username}",
-        footer=f"{count} audit{'s' if count != 1 else ''}"
+        footer=f"{count} audit{'s' if count != 1 else ''}" + (" (filtered)" if filtered else "")
     )
     return True
 
@@ -465,6 +465,90 @@ def select_audit_record(audits):
         if choice.isascii() and choice.isdigit() and int(choice) in valid_ids:
             return valid_ids.index(int(choice))
         print("Invalid audit number. Please try again.")
+
+
+# What to do next on the past-audits screen. Returns ("open", list index),
+# ("filter", None) or ("back", None).
+def choose_history_action(audits):
+    valid_ids = [_as_dict(audit).get("audit_id") for audit in audits]
+    while True:
+        choice = input(
+            "Enter an audit # to view in full, F to filter the list, "
+            "or press Enter to return: "
+        ).strip().lstrip("#")
+        if choice == "":
+            return "back", None
+        if choice.lower() == "f":
+            return "filter", None
+        if choice.isascii() and choice.isdigit() and int(choice) in valid_ids:
+            return "open", valid_ids.index(int(choice))
+        print("Invalid choice. Enter an audit number from the list, F, or press Enter.")
+
+
+# Asks how to filter the history. Returns ("status", decision status),
+# ("company", text) or None to cancel.
+def retrieve_history_filter(statuses):
+    print("\nFilter your past audits by:")
+    for number, status in enumerate(statuses, start=1):
+        print(f"  {number}. Decision: {status}")
+    print("  C. Company name (search)")
+    while True:
+        choice = input("Your choice (or press Enter to cancel): ").strip()
+        if choice == "":
+            return None
+        if choice.lower() == "c":
+            text = input("Company name contains: ").strip()
+            if text:
+                return "company", text
+            print("Nothing to search for.")
+        elif choice.isascii() and choice.isdigit() and 1 <= int(choice) <= len(statuses):
+            return "status", statuses[int(choice) - 1]
+        else:
+            print("Invalid choice. Please try again.")
+
+
+def show_no_matching_audits():
+    print("\nNo audits match that filter. Showing all of your audits again.\n")
+
+
+def confirm_export_pdf():
+    while True:
+        choice = input("Export this audit as a PDF report? (y/n): ").strip().lower()
+        if choice in ("y", "n"):
+            return choice == "y"
+        print("Invalid input. Please enter 'y' or 'n'.")
+
+
+def show_pdf_result(status, file_name, folder):
+    messages = {
+        "exported": f"PDF report saved as '{file_name}' in {folder}",
+        "missing_dependency": "PDF export needs the 'reportlab' package: pip install reportlab",
+        "invalid_pdf_name": "The PDF file name is not valid, so nothing was exported.",
+        "pdf_error": "The PDF report could not be created. Nothing was exported.",
+    }
+    print(messages.get(status, f"PDF export failed ({status})."))
+
+
+def wait_for_return():
+    gui.return_button()
+
+
+# Shown right after login so the user sees their saved history is loaded.
+def show_audit_count(count):
+    if count:
+        print(f"You have {count} saved audit{'s' if count != 1 else ''} (menu option 9).\n")
+    else:
+        print("You have no saved audits yet. Choose option 1 to start one.\n")
+
+
+# Messages for a clean exit (main.py cannot print; only this layer does).
+def show_interrupted():
+    print("\n\nInterrupted. Goodbye!")
+
+
+def show_input_ended():
+    print("\n\nNo more input available. If you run the app in Docker, "
+          "start it with 'docker run -it ...' so you can type into it.")
 
 
 # Full view of one saved audit, reusing the existing report layouts.
@@ -485,7 +569,6 @@ def display_audit_detail(audit):
         except (KeyError, TypeError, ValueError):
             # Saved decision is missing fields: show what is there instead.
             print_on_paper(format_pairs(result), title="GRANT ELIGIBILITY DECISION")
-    gui.return_button()
 
 
 # Display Company Profile

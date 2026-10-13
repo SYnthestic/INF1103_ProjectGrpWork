@@ -34,7 +34,7 @@ def test_layers_do_not_import_each_other():
 
 
 def test_only_the_io_manager_touches_the_terminal():
-    for module_name in ("ai_manager", "logic_manager", "data_manager"):
+    for module_name in ("ai_manager", "logic_manager", "data_manager", "main"):
         with open(os.path.join(ROOT, module_name + ".py"), encoding="utf-8") as file:
             tree = ast.parse(file.read())
         calls = [

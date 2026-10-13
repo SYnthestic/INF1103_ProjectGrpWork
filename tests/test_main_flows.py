@@ -8,6 +8,12 @@ import main
 from tests.helpers import temp_data_dir, raises
 
 
+def run_session_quietly(username):
+    """main.run_session without the 'you have N saved audits' line."""
+    with mock.patch.object(main.in_and_out, "show_audit_count"):
+        return main.run_session(username)
+
+
 def rec(company):
     """A minimal record the Data Manager accepts as a saved audit record."""
     return {"Company Name": company, "Proposal Narrative": "text"}
@@ -289,7 +295,7 @@ def test_exit_ends_the_program():
             mock.patch.object(main.in_and_out, "get_menu_choice", side_effect=[0]),
             mock.patch.object(main.in_and_out, "show_goodbye"),
         ):
-            assert not main.run_session("alice")
+            assert not run_session_quietly("alice")
 
 
 def test_logout_returns_to_the_login_screen_and_clears_the_user():
@@ -300,7 +306,7 @@ def test_logout_returns_to_the_login_screen_and_clears_the_user():
             ),
             mock.patch.object(main.in_and_out, "show_logged_out"),
         ):
-            assert main.run_session("alice")
+            assert run_session_quietly("alice")
         assert dm.get_active_user() is None
 
 
@@ -312,7 +318,7 @@ def test_records_are_saved_in_the_users_own_folder():
             mock.patch.object(main.in_and_out, "display_save_result"),
             mock.patch.object(main.in_and_out, "show_goodbye"),
         ):
-            main.run_session("alice")
+            run_session_quietly("alice")
         assert os.path.exists(os.path.join(folder, "records", "alice", "mine.json"))
 
 
@@ -323,7 +329,7 @@ def test_a_wrong_menu_number_shows_an_error_and_continues():
             mock.patch.object(main.in_and_out, "show_wrong_option_error") as shown,
             mock.patch.object(main.in_and_out, "show_goodbye"),
         ):
-            main.run_session("alice")
+            run_session_quietly("alice")
         shown.assert_called_once()
 
 
@@ -389,3 +395,99 @@ def test_login_screen_retries_until_success():
             mock.patch.object(main.in_and_out, "show_wrong_option_error"),
         ):
             assert main.login_screen() == "alice"
+
+
+def make_audit(audit_id, company, status):
+    return {
+        "audit_id": audit_id,
+        "timestamp": "2026-10-13T10:00:00",
+        "application": {"Company Name": company, "Proposal Narrative": "text"},
+        "ai_audit": {"scope_category": "Scope-1", "ai_status": "ok"},
+        "result": {"decision_status": status, "approved_subsidy_sgd": 100.0},
+    }
+
+
+def test_history_filter_returns_only_matching_audits():
+    audits = [make_audit(1, "Apex", "PRE_APPROVED_TIER_1"), make_audit(2, "Bolt", "MANUAL_REVIEW")]
+    io = main.in_and_out
+    with mock.patch.object(io, "retrieve_history_filter", return_value=("status", "MANUAL_REVIEW")):
+        assert main.apply_history_filter(audits) == [audits[1]]
+    with mock.patch.object(io, "retrieve_history_filter", return_value=("company", "ape")):
+        assert main.apply_history_filter(audits) == [audits[0]]
+
+
+def test_history_filter_cancel_or_no_match_returns_none():
+    audits = [make_audit(1, "Apex", "MANUAL_REVIEW")]
+    io = main.in_and_out
+    with mock.patch.object(io, "retrieve_history_filter", return_value=None):
+        assert main.apply_history_filter(audits) is None
+    with (
+        mock.patch.object(io, "retrieve_history_filter", return_value=("company", "zzz")),
+        mock.patch.object(io, "show_no_matching_audits") as shown,
+    ):
+        assert main.apply_history_filter(audits) is None
+        shown.assert_called_once()
+
+
+def test_history_flow_filters_then_opens_and_exports_the_audit():
+    audits = [make_audit(1, "Apex", "PRE_APPROVED_TIER_1"), make_audit(2, "Bolt", "MANUAL_REVIEW")]
+    io = main.in_and_out
+    with (
+        mock.patch.object(dm, "get_user_audits", return_value=audits),
+        mock.patch.object(io, "display_audit_history", return_value=True) as listing,
+        mock.patch.object(io, "choose_history_action", side_effect=[("filter", None), ("open", 0)]),
+        mock.patch.object(io, "retrieve_history_filter", return_value=("company", "bolt")),
+        mock.patch.object(io, "display_audit_detail") as detail,
+        mock.patch.object(io, "confirm_export_pdf", return_value=True),
+        mock.patch.object(dm, "export_audit_to_pdf", return_value=("a.pdf", "exported")) as export,
+        mock.patch.object(io, "show_pdf_result") as result,
+        mock.patch.object(io, "wait_for_return"),
+    ):
+        main.audit_history_flow("alice")
+    assert listing.call_args_list[1].args[0] == [audits[1]]
+    detail.assert_called_once_with(audits[1])
+    export.assert_called_once_with(audits[1])
+    assert result.call_args.args[:2] == ("exported", "a.pdf")
+
+
+def test_history_flow_with_no_audits_returns_straight_away():
+    io = main.in_and_out
+    with (
+        mock.patch.object(dm, "get_user_audits", return_value=[]),
+        mock.patch.object(io, "display_audit_history", return_value=False),
+        mock.patch.object(io, "choose_history_action") as choose,
+    ):
+        main.audit_history_flow("alice")
+    choose.assert_not_called()
+
+
+def test_declining_the_pdf_export_creates_nothing():
+    io = main.in_and_out
+    with (
+        mock.patch.object(io, "confirm_export_pdf", return_value=False),
+        mock.patch.object(dm, "export_audit_to_pdf") as export,
+    ):
+        main.export_audit_flow(make_audit(1, "Apex", "MANUAL_REVIEW"))
+    export.assert_not_called()
+
+
+def test_the_interrupt_handler_uses_the_io_layer_to_speak():
+    io = main.in_and_out
+    with mock.patch.object(io, "show_interrupted") as interrupted:
+        main._handle_uncaught(KeyboardInterrupt, KeyboardInterrupt(), None)
+    interrupted.assert_called_once()
+    with mock.patch.object(io, "show_input_ended") as ended:
+        main._handle_uncaught(EOFError, EOFError(), None)
+    ended.assert_called_once()
+
+
+def test_login_shows_how_many_audits_are_saved():
+    with temp_data_dir():
+        io = main.in_and_out
+        with (
+            mock.patch.object(io, "get_menu_choice", side_effect=[0]),
+            mock.patch.object(io, "show_goodbye"),
+            mock.patch.object(io, "show_audit_count") as count,
+        ):
+            main.run_session("alice")
+        count.assert_called_once_with(0)
