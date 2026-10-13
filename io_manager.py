@@ -854,14 +854,16 @@ def confirm_overwrite_records():
         print("Invalid input. Please enter 'y' or 'n'.")
 
 
-def confirm_append_to_existing_file(file_name):
+def ask_existing_file_action(file_name):
+    """The file already exists: returns "add", "replace" or "cancel"."""
     while True:
-        choice = input(f"'{file_name}' already exists. Add to it? (y = add, n = cancel): ").strip().lower()
-        if choice == "y":
-            return True
-        if choice == "n":
-            return False
-        print("Invalid input. Please enter 'y' or 'n'.")
+        choice = input(
+            f"'{file_name}' already exists. "
+            "(a = add to it, r = replace it, c = cancel): "
+        ).strip().lower()
+        if choice in ("a", "r", "c"):
+            return {"a": "add", "r": "replace", "c": "cancel"}[choice]
+        print("Invalid input. Please enter 'a', 'r' or 'c'.")
 
 
 def display_save_result(status, file_name):
@@ -921,52 +923,6 @@ def prompt_filename_on_disk(*args, max_len=50, blocked=""):
 # Just an icon to let you know the save was successful, without having to print the full path every time.
 def print_save_disk_block_deep_blue():
     print(gui.save_disk_block_deep_blue())
-
-# For update, delete, and AI and Logic Managers
-def select_record(records, key, action):
-    """Shows the records and asks which one to work on.
-    Returns the 1-based index, or None if there are no records."""
-    if not records:
-        display_no_records_message()
-        return None
-    display_applied_grants(records, key)
-    return retrieve_record_index(records, action)
-
-# For updating or deleting a record, we need to ask the user which record they want to change. This function prompts for a 1-based index and validates it.
-def retrieve_record_index(records, action="update"):
-    while True:
-        choice = input(f"Enter the record number to {action} (1-{len(records)}): ").strip()
-        if choice.isdigit() and 1 <= int(choice) <= len(records):
-            return int(choice)          # 1-based, matches the functions above
-        print(f"Invalid choice. Please enter a number from 1 to {len(records)}.")
-
-# io_manager.py
-def retrieve_updated_record(record):
-    updated = dict(record)   # copy, so the original isn't modified until the update succeeds
-    # ask only for the fields the user wants to change, e.g.:
-    updated["Company Name"] = retrieve_company_name()
-    updated["Sustainability Grant"] = retrieve_sustainability_grant()
-    return updated
-
-
-def confirm_delete(company_name):
-    while True:
-        choice = input(f"Delete the record for {company_name}? (y/n): ").strip().lower()
-        if choice in ("y", "n"):
-            return choice == "y"
-        print("Invalid input. Please enter 'y' or 'n'.")
-
-
-def display_edit_result(status, company_name):
-    messages = {
-        "updated": f"Successfully updated record for: {company_name}",
-        "deleted": f"Successfully deleted record for: {company_name}",
-        "invalid_index": "That record number does not exist.",
-        "no_name": "Record changed in memory, but no file name is set.",
-        "invalid_name": "Record changed in memory, but the file name is invalid.",
-        "io_error": "Record changed in memory, but the file could not be written.",
-    }
-    print(messages.get(status, f"Unknown status: {status}"))
 
 # Enables paper format
 #So it looks abit like you are reading your work on paper while also looking at a command console
@@ -1112,6 +1068,115 @@ def build_user_profile():
     return user_profile
 
 # When there is no records
+# ---------- Menu options 5 and 6: pick, edit and delete records ----------
+
+# Field name -> the prompt that asks for it (same checks as when the record
+# was first entered).
+FIELD_PROMPTS = {
+    "Company Name": retrieve_company_name,
+    "Company Industry": retrieve_company_industry,
+    "Company Total Revenue": retrieve_total_revenue,
+    "Total Employees": retrieve_total_employees,
+    "Local Equity": retrieve_local_equity,
+    "Sustainability Grant": retrieve_sustainability_grant,
+    "Proposal Narrative": retrieve_proposal_narrative,
+    "Baseline Energy Expenditure": retrieve_baseline_energy_expenditure,
+    "Estimated Retrofit Cost": retrieve_estimated_retrofit_cost,
+    "Reporting Advisory Fee": retrieve_reporting_advisory_fee,
+}
+
+COMMON_FIELDS = (
+    "Company Name", "Company Industry", "Company Total Revenue",
+    "Total Employees", "Local Equity", "Sustainability Grant", "Proposal Narrative",
+)
+
+
+def fields_for(record):
+    """The fields that make sense for this record: equipment proposals have
+    a baseline spend and retrofit cost, reporting proposals have a fee."""
+    if flat_record(record).get("Proposal Type") == "ESG Reporting / Advisory":
+        return COMMON_FIELDS + ("Reporting Advisory Fee",)
+    return COMMON_FIELDS + ("Baseline Energy Expenditure", "Estimated Retrofit Cost")
+
+
+def _choose_number(prompt, highest):
+    """Asks for a whole number from 0 to highest. Returns None if invalid."""
+    answer = key_verifier(input(prompt), max_digits=len(str(highest)))
+    if answer is None or answer > highest:
+        return None
+    return answer
+
+
+def select_record_index(records, action):
+    """Lists the records and asks which to `action` ("update"/"delete").
+    Returns the 0-based index, or None if the user cancels."""
+    print(f"\nWhich record do you want to {action}?")
+    for number, record in enumerate(records, start=1):
+        record = flat_record(record)
+        print(f"  {number}. {record.get('Company Name') or 'N/A'}"
+              f"  ({record.get('Proposal Type') or 'N/A'})")
+    print("  0. Cancel")
+
+    while True:
+        number = _choose_number(f"Enter 0-{len(records)}: ", len(records))
+        if number is None:
+            print(f"Please enter a number from 0 to {len(records)}.")
+        elif number == 0:
+            return None
+        else:
+            return number - 1
+
+
+def select_field_to_edit(record):
+    """Asks which field of `record` to change. Returns the field name or None."""
+    fields = fields_for(record)
+    flat = flat_record(record)
+    print("\nWhich detail do you want to change?")
+    for number, field in enumerate(fields, start=1):
+        value = str(flat.get(field, "N/A"))
+        shortened = value if len(value) <= 40 else value[:37] + "..."
+        print(f"  {number}. {field}: {shortened}")
+    print("  0. Cancel")
+
+    while True:
+        number = _choose_number(f"Enter 0-{len(fields)}: ", len(fields))
+        if number is None:
+            print(f"Please enter a number from 0 to {len(fields)}.")
+        elif number == 0:
+            return None
+        else:
+            return fields[number - 1]
+
+
+def retrieve_field_value(field):
+    """Prompts for a new value of `field` with the original validation."""
+    return FIELD_PROMPTS[field]()
+
+
+def confirm_delete_record(company_name):
+    while True:
+        choice = input(f"Delete the record for '{company_name}'? (y/n): ").strip().lower()
+        if choice in ("y", "n"):
+            return choice == "y"
+        print("Invalid input. Please enter 'y' or 'n'.")
+
+
+def show_record_updated(company_name, field):
+    print(f"Updated '{field}' for '{company_name}'. Use option 2 to save the change.")
+    gui.return_button()
+
+
+def show_record_deleted(company_name):
+    print(f"Deleted the record for '{company_name}'. "
+          "Use option 2 (choose replace) to remove it from a saved file too.")
+    gui.return_button()
+
+
+def show_record_not_changed():
+    print("Nothing was changed.")
+    gui.return_button()
+
+
 def display_no_records_message():
     print("No records yet. Please select option 1 first.")
     gui.return_button()

@@ -47,17 +47,24 @@ class SaveLoadFlowTests(TempDataDir):
 
     def test_save_to_an_existing_file_can_be_cancelled(self):
         dm.save_data_to_json([rec("old")], "mine")
-        with mock.patch.object(main.in_and_out, "confirm_append_to_existing_file", return_value=False), \
+        with mock.patch.object(main.in_and_out, "ask_existing_file_action", return_value="cancel"), \
                 mock.patch.object(main.in_and_out, "display_save_result"):
             main.save_records_flow([rec("new")], "mine")
         self.assertEqual(dm.load_data_from_json("mine")[0], [rec("old")])
 
     def test_save_to_an_existing_file_can_add_to_it(self):
         dm.save_data_to_json([rec("old")], "mine")
-        with mock.patch.object(main.in_and_out, "confirm_append_to_existing_file", return_value=True), \
+        with mock.patch.object(main.in_and_out, "ask_existing_file_action", return_value="add"), \
                 mock.patch.object(main.in_and_out, "display_save_result"):
             main.save_records_flow([rec("new")], "mine")
         self.assertEqual([r["Company Name"] for r in dm.load_data_from_json("mine")[0]], ["old", "new"])
+
+    def test_save_to_an_existing_file_can_replace_it(self):
+        dm.save_data_to_json([rec("old")], "mine")
+        with mock.patch.object(main.in_and_out, "ask_existing_file_action", return_value="replace"), \
+                mock.patch.object(main.in_and_out, "display_save_result"):
+            main.save_records_flow([rec("new")], "mine")
+        self.assertEqual([r["Company Name"] for r in dm.load_data_from_json("mine")[0]], ["new"])
 
     def test_invalid_name_is_reported_and_forgotten(self):
         with mock.patch.object(main.in_and_out, "display_save_result") as shown:
@@ -123,6 +130,81 @@ class AuditFlowTests(TempDataDir):
         saved.assert_not_called()
         not_saved.assert_not_called()
         self.assertEqual(dm.get_user_audits("alice"), [])
+
+
+class EditAndDeleteFlowTests(unittest.TestCase):
+    def session(self):
+        return {"username": "alice", "ai_audit": {}, "jsonfile_name": "",
+                "records": [dict(rec("A"), **{"Proposal Type": "Equipment / Energy Upgrade"}), rec("B")]}
+
+    def test_update_changes_one_field_of_one_record(self):
+        io = main.in_and_out
+        session = self.session()
+        with mock.patch.object(io, "select_record_index", return_value=1), \
+                mock.patch.object(io, "select_field_to_edit", return_value="Company Name"), \
+                mock.patch.object(io, "retrieve_field_value", return_value="Renamed"), \
+                mock.patch.object(io, "show_record_updated") as shown:
+            main.update_record_flow(session)
+        shown.assert_called_once_with("Renamed", "Company Name")
+        self.assertEqual([r["Company Name"] for r in session["records"]], ["A", "Renamed"])
+
+    def test_update_can_be_cancelled_at_either_step(self):
+        io = main.in_and_out
+        for index, field in ((None, None), (0, None)):
+            session = self.session()
+            before = [dict(r) for r in session["records"]]
+            with mock.patch.object(io, "select_record_index", return_value=index), \
+                    mock.patch.object(io, "select_field_to_edit", return_value=field), \
+                    mock.patch.object(io, "retrieve_field_value") as ask:
+                main.update_record_flow(session)
+            ask.assert_not_called()
+            self.assertEqual(session["records"], before)
+
+    def test_update_with_no_records_says_so(self):
+        session = {"records": []}
+        with mock.patch.object(main.in_and_out, "display_no_records_message") as shown:
+            main.update_record_flow(session)
+        shown.assert_called_once()
+
+    def test_update_converts_a_nested_record_to_the_screen_layout(self):
+        nested = {"company_profile": {"company_name": "N"}, "proposal": {}}
+        session = {"records": [nested]}
+        io = main.in_and_out
+        with mock.patch.object(io, "select_record_index", return_value=0), \
+                mock.patch.object(io, "select_field_to_edit", return_value="Company Industry"), \
+                mock.patch.object(io, "retrieve_field_value", return_value="mining"), \
+                mock.patch.object(io, "show_record_updated"):
+            main.update_record_flow(session)
+        self.assertEqual(session["records"][0]["Company Name"], "N")
+        self.assertEqual(session["records"][0]["Company Industry"], "mining")
+
+    def test_delete_removes_the_chosen_record(self):
+        io = main.in_and_out
+        session = self.session()
+        with mock.patch.object(io, "select_record_index", return_value=0), \
+                mock.patch.object(io, "confirm_delete_record", return_value=True), \
+                mock.patch.object(io, "show_record_deleted") as shown:
+            main.delete_record_flow(session)
+        shown.assert_called_once_with("A")
+        self.assertEqual([r["Company Name"] for r in session["records"]], ["B"])
+
+    def test_delete_needs_confirmation(self):
+        io = main.in_and_out
+        session = self.session()
+        with mock.patch.object(io, "select_record_index", return_value=0), \
+                mock.patch.object(io, "confirm_delete_record", return_value=False), \
+                mock.patch.object(io, "show_record_not_changed") as shown:
+            main.delete_record_flow(session)
+        shown.assert_called_once()
+        self.assertEqual(len(session["records"]), 2)
+
+    def test_delete_can_be_cancelled(self):
+        session = self.session()
+        with mock.patch.object(main.in_and_out, "select_record_index", return_value=None), \
+                mock.patch.object(main.in_and_out, "confirm_delete_record") as ask:
+            main.delete_record_flow(session)
+        ask.assert_not_called()
+        self.assertEqual(len(session["records"]), 2)
 
 
 class AttemptTests(unittest.TestCase):
@@ -216,34 +298,6 @@ class LoginTests(TempDataDir):
                 mock.patch.object(main, "login_flow", side_effect=[None, "alice"]), \
                 mock.patch.object(main.in_and_out, "show_wrong_option_error"):
             self.assertEqual(main.login_screen(), "alice")
-
-
-class UpdateDeleteFlowTests(TempDataDir):
-    def test_update_replaces_the_chosen_record(self):
-        records = [rec("A"), rec("B")]
-        with mock.patch.object(main.in_and_out, "select_record", return_value=2), \
-                mock.patch.object(main.in_and_out, "retrieve_updated_record", return_value=rec("B2")), \
-                mock.patch.object(main.in_and_out, "display_edit_result") as shown:
-            records, name = main.update_record_flow(records, "", 5)
-        self.assertEqual([r["Company Name"] for r in records], ["A", "B2"])
-        shown.assert_called_once_with("updated", "B2")
-
-    def test_update_does_nothing_when_no_record_chosen(self):
-        records = [rec("A")]
-        with mock.patch.object(main.in_and_out, "select_record", return_value=None):
-            self.assertEqual(main.update_record_flow(records, "f.json", 5), (records, "f.json"))
-
-    def test_delete_removes_the_record_only_after_confirmation(self):
-        with mock.patch.object(main.in_and_out, "select_record", return_value=1), \
-                mock.patch.object(main.in_and_out, "confirm_delete", return_value=False):
-            records, _ = main.delete_record_flow([rec("A")], "", 6)
-        self.assertEqual(len(records), 1)
-        with mock.patch.object(main.in_and_out, "select_record", return_value=1), \
-                mock.patch.object(main.in_and_out, "confirm_delete", return_value=True), \
-                mock.patch.object(main.in_and_out, "display_edit_result") as shown:
-            records, _ = main.delete_record_flow([rec("A")], "", 6)
-        self.assertEqual(records, [])
-        shown.assert_called_once_with("deleted", "A")
 
 
 if __name__ == "__main__":

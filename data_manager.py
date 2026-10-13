@@ -258,36 +258,6 @@ def load_data_from_json(jsonfile_name):
 
     return data, name, "loaded"
 
-def update_record_by_index(data, index, updated_record, jsonfile_name):
-    """1-based index. Returns (data, jsonfile_name, status):
-    "updated", "invalid_index", or a save status if syncing the file failed."""
-    if not 1 <= index <= len(data):
-        return data, jsonfile_name, "invalid_index"
-
-    data[index - 1] = updated_record
-
-    if jsonfile_name:
-        _, save_status = save_data_to_json(data, jsonfile_name)
-        if save_status != "saved":
-            return data, jsonfile_name, save_status
-    return data, jsonfile_name, "updated"
-
-
-def delete_record_by_index(data, index, jsonfile_name):
-    """1-based index. Returns (data, jsonfile_name, status):
-    "deleted", "invalid_index", or a save status if syncing the file failed."""
-    if not 1 <= index <= len(data):
-        return data, jsonfile_name, "invalid_index"
-
-    data.pop(index - 1)
-
-    if jsonfile_name:
-        _, save_status = save_data_to_json(data, jsonfile_name)
-        if save_status != "saved":
-            return data, jsonfile_name, save_status
-    return data, jsonfile_name, "deleted"
-
-
 def is_data_loaded(data, jsonfile_name):
     """True if there is already data/filename in memory (io_manager should
     then ask the user before overwriting it)."""
@@ -570,6 +540,58 @@ def available_decision_statuses(records):
 def merge_records(existing, new_records):
     """Existing records first, then any new ones not already present."""
     return existing + [r for r in new_records if r not in existing]
+
+
+# ---------------------------------------------------------------------------
+# Editing and deleting records in memory (menu options 5 and 6)
+# ---------------------------------------------------------------------------
+# These work on the display-layout records ("Company Name", ...) that the
+# session keeps. They return a NEW list and never change the one passed in,
+# so a failed edit can't leave half-changed data behind.
+
+EDITABLE_RECORD_FIELDS = (
+    "Company Name",
+    "Company Industry",
+    "Company Total Revenue",
+    "Total Employees",
+    "Local Equity",
+    "Sustainability Grant",
+    "Proposal Narrative",
+    "Baseline Energy Expenditure",
+    "Estimated Retrofit Cost",
+    "Reporting Advisory Fee",
+)
+
+
+def _valid_index(records, index):
+    return (
+        isinstance(records, list)
+        and isinstance(index, int)
+        and not isinstance(index, bool)
+        and 0 <= index < len(records)
+    )
+
+
+def update_record_field(records, index, field, value):
+    """Returns (new_records, status). status is "updated", "bad_index",
+    "bad_field" or "not_editable" (the record is not in the display layout)."""
+    if not _valid_index(records, index):
+        return records, "bad_index"
+    if field not in EDITABLE_RECORD_FIELDS:
+        return records, "bad_field"
+    if not isinstance(records[index], dict) or "Company Name" not in records[index]:
+        return records, "not_editable"
+
+    changed = dict(records[index])
+    changed[field] = value
+    return records[:index] + [changed] + records[index + 1:], "updated"
+
+
+def delete_record(records, index):
+    """Returns (new_records, status). status is "deleted" or "bad_index"."""
+    if not _valid_index(records, index):
+        return records, "bad_index"
+    return records[:index] + records[index + 1:], "deleted"
 
 
 # ---------------------------------------------------------------------------

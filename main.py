@@ -106,31 +106,6 @@ def run_audit(record):
     return ai_audit, result
 
 
-def update_record_flow(records, jsonfile_name, key):
-    """Option 5: I/O picks the record and collects the new values, the Data
-    Manager applies the change. Returns (records, jsonfile_name)."""
-    index = in_and_out.select_record(records, key, "update")
-    if index is None:
-        return records, jsonfile_name
-    updated = in_and_out.retrieve_updated_record(records[index - 1])
-    records, jsonfile_name, status = dm.update_record_by_index(records, index, updated, jsonfile_name)
-    in_and_out.display_edit_result(status, updated.get("Company Name", "Unknown"))
-    return records, jsonfile_name
-
-
-def delete_record_flow(records, jsonfile_name, key):
-    """Option 6: confirm with the user, then the Data Manager deletes."""
-    index = in_and_out.select_record(records, key, "delete")
-    if index is None:
-        return records, jsonfile_name
-    name = records[index - 1].get("Company Name", "Unknown")
-    if not in_and_out.confirm_delete(name):
-        return records, jsonfile_name
-    records, jsonfile_name, status = dm.delete_record_by_index(records, index, jsonfile_name)
-    in_and_out.display_edit_result(status, name)
-    return records, jsonfile_name
-
-
 def audit_history_flow(username):
     audits = dm.get_user_audits(username)
     if not in_and_out.display_audit_history(audits, username):
@@ -156,13 +131,16 @@ def save_records_flow(records, jsonfile_name):
 
     to_save = records
     if status == "exists":
-        if not in_and_out.confirm_append_to_existing_file(clean_name):
+        action = in_and_out.ask_existing_file_action(clean_name)
+        if action == "cancel":
             return clean_name
-        existing, _, load_status = dm.load_data_from_json(clean_name)
-        if load_status != "loaded":
-            in_and_out.display_load_result(load_status, clean_name)
-            return clean_name
-        to_save = dm.merge_records(existing, records)
+        if action == "add":
+            existing, _, load_status = dm.load_data_from_json(clean_name)
+            if load_status != "loaded":
+                in_and_out.display_load_result(load_status, clean_name)
+                return clean_name
+            to_save = dm.merge_records(existing, records)
+        # "replace": the file will hold exactly the records in memory
 
     saved_name, save_status = dm.save_data_to_json(to_save, clean_name)
     in_and_out.display_save_result(save_status, clean_name)
@@ -255,6 +233,53 @@ def new_application_flow(session, key):
         session["jsonfile_name"] = save_records_flow(session["records"], session["jsonfile_name"])
 
 
+def update_record_flow(session):
+    """Menu option 5: change one detail of one record in memory."""
+    records = session["records"]
+    if not records:
+        in_and_out.display_no_records_message()
+        return
+
+    index = in_and_out.select_record_index(records, "update")
+    field = None if index is None else in_and_out.select_field_to_edit(records[index])
+    if field is None:
+        return
+
+    # Records loaded from a file may use the nested layout; the editor works
+    # on the flat layout the screens use.
+    records[index] = in_and_out.flat_record(records[index])
+    value = in_and_out.retrieve_field_value(field)
+    session["records"], status = dm.update_record_field(records, index, field, value)
+
+    if status == "updated":
+        in_and_out.show_record_updated(session["records"][index].get("Company Name") or "N/A", field)
+    else:
+        in_and_out.show_record_not_changed()
+
+
+def delete_record_flow(session):
+    """Menu option 6: remove one record from memory."""
+    records = session["records"]
+    if not records:
+        in_and_out.display_no_records_message()
+        return
+
+    index = in_and_out.select_record_index(records, "delete")
+    if index is None:
+        return
+
+    name = in_and_out.flat_record(records[index]).get("Company Name") or "N/A"
+    if not in_and_out.confirm_delete_record(name):
+        in_and_out.show_record_not_changed()
+        return
+
+    session["records"], status = dm.delete_record(records, index)
+    if status == "deleted":
+        in_and_out.show_record_deleted(name)
+    else:
+        in_and_out.show_record_not_changed()
+
+
 def rerun_ai_flow(session):
     """Menu option 7: run the AI Manager again on the latest record."""
     if not session["records"]:
@@ -307,14 +332,10 @@ def run_session(username):
                 )
             case 4:  # Display the current records
                 in_and_out.display_applied_grants(session["records"], key)
-            case 5:  # Update
-                session["records"], session["jsonfile_name"] = update_record_flow(
-                    session["records"], session["jsonfile_name"], key
-                )
-            case 6:  # Delete
-                session["records"], session["jsonfile_name"] = delete_record_flow(
-                    session["records"], session["jsonfile_name"], key
-                )
+            case 5:  # Update a record
+                update_record_flow(session)
+            case 6:  # Delete a record
+                delete_record_flow(session)
             case 7:
                 rerun_ai_flow(session)
             case 8:

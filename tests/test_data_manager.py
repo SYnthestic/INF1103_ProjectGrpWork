@@ -176,6 +176,39 @@ class LockTests(TempDataDir):
         self.assertFalse(any(name.endswith(".lock") for name in os.listdir(self._tmp.name)))
 
 
+class EditAndDeleteTests(unittest.TestCase):
+    def records(self):
+        return [{"Company Name": "A", "Local Equity": 50.0}, {"Company Name": "B"}]
+
+    def test_update_returns_a_new_list_and_leaves_the_old_one(self):
+        old = self.records()
+        new, status = dm.update_record_field(old, 0, "Local Equity", 80.0)
+        self.assertEqual(status, "updated")
+        self.assertEqual(new[0]["Local Equity"], 80.0)
+        self.assertEqual(old[0]["Local Equity"], 50.0)
+        self.assertEqual(new[1], old[1])
+
+    def test_update_rejects_bad_input(self):
+        old = self.records()
+        self.assertEqual(dm.update_record_field(old, 5, "Company Name", "x"), (old, "bad_index"))
+        self.assertEqual(dm.update_record_field(old, -1, "Company Name", "x"), (old, "bad_index"))
+        self.assertEqual(dm.update_record_field(old, True, "Company Name", "x")[1], "bad_index")
+        self.assertEqual(dm.update_record_field(old, 0, "Proposal Type", "x")[1], "bad_field")
+        self.assertEqual(dm.update_record_field([{"company_profile": {}}], 0, "Company Name", "x")[1], "not_editable")
+        self.assertEqual(dm.update_record_field("nope", 0, "Company Name", "x")[1], "bad_index")
+
+    def test_delete_removes_one_record(self):
+        old = self.records()
+        new, status = dm.delete_record(old, 0)
+        self.assertEqual((status, [r["Company Name"] for r in new]), ("deleted", ["B"]))
+        self.assertEqual(len(old), 2)
+
+    def test_delete_rejects_a_bad_index(self):
+        old = self.records()
+        self.assertEqual(dm.delete_record(old, 2), (old, "bad_index"))
+        self.assertEqual(dm.delete_record([], 0)[1], "bad_index")
+
+
 class FilterTests(unittest.TestCase):
     def records(self):
         def record(audit_id, company, status):

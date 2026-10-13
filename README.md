@@ -6,11 +6,14 @@ A terminal app that takes an SME's details and a free-text upgrade proposal, use
 
 | File | Role |
 |---|---|
-| `main.py` | Menu loop that ties the layers together |
-| `io_manager.py` | All user input, validation and screen output |
-| `ai_manager.py` | Sends the proposal to the AI API and returns a validated JSON result |
-| `logic_manager.py` | Eligibility checks, grant matching and subsidy maths (no AI) |
-| `data_manager.py` | Saving and loading records, user accounts and audit history as JSON |
+| `main.py` | The controller: runs the login screen and menu, and passes data between the layers. The only file that knows about all four layers |
+| `io_manager.py` | **I/O layer.** All user input, validation and screen output |
+| `ai_manager.py` | **AI layer.** Sends the proposal to the AI API and returns a validated JSON result |
+| `logic_manager.py` | **Logic layer.** Eligibility rules, grant matching, subsidy maths and password hashing (no AI) |
+| `data_manager.py` | **Data layer.** Saving and loading records, user accounts and audit history as JSON |
+| `tests/` | Automated tests, including one that fails if a layer imports another layer |
+
+The layers never import each other and only `io_manager.py` prints or asks for input. Data flows one way: the I/O layer collects and checks the input, the AI layer turns the narrative into a JSON audit, the logic layer decides, then the result goes to the data layer to be stored and back to the I/O layer to be shown.
 
 The project uses plain functions only (no classes).
 
@@ -157,7 +160,7 @@ Once logged in, choose **1 (Start)** at the menu and enter:
 
 The app then shows the AI audit and the grant decision, and asks whether to save. Because the AI estimates the energy reduction, exact figures can vary from run to run.
 
-Other menu options: **2** save, **3** load, **4** view records, **5** update a record, **6** delete a record, **7** and **8** re-run the AI and logic steps on the latest record, **9** view your past audits, **10** logout.
+Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **5** change one detail of a record, **6** delete a record, **9** view your past audits, **10** logout. Options 5 and 6 change the records in memory only; use option 2 to save. If the file already exists, option 2 asks whether to **add** to it, **replace** it (use this after deleting a record) or cancel.
 
 ## How grant decisions are made
 
@@ -177,6 +180,8 @@ The AI only classifies the proposal (scope, estimated energy reduction, any excl
 | 10 | Energy reduction under 10% | `REJECT_LOW_IMPACT` |
 
 Equipment subsidies (rows 6 to 8) are never larger than the retrofit cost you entered. The grant you pick when entering the application does not change the decision; if the proposal matched a different scheme, a recommendation says so.
+
+In the code each row is one small `rule_*` function in `logic_manager.py`, and the list `DECISION_RULES` fixes their order, so changing a rule or its priority is a one-place edit with a matching test in `tests/test_logic_manager.py`.
 
 ## Accounts and login
 

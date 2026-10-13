@@ -90,5 +90,51 @@ class RecordConversionTests(unittest.TestCase):
             io_mgr.display_applied_grants([{}, {"Company Name": None}, 5], 4)
 
 
+class RecordPickerTests(unittest.TestCase):
+    RECORDS = [{"Company Name": "A", "Proposal Type": "Equipment / Energy Upgrade"},
+               {"Company Name": "B", "Proposal Type": "ESG Reporting / Advisory"}]
+
+    def pick(self, function, answers, *args):
+        with contextlib.redirect_stdout(io.StringIO()), \
+                mock.patch("builtins.input", side_effect=answers):
+            return function(*args)
+
+    def test_choosing_a_record(self):
+        self.assertEqual(self.pick(io_mgr.select_record_index, ["2"], self.RECORDS, "update"), 1)
+
+    def test_zero_cancels(self):
+        self.assertIsNone(self.pick(io_mgr.select_record_index, ["0"], self.RECORDS, "delete"))
+
+    def test_bad_answers_are_asked_again(self):
+        self.assertEqual(
+            self.pick(io_mgr.select_record_index, ["x", "", "3", "-1", "1"], self.RECORDS, "update"), 0)
+
+    def test_fields_depend_on_the_proposal_type(self):
+        equipment = io_mgr.fields_for(self.RECORDS[0])
+        reporting = io_mgr.fields_for(self.RECORDS[1])
+        self.assertIn("Baseline Energy Expenditure", equipment)
+        self.assertNotIn("Reporting Advisory Fee", equipment)
+        self.assertIn("Reporting Advisory Fee", reporting)
+        self.assertNotIn("Estimated Retrofit Cost", reporting)
+
+    def test_every_editable_field_has_a_prompt(self):
+        import data_manager
+        self.assertEqual(set(io_mgr.FIELD_PROMPTS), set(data_manager.EDITABLE_RECORD_FIELDS))
+
+    def test_choosing_a_field(self):
+        field = self.pick(io_mgr.select_field_to_edit, ["1"], self.RECORDS[0])
+        self.assertEqual(field, "Company Name")
+        self.assertIsNone(self.pick(io_mgr.select_field_to_edit, ["0"], self.RECORDS[0]))
+
+    def test_existing_file_choices(self):
+        for typed, expected in (("a", "add"), (" R ", "replace"), ("c", "cancel")):
+            self.assertEqual(self.pick(io_mgr.ask_existing_file_action, [typed], "f.json"), expected)
+        self.assertEqual(self.pick(io_mgr.ask_existing_file_action, ["x", "", "a"], "f.json"), "add")
+
+    def test_delete_confirmation(self):
+        self.assertTrue(self.pick(io_mgr.confirm_delete_record, ["maybe", "y"], "A"))
+        self.assertFalse(self.pick(io_mgr.confirm_delete_record, ["n"], "A"))
+
+
 if __name__ == "__main__":
     unittest.main()
