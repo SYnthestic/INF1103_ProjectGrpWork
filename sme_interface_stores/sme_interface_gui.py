@@ -242,8 +242,8 @@ def boxed_menu():
         row("    4. Display Current Records"),
         row("    5. Update Records"),
         row("    6. Delete Records"),
-        row("    7. AI Processor"),
-        row("    8. Logic Manager"),
+        row("    7. Run AI Manager (only)"),
+        row("    8. Run Logic Manager (only)"),
         blank,
         border,
     ]

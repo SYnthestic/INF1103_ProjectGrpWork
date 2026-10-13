@@ -116,7 +116,7 @@ while key != 0:
                         scheme_grant_records, index, jsonfile_name
                     )
                     in_and_out.display_edit_result(status, name)
-        case 7:  # AI Processor
+        case 7:  # AI Manager
             index = in_and_out.select_record(scheme_grant_records, key, "analyse")
             if index is not None:
                 narrative = scheme_grant_records[index - 1].get("Proposal Narrative", "")
