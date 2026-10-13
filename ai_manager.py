@@ -214,6 +214,20 @@ def _to_scope(value):
     return "Unknown"
 
 
+# Words models write instead of an empty list ("none", "N/A", ...). They
+# are not real exclusions and must not trigger the exclusion review.
+PLACEHOLDER_KEYWORDS = {
+    "none", "no", "nil", "null", "n/a", "na", "-", "--", "not applicable",
+    "none detected", "no exclusions", "no exclusion", "no keywords",
+    "none found", "nothing", "unknown",
+}
+
+
+def is_placeholder_keyword(text):
+    lowered = str(text).strip().lower().strip(".")
+    return lowered in PLACEHOLDER_KEYWORDS or lowered.startswith("none ")
+
+
 def _to_string_list(value):
     """A list of non-empty strings. A single string is split on commas,
     semicolons and new lines; None or other types give an empty list."""
@@ -226,7 +240,7 @@ def _to_string_list(value):
         if item is None or isinstance(item, (dict, list, tuple)):
             continue
         text = str(item).strip()
-        if text:
+        if text and not is_placeholder_keyword(text):
             items.append(text)
     return items
 

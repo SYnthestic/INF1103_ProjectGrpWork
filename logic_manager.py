@@ -47,14 +47,30 @@ def _number(value, default=0.0):
     return value if math.isfinite(value) else default
 
 
+_PLACEHOLDER_KEYWORDS = {
+    "none", "no", "nil", "null", "n/a", "na", "-", "--", "not applicable",
+    "none detected", "no exclusions", "no exclusion", "no keywords",
+    "none found", "nothing", "unknown",
+}
+
+
 def _string_list(value):
     """The exclusion keywords as a list of strings (a lone string is kept
-    whole instead of being read letter by letter)."""
+    whole instead of being read letter by letter). Placeholders such as
+    "none" or "N/A" are not exclusions and are dropped."""
     if isinstance(value, str):
-        return [value.strip()] if value.strip() else []
+        value = [value]
     if not isinstance(value, (list, tuple)):
         return []
-    return [str(item).strip() for item in value if item is not None and str(item).strip()]
+    items = []
+    for item in value:
+        if item is None:
+            continue
+        text = str(item).strip()
+        lowered = text.lower().strip(".")
+        if text and lowered not in _PLACEHOLDER_KEYWORDS and not lowered.startswith("none "):
+            items.append(text)
+    return items
 
 
 # =========================================================
