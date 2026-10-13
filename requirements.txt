@@ -1,4 +1,4 @@
-openai
-python-dotenv
-art
-reportlab
+openai>=1.0,<3
+python-dotenv>=1.0,<2
+art>=6.0,<7
+reportlab>=4.0,<6
