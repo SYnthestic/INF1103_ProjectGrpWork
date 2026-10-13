@@ -218,18 +218,16 @@ def check_sme_status(local_equity_pct, annual_revenue, headcount):
 
     Requirements:
     - At least 30% local shareholding
-    - Annual group revenue <= S$100 million AND
-      group employment size <= 200 employees
+    - Annual group revenue of at most S$100 million (a company above the
+      revenue cap is rejected whatever its headcount; `headcount` is kept
+      as a parameter for callers but no longer affects the result)
 
     Returns:
         bool: True if the company qualifies as an SME.
     """
 
-    has_local_equity = local_equity_pct >= 30.0
-    within_size_caps = (
-        annual_revenue <= 100_000_000.0
-        and headcount <= 200
-    )
+    has_local_equity = local_equity_pct >= SME_MIN_LOCAL_EQUITY_PCT
+    within_revenue_cap = annual_revenue <= SME_MAX_REVENUE_SGD
 
     return has_local_equity and within_revenue_cap
 
@@ -250,7 +248,7 @@ def get_sme_fail_reasons(local_equity_pct, annual_revenue, headcount):
             f"below the required minimum of 30%."
         )
 
-    if annual_revenue > 100_000_000.0 or headcount > 200:
+    if annual_revenue > SME_MAX_REVENUE_SGD:
         reasons.append(
             f"Annual revenue of S${annual_revenue:,.2f} exceeds the "
             f"S$100,000,000 SME revenue cap."
@@ -439,7 +437,7 @@ def evaluate_grant_application(user_profile, ai_audit):
     # 6. Check fossil fuel modification
     # ---------------------------------------------------------
 
-    elif "fossil fuel modification" in intervention.lower():
+    elif intervention == "Fossil Fuel Modification":
 
         decision_status = "MANUAL_EXCLUSION_REVIEW"
 
@@ -480,25 +478,12 @@ def evaluate_grant_application(user_profile, ai_audit):
                 "if commercially and legally appropriate."
             )
 
-        if annual_revenue > 100_000_000.0 or headcount > 200:
-            if annual_revenue > 100_000_000.0 and headcount > 200:
-                recommendations.append(
-                    "The company exceeds both SME size limits. "
-                     "SME-targeted co-funding is therefore unavailable "
-                     "under these criteria."
-                )
-            elif annual_revenue > 100_000_000.0 and headcount <= 200:
-                recommendations.append(
-                    "The company exceeds revenue limits. "
-                    "SME-targeted co-funding is therefore unavailable "
-                    "under these criteria.")
-            elif annual_revenue <= 100_000_000.0 and headcount > 200:
-                recommendations.append(
-                    "The company exceeds headcount limit"
-                    "SME-targeted co-funding is therefore unavailable "
-                    "under these criteria."
-                )
-                
+        if annual_revenue > SME_MAX_REVENUE_SGD:
+            recommendations.append(
+                "The company's revenue exceeds the SME cap of S$100 million. "
+                "SME-targeted co-funding is therefore unavailable "
+                "under these criteria."
+            )
 
         recommendations.append(
             "Consider the Enterprise Financing Scheme – Green "
