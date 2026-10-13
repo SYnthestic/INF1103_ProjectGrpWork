@@ -285,6 +285,7 @@ def delete_record_by_index(data, index, jsonfile_name):
         _, save_status = save_data_to_json(data, jsonfile_name)
         if save_status != "saved":
             return data, jsonfile_name, save_status
+    return data, jsonfile_name, "deleted"
 
 
 def is_data_loaded(data, jsonfile_name):
@@ -1091,31 +1092,5 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
         logger.exception("Could not export audit records from %s to PDF: %s", clean_json_name, err)
         return None, "pdf_error"
 
-def update_record_by_index(data, index, updated_record, jsonfile_name):
-    """1-based index. Returns (data, jsonfile_name, status):
-    "updated", "invalid_index", or a save status if syncing the file failed."""
-    if not 1 <= index <= len(data):
-        return data, jsonfile_name, "invalid_index"
-
-    data[index - 1] = updated_record
-
-    if jsonfile_name:
-        _, save_status = save_data_to_json(data, jsonfile_name)
-        if save_status != "saved":
-            return data, jsonfile_name, save_status
-    return data, jsonfile_name, "updated"
 
 
-def delete_record_by_index(data, index, jsonfile_name):
-    """1-based index. Returns (data, jsonfile_name, status):
-    "deleted", "invalid_index", or a save status if syncing the file failed."""
-    if not 1 <= index <= len(data):
-        return data, jsonfile_name, "invalid_index"
-
-    data.pop(index - 1)
-
-    if jsonfile_name:
-        _, save_status = save_data_to_json(data, jsonfile_name)
-        if save_status != "saved":
-            return data, jsonfile_name, save_status
-    return data, jsonfile_name, "deleted"
