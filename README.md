@@ -219,10 +219,10 @@ Files saved by an older version directly in the folder are not shown to any user
 
 ## Tests and continuous integration
 
-The project has an automated test suite (Python's built-in `unittest`, so nothing extra to install) that covers the grant rules, the AI output cleaning, accounts and saved files. It never calls the AI or touches your real data.
+The project has an automated test suite (plain test functions with plain `assert` statements, run by `tests/run_tests.py`, so there are no test classes and nothing extra to install) that covers the grant rules, the AI output cleaning, accounts and saved files. It never calls the AI or touches your real data.
 
 ```
-python -m unittest discover -s tests -t . -v
+python tests/run_tests.py -v
 ```
 
 To check the code style as well, install [ruff](https://docs.astral.sh/ruff/) (`pip install ruff`) and run `ruff check .`.
@@ -233,10 +233,10 @@ You can also run the tests inside the Docker image:
 
 ```
 docker build -t sme-grant-auditor .
-docker run --rm sme-grant-auditor python -m unittest discover -s tests -t .
+docker run --rm sme-grant-auditor python tests/run_tests.py
 ```
 
-The tests live in `tests/`, one file per layer (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`). When you change a rule, change or add the matching test in the same commit.
+The tests live in `tests/`, one file per layer (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py`) plus `test_architecture.py`, which fails if a layer imports another layer, a non-I/O layer calls `print()`/`input()`, or any `class` appears. When you change a rule, change or add the matching test in the same commit.
 
 ---
 

@@ -30,7 +30,7 @@ jobs:
         run: ruff check .
 
       - name: Unit tests
-        run: python -m unittest discover -s tests -t . -v
+        run: python tests/run_tests.py -v
 
   docker:
     runs-on: ubuntu-latest
@@ -42,4 +42,4 @@ jobs:
         run: docker build -t sme-grant-auditor .
 
       - name: Run the unit tests inside the image
-        run: docker run --rm sme-grant-auditor python -m unittest discover -s tests -t .
+        run: docker run --rm sme-grant-auditor python tests/run_tests.py
