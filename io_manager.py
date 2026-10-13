@@ -755,28 +755,6 @@ def display_applied_grants(scheme_grant_records, key):
             "Proposal Type": grant.get("Proposal Type", "N/A"),
             "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
             "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
-            "Baseline Energy Expenditure": grant["Baseline Energy Expenditure"],
-            "Estimated Retrofit Cost": grant["Estimated Retrofit Cost"],
-            "Reporting Advisory Fee": grant.get("Reporting Advisory Fee", 0.0),
-        }
-        lines.extend(format_pairs(details, indent="   "))
-
-    count = len(scheme_grant_records)
-    footer = f"{count} record{'s' if count != 1 else ''}"
-
-    # Build the paper contents: one block per grant
-    lines = []
-    for i, grant in enumerate(scheme_grant_records, start=1):
-        if i > 1:
-            lines.append("")
-        lines.append(f"{i}. {grant['Company Name']} - {grant['Company Industry']}")
-        details = {
-            "Total Revenue": grant["Company Total Revenue"],
-            "Total Employees": grant["Total Employees"],
-            "Local Equity": grant["Local Equity"],
-            "Proposal Type": grant.get("Proposal Type", "N/A"),
-            "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
-            "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
             "Baseline Energy Expenditure": grant.get("Baseline Energy Expenditure", "N/A"),
             "Estimated Retrofit Cost": grant.get("Estimated Retrofit Cost", "N/A"),
             "Reporting Advisory Fee": grant.get("Reporting Advisory Fee", 0.0),
@@ -1128,25 +1106,6 @@ def display_grant_decision(result):
             lines.append("")
             lines.append(heading)
             lines.extend(f"  - {item}" for item in items)
-    lines = [
-        f"SME Eligible     : {'YES' if result['is_sme'] else 'NO'}",
-        f"Decision Status  : {result['decision_status']}",
-        f"Audit Passed     : {result['audit_passed']}",
-        f"Approved Subsidy : SGD {result['approved_subsidy_sgd']:,.2f}",
-    ]
-
-    sections = [
-        ("Matched Schemes:", result["matched_schemes"]),
-        ("Reasons:", result["reasons"]),
-        ("Recommendations:", result["recommendations"]),
-    ]
-    for heading, items in sections:
-        if items:
-            lines.append("")
-            lines.append(heading)
-            lines.extend(f"  - {item}" for item in items)
-
-    print_on_paper(lines, title="GRANT ELIGIBILITY DECISION")
     print_on_paper(lines, title="GRANT ELIGIBILITY DECISION")
 
 # Coordinator that collects every input and maps it onto the exact dict

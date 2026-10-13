@@ -157,7 +157,7 @@ Once logged in, choose **1 (Start)** at the menu and enter:
 
 The app then shows the AI audit and the grant decision, and asks whether to save. Because the AI estimates the energy reduction, exact figures can vary from run to run.
 
-Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **9** view your past audits, **10** logout. (Options 5 and 6, update and delete, are not built yet.)
+Other menu options: **2** save, **3** load, **4** view records, **5** update a record, **6** delete a record, **7** and **8** re-run the AI and logic steps on the latest record, **9** view your past audits, **10** logout.
 
 ## How grant decisions are made
 
@@ -249,4 +249,3 @@ The tests live in `tests/`, one file per layer (`test_logic_manager.py`, `test_a
 | Accounts or saved files disappear in Docker, or no `.json` files appear in your folder | The files were saved inside the container. Recreate the container with `-v "<your folder>:/app/data"` (Step 3, Option A, item 3). A container created earlier without it must be removed with `docker rm sme-auditor` first, and the image rebuilt if your Dockerfile is old. |
 | `Could not save the new account` / an audit is not saved | Another copy of the app is writing at the same moment, or the data folder is not writable. Try again; if it keeps failing, check the folder's permissions (and delete a stale `*.lock` file in it). |
 | Filename rejected when saving | Use a plain name such as `Save1`, with no `/`, `\` or other special characters. |
-| Docker on Linux: `Permission denied` writing to the data folder | The container runs as a normal user (id 1000), not root. Make your data folder writable by it (`sudo chown 1000 <folder>`), or add `--user "$(id -u):$(id -g)"` to `docker run`. Docker Desktop on Windows/Mac needs nothing extra. |
