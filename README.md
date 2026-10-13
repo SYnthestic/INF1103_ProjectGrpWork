@@ -157,7 +157,26 @@ Once logged in, choose **1 (Start)** at the menu and enter:
 
 The app then shows the AI audit and the grant decision, and asks whether to save. Because the AI estimates the energy reduction, exact figures can vary from run to run.
 
-Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **9** view your past audits, **10** logout.
+Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **9** view your past audits, **10** logout. (Options 5 and 6, update and delete, are not built yet.)
+
+## How grant decisions are made
+
+The AI only classifies the proposal (scope, estimated energy reduction, any exclusion keywords). The decision and the subsidy come from fixed Python rules in `logic_manager.py`. They are checked in this order, and the first one that applies decides:
+
+| # | Condition | Decision |
+|---|---|---|
+| 1 | Exclusion keywords found (e.g. "second-hand"), or the intervention is "Fossil Fuel Modification" | `MANUAL_EXCLUSION_REVIEW` |
+| 2 | Local shareholding under 30%, or annual revenue over SGD 100 million | `REJECT_NON_SME` |
+| 3 | ESG Reporting proposal with a fee over SGD 0 | `PRE_APPROVED_SRG` (30% of the fee, up to SGD 150,000) |
+| 4 | Equipment proposal with no baseline energy spend, or ESG proposal with no fee | `MANUAL_REVIEW` |
+| 5 | The AI could not classify a scope (also when the AI call failed) | `MANUAL_REVIEW` |
+| 6 | Lifetime abatement over 350 tonnes **and** energy reduction of at least 10% | `PRE_APPROVED_TIER_1_ADVANCED` (70% of baseline spend, up to SGD 350,000) |
+| 7 | Scope-1 and energy reduction of at least 20% | `PRE_APPROVED_TIER_1` (70% of baseline spend, up to SGD 30,000) |
+| 8 | Any scope and energy reduction of at least 15% | `PROVISIONAL_APPROVAL_TIER_2` (50% of baseline spend, up to SGD 20,000) |
+| 9 | Energy reduction from 10% to under 15% | `MANUAL_REVIEW` |
+| 10 | Energy reduction under 10% | `REJECT_LOW_IMPACT` |
+
+Equipment subsidies (rows 6 to 8) are never larger than the retrofit cost you entered. The grant you pick when entering the application does not change the decision; if the proposal matched a different scheme, a recommendation says so.
 
 ## Accounts and login
 
