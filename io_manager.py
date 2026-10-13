@@ -525,9 +525,6 @@ def display_applied_grants(scheme_grant_records, key):
     count = len(scheme_grant_records)
     footer = f"{count} record{'s' if count != 1 else ''}"
 
-    if key == 1:
-        print_on_paper(lines, title="SCHEME GRANT RECORDS", footer=footer)
-
     # Build the paper contents: one block per grant
     lines = []
     for i, grant in enumerate(scheme_grant_records, start=1):
@@ -714,6 +711,35 @@ def prompt_filename_on_disk(max_len=50, blocked=""):
 # Just an icon to let you know the save was successful, without having to print the full path every time.
 def print_save_disk_block_deep_blue():
     print(gui.save_disk_block_deep_blue())
+
+# For update, delete, and AI and Logic Managers
+def select_record(records, key, action):
+    """Shows the records and asks which one to work on.
+    Returns the 1-based index, or None if there are no records."""
+    if not records:
+        display_no_records_message()
+        return None
+    display_applied_grants(records, key)
+    return retrieve_record_index(records, action)
+
+#For option 5
+def edit_record(records, jsonfile_name, key, action):
+    index = select_record(records, key, action)
+    if index is None:
+        return records, jsonfile_name
+
+    name = records[index - 1].get("Company Name", "Unknown")
+    if action == "update":
+        updated = retrieve_updated_record(records[index - 1])
+        records, jsonfile_name, status = dm.update_record_by_index(records, index, updated, jsonfile_name)
+        name = updated.get("Company Name", name)
+    else:
+        if not confirm_delete(name):
+            return records, jsonfile_name
+        records, jsonfile_name, status = dm.delete_record_by_index(records, index, jsonfile_name)
+
+    display_edit_result(status, name)
+    return records, jsonfile_name
 
 # For updating or deleting a record, we need to ask the user which record they want to change. This function prompts for a 1-based index and validates it.
 def retrieve_record_index(records, action="update"):
@@ -920,7 +946,7 @@ def display_no_records_message():
 
 # When AI hasn't yet audited the machine. The AI will audit right after finishing the input for the company grant so it only activates in practice when no data exists
 def display_no_ai_audit():
-    print("No AI audit yet. Please run option 5 first.")
+    print("No AI audit yet. Please run option 7 first.")
     gui.return_button()
 
 # ASCII related
