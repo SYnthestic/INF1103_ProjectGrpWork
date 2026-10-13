@@ -29,6 +29,14 @@ FAST_TRACK_MIN_PCT = 20.0
 PROVISIONAL_MIN_PCT = 15.0
 MINIMUM_IMPACT_PCT = 10.0
 
+# Decisions whose subsidy comes from the baseline energy spend (the
+# reporting grant is based on the advisory fee instead).
+EQUIPMENT_SUBSIDY_STATUSES = (
+    "PRE_APPROVED_TIER_1",
+    "PRE_APPROVED_TIER_1_ADVANCED",
+    "PROVISIONAL_APPROVAL_TIER_2",
+)
+
 
 def _number(value, default=0.0):
     """A finite float, or `default` for None, text, NaN or infinity.
@@ -285,6 +293,10 @@ def evaluate_grant_application(user_profile, ai_audit):
         user_profile.get("reporting_advisory_fee_sgd")
     )
 
+    retrofit_cost = _number(
+        user_profile.get("estimated_retrofit_cost_sgd")
+    )
+
     # ---------------------------------------------------------
     # 2. Extract AI information
     # ---------------------------------------------------------
@@ -456,6 +468,22 @@ def evaluate_grant_application(user_profile, ai_audit):
     # reporting/advisory proposal has no GHG scope to classify — it is
     # a different proposal category entirely, self-declared by the
     # applicant in io_manager.py rather than inferred by the AI.
+
+    elif proposal_type == "ESG Reporting / Advisory" and reporting_advisory_fee <= 0:
+
+        # The grant is a percentage of the fee, so without a fee there is
+        # nothing to approve (it would be a "pre-approval" for SGD 0).
+        decision_status = "MANUAL_REVIEW"
+
+        reasons.append(
+            "No valid external ESG reporting/advisory fee was provided, "
+            "so a subsidy cannot be calculated."
+        )
+
+        recommendations.append(
+            "Provide the quoted reporting/advisory fee (more than SGD 0) "
+            "and resubmit the proposal."
+        )
 
     elif proposal_type == "ESG Reporting / Advisory":
 
@@ -690,6 +718,23 @@ def evaluate_grant_application(user_profile, ai_audit):
         recommendations.append(
             "Recalculate the expected energy reduction after "
             "modifying the proposed project."
+        )
+
+    # ---------------------------------------------------------
+    # 14b. Never subsidise more than the project costs
+    # ---------------------------------------------------------
+    # Equipment subsidies are worked out from the baseline energy spend, so
+    # a small retrofit could otherwise be "granted" more than it costs.
+    # (A missing cost of 0 means "not stated" and applies no cap.)
+
+    if (
+        decision_status in EQUIPMENT_SUBSIDY_STATUSES
+        and 0 < retrofit_cost < approved_subsidy
+    ):
+        approved_subsidy = round(retrofit_cost, 2)
+        reasons.append(
+            f"Subsidy limited to the stated retrofit cost of "
+            f"SGD {retrofit_cost:,.2f}."
         )
 
     # ---------------------------------------------------------
