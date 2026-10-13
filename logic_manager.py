@@ -164,6 +164,38 @@ SME_MIN_LOCAL_EQUITY_PCT = 30.0
 SME_MAX_REVENUE_SGD = 100_000_000.0
 
 
+# Menu text chosen by the applicant -> the scheme name the rules produce.
+# Other choices (e.g. Enterprise Development Grant, "Others") have no
+# matching rule, so they are never flagged.
+CHOSEN_SCHEME_KEYWORDS = (
+    ("advanced tier", "Energy Efficiency Grant (EEG) - Advanced Tier"),
+    ("base tier", "Energy Efficiency Grant (EEG) - Base Tier"),
+    ("reporting", "Sustainability Reporting Grant (SRG)"),
+)
+
+
+def scheme_mismatch_note(chosen_scheme, matched_schemes):
+    """Returns a recommendation when the scheme the applicant picked is not
+    the one the rules matched, otherwise None. Informational only: the
+    decision itself is never changed by the applicant's choice."""
+
+    if not isinstance(chosen_scheme, str) or not matched_schemes:
+        return None
+
+    lowered = chosen_scheme.lower()
+    for keyword, expected_scheme in CHOSEN_SCHEME_KEYWORDS:
+        if keyword in lowered:
+            if expected_scheme in matched_schemes:
+                return None
+            chosen_name = chosen_scheme.lstrip("0123456789. ").strip()
+            return (
+                f"You selected '{chosen_name}', but this proposal matched: "
+                f"{'; '.join(matched_schemes)}. Check that you are applying "
+                "for the right scheme."
+            )
+    return None
+
+
 def check_sme_status(local_equity_pct, annual_revenue, headcount):
     """
     Checks whether the company meets the statutory SME requirements.
@@ -736,6 +768,15 @@ def evaluate_grant_application(user_profile, ai_audit):
             f"Subsidy limited to the stated retrofit cost of "
             f"SGD {retrofit_cost:,.2f}."
         )
+
+    # ---------------------------------------------------------
+    # 14c. Tell the applicant if they picked a different scheme
+    # ---------------------------------------------------------
+
+    if decision_status in EQUIPMENT_SUBSIDY_STATUSES + ("PRE_APPROVED_SRG",):
+        mismatch_note = scheme_mismatch_note(sustainability_grant, matched_schemes)
+        if mismatch_note:
+            recommendations.append(mismatch_note)
 
     # ---------------------------------------------------------
     # 15. Determine whether audit passed
