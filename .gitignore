@@ -11,3 +11,6 @@ audit_history.json
 records/
 *.lock
 app.log
+
+# Scratch save files from manual testing in the project root
+/*.json
