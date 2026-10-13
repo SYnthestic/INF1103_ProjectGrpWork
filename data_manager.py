@@ -2,6 +2,8 @@ import json
 import logging
 import os
 import re
+import time
+from contextlib import contextmanager
 from datetime import datetime
 
 # Stay silent unless someone configures logging (otherwise Python's default
@@ -48,7 +50,49 @@ def is_valid_filename(jsonfile_name):
 
 
 def _full_path(jsonfile_name):
+    """Path of a shared file in DATA_DIR (users.json, audit_history.json)."""
     return os.path.join(DATA_DIR, jsonfile_name)
+
+
+# ---------------------------------------------------------------------------
+# Per-user record files
+# ---------------------------------------------------------------------------
+# Saved record files (menu options 2/3 and the PDF export) are kept in
+# DATA_DIR/records/<username>/ so one user can never load, overwrite or
+# list another user's files. main.py calls set_active_user() at login and
+# set_active_user(None) at logout. With no active user (e.g. tests or old
+# scripts) the files stay in DATA_DIR itself, as before.
+
+RECORDS_DIR_NAME = "records"
+_USERNAME_FOR_PATH = re.compile(r"[a-z0-9_]{1,64}")
+_active_user = None
+
+
+def set_active_user(username):
+    """Chooses whose folder the record files are saved to / loaded from.
+    Pass None to go back to no active user."""
+    global _active_user
+    if username is None:
+        _active_user = None
+        return
+    if not isinstance(username, str) or not _USERNAME_FOR_PATH.fullmatch(username):
+        # Never build a folder name from anything unexpected (e.g. "..").
+        raise ValueError("Invalid username for a records folder.")
+    _active_user = username
+
+
+def get_active_user():
+    return _active_user
+
+
+def _records_dir():
+    if _active_user is None:
+        return DATA_DIR
+    return os.path.join(DATA_DIR, RECORDS_DIR_NAME, _active_user)
+
+
+def _record_path(jsonfile_name):
+    return os.path.join(_records_dir(), jsonfile_name)
 
 
 def generate_company_save_filename(company_name):
@@ -155,7 +199,7 @@ def inspect_save_file(jsonfile_name):
         return "", "no_name"
     if not is_valid_filename(name):
         return "", "invalid_name"
-    if os.path.isfile(_full_path(name)):
+    if os.path.isfile(_record_path(name)):
         return name, "exists"
     return name, "not_found"
 
@@ -188,7 +232,7 @@ def load_data_from_json(jsonfile_name):
     if not is_valid_filename(name):
         return [], "", "invalid_name"
 
-    path = _full_path(name)
+    path = _record_path(name)
     if not os.path.isfile(path):
         return [], name, "not_found"
 
@@ -269,10 +313,10 @@ def save_data_to_json(data, jsonfile_name):
     if not is_valid_filename(name):
         return None, "invalid_name"
 
-    path = _full_path(name)
+    path = _record_path(name)
     tmp_path = path + ".tmp"
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(_records_dir(), exist_ok=True)
         with open(tmp_path, 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
         os.replace(tmp_path, path)
@@ -286,6 +330,201 @@ def save_data_to_json(data, jsonfile_name):
         return None, "io_error"
 
 
+
+
+# ---------------------------------------------------------------------------
+# User accounts and per-user audit history
+# ---------------------------------------------------------------------------
+# users.json         -> {username: {password_hash, salt, ...}}
+# audit_history.json -> {username: [audit_record, audit_record, ...]}
+#
+# The Data Manager only reads and writes these files. It never hashes or
+# checks passwords (Logic Manager's job) and never prints prompts (I/O
+# Manager's job). NOTE: storage is plain JSON for now and is NOT secure -
+# only the passwords are protected (by hashing).
+
+USERS_FILE = "users.json"
+AUDIT_HISTORY_FILE = "audit_history.json"
+
+
+def read_json_file(filename, default):
+    """Returns the parsed contents of a data file, or `default` if the file
+    does not exist yet. Returns None if the file exists but cannot be read,
+    so callers never overwrite data they failed to load. A corrupt file is
+    set aside as .corrupt, like the record save files."""
+    path = _full_path(filename)
+    if not os.path.isfile(path):
+        return default
+    try:
+        with open(path, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+    except ValueError:  # JSONDecodeError and UnicodeDecodeError
+        logger.error("%s contains invalid JSON.", path)
+        _backup_corrupt_file(path)
+        return default
+    except (OSError, RecursionError) as err:
+        logger.error("Could not read %s: %s", path, err)
+        return None
+    if not isinstance(data, type(default)):
+        logger.error("%s does not have the expected format.", path)
+        _backup_corrupt_file(path)
+        return default
+    return data
+
+
+def write_json_file(filename, data):
+    """Writes data to a temporary file first and then swaps it in, so a crash
+    midway can never leave a half-written file behind.
+    Returns True on success, False otherwise."""
+    path = _full_path(filename)
+    tmp_path = path + ".tmp"
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(tmp_path, 'w', encoding='utf-8') as file:
+            json.dump(data, file, indent=4, ensure_ascii=False)
+        os.replace(tmp_path, path)
+        return True
+    except (OSError, TypeError, ValueError) as err:
+        logger.error("Could not save to %s: %s", path, err)
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return False
+
+
+# ---------- Locking ----------
+# users.json and audit_history.json are read, changed and rewritten as a
+# whole. If two copies of the app (e.g. two containers sharing one folder)
+# did that at the same moment, one change would be lost. A small ".lock"
+# file, created atomically, makes the second one wait its turn.
+LOCK_TIMEOUT_SECONDS = 5.0
+LOCK_STALE_SECONDS = 30.0
+
+
+@contextmanager
+def _file_lock(filename):
+    """Yields True once this process holds the lock for `filename`, or
+    False if it could not be obtained within LOCK_TIMEOUT_SECONDS (the
+    caller then reports a failed save instead of risking a lost update).
+    A lock older than LOCK_STALE_SECONDS (left by a crashed run) is
+    removed."""
+    lock_path = _full_path(filename) + ".lock"
+    held = False
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
+        while True:
+            try:
+                descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(descriptor)
+                held = True
+                break
+            except FileExistsError:
+                try:
+                    if time.time() - os.path.getmtime(lock_path) > LOCK_STALE_SECONDS:
+                        os.remove(lock_path)
+                        continue
+                except OSError:
+                    pass  # lock vanished or cannot be inspected: just retry
+                if time.monotonic() >= deadline:
+                    break
+                time.sleep(0.05)
+    except OSError as err:
+        logger.error("Could not lock %s: %s", filename, err)
+    try:
+        yield held
+    finally:
+        if held:
+            try:
+                os.remove(lock_path)
+            except OSError:
+                pass
+
+
+# ---------- Users ----------
+def load_users():
+    """All stored users as {username: record}, or None if unreadable."""
+    return read_json_file(USERS_FILE, {})
+
+
+def get_user(username):
+    """Returns the stored user record for `username`, or None."""
+    users = load_users()
+    if users is None:
+        return None
+    record = users.get(username)
+    return record if isinstance(record, dict) else None
+
+
+def user_exists(username):
+    """True if the username is already in users.json (even if its record
+    is damaged, so it can never be silently overwritten)."""
+    users = load_users()
+    return users is not None and username in users
+
+
+def save_new_user(user_record):
+    """Adds a new user (built by logic_manager.build_new_user_record).
+    Returns False if the username is already taken or the write failed."""
+    with _file_lock(USERS_FILE) as locked:
+        if not locked:
+            return False
+        users = load_users()
+        if users is None:
+            return False
+        username = user_record["username"]
+        if username in users:
+            return False
+
+        stored = dict(user_record)
+        stored["created_at"] = datetime.now().isoformat(timespec="seconds")
+        users[username] = stored
+        return write_json_file(USERS_FILE, users)
+
+
+# ---------- Audit history ----------
+def load_audit_history():
+    """All saved audits as {username: [audit, ...]}, or None if unreadable."""
+    return read_json_file(AUDIT_HISTORY_FILE, {})
+
+
+def get_user_audits(username):
+    """All audits saved by `username`, oldest first."""
+    history = load_audit_history()
+    audits = history.get(username, []) if history else []
+    if not isinstance(audits, list):
+        return []
+    # Ignore damaged entries so the screens only ever see audit dicts.
+    return [audit for audit in audits if isinstance(audit, dict)]
+
+
+def append_user_audit(username, application, ai_audit, result):
+    """Saves one completed audit (inputs + AI output + decision) under the
+    logged-in user. Returns the saved record, or None on failure."""
+    with _file_lock(AUDIT_HISTORY_FILE) as locked:
+        if not locked:
+            return None
+        history = load_audit_history()
+        if history is None:
+            return None
+        user_audits = history.get(username)
+        if not isinstance(user_audits, list):
+            user_audits = []
+            history[username] = user_audits
+
+        audit_record = {
+            "audit_id": generate_audit_id(user_audits),
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "application": application,
+            "ai_audit": ai_audit,
+            "result": result,
+        }
+        user_audits.append(audit_record)
+
+        if write_json_file(AUDIT_HISTORY_FILE, history):
+            return audit_record
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -404,10 +643,10 @@ def export_json_to_pdf(jsonfile_name, pdf_filename=None):
     ):
         return None, "invalid_pdf_name"
 
-    pdf_path = _full_path(pdf_name)
+    pdf_path = _record_path(pdf_name)
 
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(_records_dir(), exist_ok=True)
 
         # Embed Times New Roman when available so the report keeps the requested
         # typeface on other computers. In Docker, mount/provide the font files

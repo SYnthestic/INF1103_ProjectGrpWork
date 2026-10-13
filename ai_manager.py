@@ -1,7 +1,8 @@
+import copy
 import os
 import json
-import sys
-import time
+import math
+import re
 import threading
 from openai import OpenAI
 import io_manager as in_and_out
@@ -10,9 +11,13 @@ import io_manager as in_and_out
 def setup_ai_client():
 
     api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "OPENROUTER_API_KEY is not set. Add it to your .env file (see README)."
+        )
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
-        api_key=os.environ["OPENROUTER_API_KEY"],
+        api_key=api_key,
         max_retries=0,
         timeout=60 # Otherwise, say AI not responding
     )
@@ -31,8 +36,19 @@ DEFAULT_AI_AUDIT = {
     "estimated_lifetime_abatement_tonnes": 0.0,
     "detected_exclusion_keywords": [],
     "implementation_bottleneck": "",
-    "ai_reasoning_summary": "AI response could not be parsed; manual review recommended."
+    "ai_reasoning_summary": "AI response could not be parsed; manual review recommended.",
+    # "ok" when the model answered with usable JSON, "failed" when the
+    # call errored or the answer could not be parsed (fallback defaults).
+    "ai_status": "failed"
 }
+
+VALID_SCOPE_NAMES = ("Scope-1", "Scope-2", "Scope-3")
+
+
+def default_ai_audit():
+    """A fresh copy of the fallback audit. A deep copy, so changing the
+    keyword list of one result can never change the shared defaults."""
+    return copy.deepcopy(DEFAULT_AI_AUDIT)
 
 SYSTEM_PROMPT = """You are a compliance-classification assistant for a Singapore SME green grant auditor.
 Given a free-text proposal narrative describing an energy or sustainability upgrade, classify it
@@ -83,7 +99,9 @@ def get_ai_response(proposal_narrative):
             api_done_event.set()
 
     # 1. Spawn and start the background API network thread
-    api_thread = threading.Thread(target=worker_api_call)
+    # daemon: if the user presses Ctrl+C during the wait, the program can
+    # exit straight away instead of waiting for the network call to finish.
+    api_thread = threading.Thread(target=worker_api_call, daemon=True)
     api_thread.start()
 
     # 2. Run the ASCII progress bar on the main UI thread immediately
@@ -95,7 +113,7 @@ def get_ai_response(proposal_narrative):
     # 4. Handle Fallbacks if an error was caught inside the background worker
     if thread_results["error"] is not None:
         error = thread_results["error"]
-        fallback = dict(DEFAULT_AI_AUDIT)
+        fallback = default_ai_audit()
         fallback["ai_reasoning_summary"] = (
             f"AI call failed ({type(error).__name__}: {error}); "
             "manual review recommended."
@@ -115,8 +133,9 @@ def parse_ai_audit(raw_content):
     model actually returned.
     """
 
-    if raw_content is None:
-        return dict(DEFAULT_AI_AUDIT)
+    # Some models return a list of content parts (or nothing usable).
+    if not isinstance(raw_content, str):
+        return default_ai_audit()
 
     cleaned = raw_content.strip()
 
@@ -130,14 +149,124 @@ def parse_ai_audit(raw_content):
     try:
         parsed = json.loads(cleaned)
     except (json.JSONDecodeError, ValueError):
-        return dict(DEFAULT_AI_AUDIT)
+        # Some models add a sentence before/after the JSON; try the part
+        # between the first "{" and the last "}".
+        start, end = cleaned.find("{"), cleaned.rfind("}")
+        if start == -1 or end <= start:
+            return default_ai_audit()
+        try:
+            parsed = json.loads(cleaned[start:end + 1])
+        except (json.JSONDecodeError, ValueError):
+            return default_ai_audit()
 
     if not isinstance(parsed, dict):
-        return dict(DEFAULT_AI_AUDIT)
+        return default_ai_audit()
 
-    ai_audit = dict(DEFAULT_AI_AUDIT)
-    for key in DEFAULT_AI_AUDIT:
-        if key in parsed:
-            ai_audit[key] = parsed[key]
+    return sanitise_ai_audit(parsed)
 
+
+def ai_call_failed(ai_audit):
+    """True when the audit is the fallback default (the AI call errored or
+    its answer could not be used), so callers can avoid treating it as a
+    real audit."""
+    return not isinstance(ai_audit, dict) or ai_audit.get("ai_status") != "ok"
+
+
+# ---------------------------------------------------------------------------
+# Schema validation: the model can return the right keys with the wrong
+# types (e.g. "30%" instead of 30, or null instead of a list). Everything
+# below turns whatever came back into the exact types the Logic Manager
+# expects, falling back to the safe defaults field by field.
+# ---------------------------------------------------------------------------
+
+def _to_number(value, default=0.0, minimum=None, maximum=None):
+    """Converts numbers and strings like "30", "30%" or "1,200" to a finite
+    float, clamped to [minimum, maximum]. Anything else -> default."""
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, str):
+        match = re.search(r"-?\d[\d,]*\.?\d*|-?\.\d+", value)
+        if not match:
+            return default
+        try:
+            value = float(match.group().replace(",", ""))
+        except ValueError:
+            return default
+    if not isinstance(value, (int, float)):
+        return default
+    number = float(value)
+    if math.isnan(number) or math.isinf(number):
+        return default
+    if minimum is not None:
+        number = max(number, minimum)
+    if maximum is not None:
+        number = min(number, maximum)
+    return number
+
+
+def _to_text(value, default=""):
+    if value is None:
+        return default
+    return value.strip() if isinstance(value, str) else str(value)
+
+
+def _to_scope(value):
+    """"scope-1", "Scope 1" and "scope1" all become "Scope-1"."""
+    if isinstance(value, str):
+        match = re.fullmatch(r"\s*scope[\s_-]*([123])\s*", value, re.IGNORECASE)
+        if match:
+            return f"Scope-{match.group(1)}"
+    return "Unknown"
+
+
+# Words models write instead of an empty list ("none", "N/A", ...). They
+# are not real exclusions and must not trigger the exclusion review.
+PLACEHOLDER_KEYWORDS = {
+    "none", "no", "nil", "null", "n/a", "na", "-", "--", "not applicable",
+    "none detected", "no exclusions", "no exclusion", "no keywords",
+    "none found", "nothing", "unknown",
+}
+
+
+def is_placeholder_keyword(text):
+    lowered = str(text).strip().lower().strip(".")
+    return lowered in PLACEHOLDER_KEYWORDS or lowered.startswith("none ")
+
+
+def _to_string_list(value):
+    """A list of non-empty strings. A single string is split on commas,
+    semicolons and new lines; None or other types give an empty list."""
+    if isinstance(value, str):
+        value = re.split(r"[,;\n]", value)
+    if not isinstance(value, (list, tuple)):
+        return []
+    items = []
+    for item in value:
+        if item is None or isinstance(item, (dict, list, tuple)):
+            continue
+        text = str(item).strip()
+        if text and not is_placeholder_keyword(text):
+            items.append(text)
+    return items
+
+
+def sanitise_ai_audit(parsed):
+    """Builds a complete, correctly typed ai_audit dict from parsed JSON."""
+    ai_audit = default_ai_audit()
+    ai_audit["scope_category"] = _to_scope(parsed.get("scope_category"))
+    ai_audit["primary_intervention_type"] = _to_text(parsed.get("primary_intervention_type"))
+    ai_audit["estimated_energy_reduction_pct"] = _to_number(
+        parsed.get("estimated_energy_reduction_pct"), 0.0, 0.0, 100.0
+    )
+    ai_audit["estimated_lifetime_abatement_tonnes"] = _to_number(
+        parsed.get("estimated_lifetime_abatement_tonnes"), 0.0, 0.0
+    )
+    ai_audit["detected_exclusion_keywords"] = _to_string_list(
+        parsed.get("detected_exclusion_keywords")
+    )
+    ai_audit["implementation_bottleneck"] = _to_text(parsed.get("implementation_bottleneck"))
+    ai_audit["ai_reasoning_summary"] = _to_text(
+        parsed.get("ai_reasoning_summary"), DEFAULT_AI_AUDIT["ai_reasoning_summary"]
+    )
+    ai_audit["ai_status"] = "ok"
     return ai_audit

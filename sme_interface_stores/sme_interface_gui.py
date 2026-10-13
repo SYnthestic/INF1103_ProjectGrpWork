@@ -251,7 +251,7 @@ def save_disk_block_deep_blue():
     return disk_art
 
 # sme_interface_gui.py
-def boxed_menu():
+def boxed_menu(username=None):
     border = "▓⚗_⚗▓ " * 10
     blank = "▓" + " " * 57 + "▓"
 
@@ -261,7 +261,7 @@ def boxed_menu():
     lines = [
         border,
         blank,
-        row("    Please select your choice (0,1,2,3,4,5,6)"),
+        row("    Please select your choice (0-10)"),
         blank,
         row("    0. Exit"),
         row("    1. Start"),
@@ -272,9 +272,14 @@ def boxed_menu():
         row("    6. Delete Records"),
         row("    7. Run AI Manager (only)"),
         row("    8. Run Logic Manager (only)"),
+        row("    9. View My Past Audits"),
+        row("   10. Logout"),
         blank,
-        border,
     ]
+    if username:
+        lines.append(row(f"    Logged in as: {username}"))
+        lines.append(blank)
+    lines.append(border)
     return "\n".join(lines)
 
 def sustainability_banner():

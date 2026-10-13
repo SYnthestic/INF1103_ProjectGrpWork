@@ -3,3 +3,10 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Local user accounts (contain password hashes) and audit history
+users.json
+audit_history.json
+*.json.tmp
+records/
+*.lock

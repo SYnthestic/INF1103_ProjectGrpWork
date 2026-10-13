@@ -10,9 +10,20 @@ A terminal app that takes an SME's details and a free-text upgrade proposal, use
 | `io_manager.py` | All user input, validation and screen output |
 | `ai_manager.py` | Sends the proposal to the AI API and returns a validated JSON result |
 | `logic_manager.py` | Eligibility checks, grant matching and subsidy maths (no AI) |
-| `data_manager.py` | Saving and loading records as JSON |
+| `data_manager.py` | Saving and loading records, user accounts and audit history as JSON |
 
 The project uses plain functions only (no classes).
+
+---
+
+## Quick start
+
+1. Get the code (Step 1).
+2. Put your OpenRouter key in a `.env` file (Step 2).
+3. Run the app with Docker **or** plain Python (Step 3).
+4. Create an account, log in, and try the sample audit (Steps 4 and 5).
+
+The sections below walk through each step in detail.
 
 ---
 
@@ -61,41 +72,40 @@ Rules that matter:
 ### Option A: Docker
 
 1. Start Docker Desktop and wait until it says the engine is running.
-2. Confirm your `Dockerfile` contains these two lines (add them if missing):
-
-   ```dockerfile
-   ENV SME_DATA_DIR=/app/data
-   ENV PYTHONDONTWRITEBYTECODE=1
-   ```
-
-3. Build the image (from the project folder):
+2. Build the image from the project folder (repeat this whenever the code changes):
 
    ```
    docker build -t sme-grant-auditor .
    ```
 
-4. Create and run the container. The `-it` flag is required because the app asks for input:
+3. Pick a folder on your computer for the app's saved files, then run the container. Replace the part before the colon with your own folder:
 
-   ```
-   docker run -it --name sme-auditor --env-file .env -v "C:\SME_Grant_Data:/app/data" sme-grant-auditor
-   ```
+   | Your computer | Command |
+   |---|---|
+   | Windows (CMD or PowerShell) | `docker run -it --name sme-auditor --env-file .env -v "C:\SME_Grant_Data:/app/data" sme-grant-auditor` |
+   | Windows, `data` folder inside the project (PowerShell) | `docker run -it --name sme-auditor --env-file .env -v "${PWD}\data:/app/data" sme-grant-auditor` |
+   | Mac / Linux | `docker run -it --name sme-auditor --env-file .env -v "$HOME/SME_Grant_Data:/app/data" sme-grant-auditor` |
 
-   Replace `C:\SME_Grant_Data` with any folder on your computer where saved files should go.
-   On Mac/Linux use a path such as `"$HOME/SME_Grant_Data:/app/data"`.
+   What the options do:
 
-5. Next time, reuse the same container:
+   - `-it` is required because the app asks for input.
+   - `--env-file .env` passes in your API key.
+   - `-v "<your folder>:/app/data"` links a folder on your computer to the folder the app saves into. The Dockerfile already points the app at `/app/data`, so your JSON files (saved records, `users.json`, `audit_history.json`) appear in your folder and survive the container being removed. **Do not leave this out**, or the files are lost.
+
+4. Next time, reuse the same container:
 
    ```
    docker start -ai sme-auditor
    ```
 
-6. After changing code, `.env` or `requirements.txt`, recreate it:
+5. After changing code, `.env` or `requirements.txt`, recreate it (your saved files stay in your folder):
 
    ```
    docker rm sme-auditor
    docker build -t sme-grant-auditor .
-   docker run -it --name sme-auditor --env-file .env -v "C:\SME_Grant_Data:/app/data" sme-grant-auditor
    ```
+
+   then run the `docker run` command from item 3 again.
 
 ### Option B: Plain Python
 
@@ -123,9 +133,15 @@ If VS Code underlines `openai` as unresolved, choose the `.venv` interpreter via
 
 ---
 
-## Step 4: Try a sample run
+## Step 4: Create an account
 
-At the menu choose **1 (Start)** and enter:
+The app opens on a login screen. Choose **2** to create an account (a username and a password of at least 8 characters with a letter and a digit), then choose **1** to log in. More detail is under *Accounts and login* below.
+
+---
+
+## Step 5: Try a sample run
+
+Once logged in, choose **1 (Start)** at the menu and enter:
 
 | Prompt | Sample input |
 |---|---|
@@ -141,13 +157,81 @@ At the menu choose **1 (Start)** and enter:
 
 The app then shows the AI audit and the grant decision, and asks whether to save. Because the AI estimates the energy reduction, exact figures can vary from run to run.
 
-Other menu options: **2** save, **3** load, **4** view records, **5** and **6** re-run the AI and logic steps on the latest record.
+Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **9** view your past audits, **10** logout. (Options 5 and 6, update and delete, are not built yet.)
+
+## How grant decisions are made
+
+The AI only classifies the proposal (scope, estimated energy reduction, any exclusion keywords). The decision and the subsidy come from fixed Python rules in `logic_manager.py`. They are checked in this order, and the first one that applies decides:
+
+| # | Condition | Decision |
+|---|---|---|
+| 1 | Exclusion keywords found (e.g. "second-hand"), or the intervention is "Fossil Fuel Modification" | `MANUAL_EXCLUSION_REVIEW` |
+| 2 | Local shareholding under 30%, or annual revenue over SGD 100 million | `REJECT_NON_SME` |
+| 3 | ESG Reporting proposal with a fee over SGD 0 | `PRE_APPROVED_SRG` (30% of the fee, up to SGD 150,000) |
+| 4 | Equipment proposal with no baseline energy spend, or ESG proposal with no fee | `MANUAL_REVIEW` |
+| 5 | The AI could not classify a scope (also when the AI call failed) | `MANUAL_REVIEW` |
+| 6 | Lifetime abatement over 350 tonnes **and** energy reduction of at least 10% | `PRE_APPROVED_TIER_1_ADVANCED` (70% of baseline spend, up to SGD 350,000) |
+| 7 | Scope-1 and energy reduction of at least 20% | `PRE_APPROVED_TIER_1` (70% of baseline spend, up to SGD 30,000) |
+| 8 | Any scope and energy reduction of at least 15% | `PROVISIONAL_APPROVAL_TIER_2` (50% of baseline spend, up to SGD 20,000) |
+| 9 | Energy reduction from 10% to under 15% | `MANUAL_REVIEW` |
+| 10 | Energy reduction under 10% | `REJECT_LOW_IMPACT` |
+
+Equipment subsidies (rows 6 to 8) are never larger than the retrofit cost you entered. The grant you pick when entering the application does not change the decision; if the proposal matched a different scheme, a recommendation says so.
+
+## Accounts and login
+
+When the app starts you must log in (option **1**) or create an account (option **2**) before reaching the main menu.
+
+- Usernames: 3-20 characters, letters/digits/underscore, not case-sensitive.
+- Passwords: 8 to 64 characters, with at least one letter and one digit. Typing is hidden.
+- Every audit completed with option **1** is saved automatically to your history. Option **9** lists your past audits and lets you open one in full. You only ever see your own audits. If the AI call fails (for example a missing API key or no internet), the result is shown but is **not** added to your history, so just run option **1** again.
+
+Passwords are never stored. Each account stores a random salt and a salted SHA-256 hash (PBKDF2-HMAC-SHA256, 200,000 iterations), checked with a constant-time comparison.
+
+| File | Contents |
+|---|---|
+| `users.json` | Usernames, salts and password hashes |
+| `audit_history.json` | Each user's saved audits (inputs, AI result, decision) |
+
+Both files are plain JSON and are **not** otherwise protected yet. They are in `.gitignore` and `.dockerignore`, so they are never committed or copied into the Docker image. They are saved with the app's other files (see *Where saved files go*). To reset all accounts, delete both files. A short-lived `users.json.lock` / `audit_history.json.lock` file may appear while the app is writing; it is removed automatically.
 
 ## Where saved files go
 
-- Plain Python: `SME_Grant_Data` in your user folder (for example `C:\Users\<you>\SME_Grant_Data`).
-- Docker: the folder you mounted with `-v`.
-- To choose another location, set the environment variable `SME_DATA_DIR`.
+Everything the app saves goes into one folder, chosen by the `DATA_DIR` environment variable:
+
+| What | Where inside that folder |
+|---|---|
+| `users.json`, `audit_history.json` | the folder itself |
+| Records saved with option 2 (and PDF exports) | `records/<your username>/` - each user has a private folder, so users cannot load or overwrite each other's files |
+
+Files saved by an older version directly in the folder are not shown to any user; move them into `records/<username>/` to keep using them.
+
+
+- Docker: `/app/data` inside the container (set in the Dockerfile), which the `-v` option in Step 3 links to a folder on your computer. Keep `-v` in the `docker run` command, otherwise the files stay inside the container and are lost when it is removed.
+- Plain Python: the folder you run `python main.py` from (normally the project folder), unless `DATA_DIR` is set. To keep the files in a separate folder, add a line such as `DATA_DIR=data` to your `.env` file. The folder is created automatically.
+
+---
+
+## Tests and continuous integration
+
+The project has an automated test suite (Python's built-in `unittest`, so nothing extra to install) that covers the grant rules, the AI output cleaning, accounts and saved files. It never calls the AI or touches your real data.
+
+```
+python -m unittest discover -s tests -t . -v
+```
+
+To check the code style as well, install [ruff](https://docs.astral.sh/ruff/) (`pip install ruff`) and run `ruff check .`.
+
+Every push and pull request on GitHub runs the same checks automatically (`.github/workflows/ci.yml`): lint, the tests on Python 3.11, 3.12 and 3.13, then a Docker build whose image runs the tests again. A red cross on a commit means a check failed; click it to see which one.
+
+You can also run the tests inside the Docker image:
+
+```
+docker build -t sme-grant-auditor .
+docker run --rm sme-grant-auditor python -m unittest discover -s tests -t .
+```
+
+The tests live in `tests/`, one file per layer (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`). When you change a rule, change or add the matching test in the same commit.
 
 ---
 
@@ -161,5 +245,8 @@ Other menu options: **2** save, **3** load, **4** view records, **5** and **6** 
 | `container name "/sme-auditor" is already in use` | It already exists. Use `docker start -ai sme-auditor`, or `docker rm sme-auditor` to recreate it. |
 | Docker errors mentioning `pipe` or `dockerDesktopLinuxEngine` | Docker Desktop isn't running. Start it. |
 | Windows "Protected folder access blocked" | Controlled Folder Access is blocking writes to Documents/Desktop. Keep your data folder outside those (for example `C:\SME_Grant_Data`), or allow `docker.exe` in Windows Security. |
-| Code changes have no effect in Docker | The image still holds the old code. Rebuild and recreate the container (Step 3, Option A, item 6). |
+| Code changes have no effect in Docker | The image still holds the old code. Rebuild and recreate the container (Step 3, Option A, item 5). |
+| Accounts or saved files disappear in Docker, or no `.json` files appear in your folder | The files were saved inside the container. Recreate the container with `-v "<your folder>:/app/data"` (Step 3, Option A, item 3). A container created earlier without it must be removed with `docker rm sme-auditor` first, and the image rebuilt if your Dockerfile is old. |
+| `Could not save the new account` / an audit is not saved | Another copy of the app is writing at the same moment, or the data folder is not writable. Try again; if it keeps failing, check the folder's permissions (and delete a stale `*.lock` file in it). |
 | Filename rejected when saving | Use a plain name such as `Save1`, with no `/`, `\` or other special characters. |
+| Docker on Linux: `Permission denied` writing to the data folder | The container runs as a normal user (id 1000), not root. Make your data folder writable by it (`sudo chown 1000 <folder>`), or add `--user "$(id -u):$(id -g)"` to `docker run`. Docker Desktop on Windows/Mac needs nothing extra. |

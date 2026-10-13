@@ -1,12 +1,12 @@
 from sme_interface_stores import sme_interface_gui as gui
 import data_manager as dm
-import logic_manager as logic
-import random
 import sys
 import os
 import time
 import textwrap
 import codecs
+import getpass
+import math
 from contextlib import contextmanager
 import textwrap
 import codecs
@@ -266,12 +266,263 @@ def key_verifier(key, max_digits=2):
     return int(key)
 
 # Menu Options
-def get_menu_choice():
+def get_menu_choice(username=None):
     key = None
     while key is None: #Prints the menu and then asks you to get the key
-        print(gui.boxed_menu())
+        print(gui.boxed_menu(username))
         key = key_verifier(input("➔   ")) #This function calls the key_verifier function which checks if the key is an integer
     return key
+
+
+# ========================================================
+# Login / account screens
+# ========================================================
+# Menu numbers for the account options shown under the main menu.
+# Kept here so main.py and the printed menu always agree.
+MENU_AUDIT_HISTORY = 9
+MENU_LOGOUT = 10
+
+USERNAME_MIN_LEN = 3
+USERNAME_MAX_LEN = 20
+PASSWORD_MIN_LEN = 8
+PASSWORD_MAX_LEN = 64
+
+
+# Login screen shown before the main menu.
+def get_auth_choice():
+    key = None
+    while key is None:
+        lines = [
+            "1. Login",
+            "2. Create a new account",
+            "0. Exit",
+        ]
+        print_on_paper(lines, title="ACCOUNT LOGIN", footer="Please login to continue")
+        key = key_verifier(input("➔   "))
+    return key
+
+
+def is_valid_username(username):
+    """3-20 characters: letters, digits and underscores only."""
+    return (
+        USERNAME_MIN_LEN <= len(username) <= USERNAME_MAX_LEN
+        and username.isascii()
+        and username.replace("_", "").isalnum()
+    )
+
+
+# New account: username format check (whether it is taken is checked
+# against stored data in main.py via the Data Manager).
+def retrieve_new_username():
+    while True:
+        username = input(
+            f"Choose a username ({USERNAME_MIN_LEN}-{USERNAME_MAX_LEN} characters, "
+            "letters/digits/underscore): "
+        ).strip().lower()
+        if username == "":
+            print("Username cannot be empty. Please try again.")
+        elif not is_valid_username(username):
+            print("Invalid username. Use only letters, digits and underscores.")
+        else:
+            return username
+
+
+# Login: just needs something typed in; the Logic Manager decides if it's right.
+def retrieve_username():
+    while True:
+        username = input("Username: ").strip().lower()
+        if username == "":
+            print("Username cannot be empty. Please try again.")
+        else:
+            return username
+
+
+def password_problems(password):
+    """Returns a list of rules the password breaks (empty if it's fine)."""
+    problems = []
+    if len(password) < PASSWORD_MIN_LEN:
+        problems.append(f"be at least {PASSWORD_MIN_LEN} characters long")
+    if len(password) > PASSWORD_MAX_LEN:
+        problems.append(f"be at most {PASSWORD_MAX_LEN} characters long")
+    if not any(ch.isalpha() for ch in password):
+        problems.append("contain at least one letter")
+    if not any(ch.isdigit() for ch in password):
+        problems.append("contain at least one digit")
+    if password != password.strip():
+        problems.append("not start or end with a space")
+    return problems
+
+
+# New account: hidden input, strength rules, typed twice to confirm.
+def retrieve_new_password():
+    while True:
+        password = getpass.getpass(
+            f"Choose a password (min {PASSWORD_MIN_LEN} chars, letters and digits, hidden): "
+        )
+        problems = password_problems(password)
+        if problems:
+            print("Password must " + ", ".join(problems) + ".")
+            continue
+
+        confirm = getpass.getpass("Confirm password: ")
+        if confirm != password:
+            print("Passwords do not match. Please try again.")
+            continue
+        return password
+
+
+# Login: hidden input.
+def retrieve_password():
+    while True:
+        password = getpass.getpass("Password (hidden): ")
+        if password == "":
+            print("Password cannot be empty. Please try again.")
+        elif len(password) > PASSWORD_MAX_LEN:
+            # Accounts can never have a password this long, so don't bother
+            # hashing it - and don't allow huge inputs.
+            print(f"Passwords are at most {PASSWORD_MAX_LEN} characters long. Please try again.")
+        else:
+            return password
+
+
+def show_username_taken(username):
+    print(f"The username '{username}' is already taken. Please choose another.")
+
+
+def show_account_created(username):
+    green = "\033[92m"
+    reset = "\033[0m"
+    print(f"\n{green}Account '{username}' created. You can now login.{reset}\n")
+
+
+def show_account_save_failed():
+    red = "\033[91m"
+    reset = "\033[0m"
+    print(f"\n{red}Could not save the new account. Please try again.{reset}\n")
+
+
+def show_login_success(username):
+    green = "\033[92m"
+    reset = "\033[0m"
+    print(f"\n{green}Welcome back, {username}!{reset}\n")
+
+
+def show_login_failed():
+    red = "\033[91m"
+    reset = "\033[0m"
+    # Deliberately vague: don't reveal whether the username exists.
+    print(f"\n{red}Invalid username or password.{reset}\n")
+
+
+def show_logged_out(username):
+    print(f"\n{username} has been logged out.\n")
+
+
+# ========================================================
+# Audit history
+# ========================================================
+def show_audit_saved_to_history(audit_record):
+    if audit_record is None:
+        print("Warning: this audit could not be saved to your history.")
+    else:
+        print(f"Audit #{audit_record['audit_id']} saved to your history.")
+
+
+def show_unexpected_error(error):
+    red = "\033[91m"
+    reset = "\033[0m"
+    print(f"\n{red}Something went wrong and this step was skipped "
+          f"({type(error).__name__}: {error}).")
+    print(f"Nothing was saved. Please try again.{reset}\n")
+
+
+def show_audit_not_saved_ai_failed():
+    yellow = "\033[93m"
+    reset = "\033[0m"
+    print(f"{yellow}The AI analysis failed, so this audit was NOT added to your history.")
+    print(f"Check your internet connection and OPENROUTER_API_KEY, then run option 1 again.{reset}")
+
+
+# Helpers so one damaged field in audit_history.json (null, wrong type)
+# cannot crash the history screens.
+def _as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _as_text(value, default=""):
+    return default if value is None else str(value)
+
+
+def _as_money(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return 0.0
+    return float(value)
+
+
+def _audit_stamp(audit):
+    return _as_text(audit.get("timestamp")).replace("T", " ")
+
+
+# Summary table of every audit the user has done.
+def display_audit_history(audits, username):
+    if len(audits) == 0:
+        print(f"\nNo past audits found for '{username}'. Choose option 1 to start one.\n")
+        gui.return_button()
+        return False
+
+    lines = []
+    for audit in audits:
+        audit = _as_dict(audit)
+        application = _as_dict(audit.get("application"))
+        result = _as_dict(audit.get("result"))
+        lines.append(
+            f"#{_as_text(audit.get('audit_id'), '?')}  {_audit_stamp(audit)}  |  "
+            f"{_as_text(application.get('Company Name'), 'N/A')}  |  "
+            f"{_as_text(result.get('decision_status'), 'N/A')}  |  "
+            f"SGD {_as_money(result.get('approved_subsidy_sgd')):,.2f}"
+        )
+
+    count = len(audits)
+    print_on_paper(
+        lines,
+        title=f"PAST AUDITS - {username}",
+        footer=f"{count} audit{'s' if count != 1 else ''}"
+    )
+    return True
+
+
+# Asks which audit to open in full. Returns a list index, or None to go back.
+def select_audit_record(audits):
+    valid_ids = [_as_dict(audit).get("audit_id") for audit in audits]
+    while True:
+        choice = input("Enter an audit # to view in full (or press Enter to return): ").strip().lstrip("#")
+        if choice == "":
+            return None
+        if choice.isascii() and choice.isdigit() and int(choice) in valid_ids:
+            return valid_ids.index(int(choice))
+        print("Invalid audit number. Please try again.")
+
+
+# Full view of one saved audit, reusing the existing report layouts.
+def display_audit_detail(audit):
+    audit = _as_dict(audit)
+    application = _as_dict(audit.get("application"))
+    ai_audit = _as_dict(audit.get("ai_audit"))
+    result = _as_dict(audit.get("result"))
+
+    print(f"\nAudit #{_as_text(audit.get('audit_id'), '?')} - {_audit_stamp(audit)}")
+    if application:
+        print_on_paper(format_pairs(application), title="APPLICATION DETAILS")
+    if ai_audit:
+        display_ai_audit(ai_audit)
+    if result:
+        try:
+            display_grant_decision(result)
+        except (KeyError, TypeError, ValueError):
+            # Saved decision is missing fields: show what is there instead.
+            print_on_paper(format_pairs(result), title="GRANT ELIGIBILITY DECISION")
+    gui.return_button()
+
 
 # Display Company Profile
 def display_company_profile(company_name, company_industry, total_revenue, total_employees, local_equity, proposal_type, sustainability_grant, proposal_narrative, baseline_energy_expenditure, estimated_retrofit_cost, reporting_advisory_fee):
@@ -281,7 +532,7 @@ def display_company_profile(company_name, company_industry, total_revenue, total
     print(f"Total Employees: {total_employees}")
     print(f"Local Equity: {local_equity}")
     print(f"Proposal Type: {proposal_type}")
-    print(f": {sustainability_grant}")
+    print(f"Sustainability Grant: {sustainability_grant}")
     print(f"Proposal Narrative:  {proposal_narrative}")
     print(f"Baseline Energy Expenditure: {baseline_energy_expenditure}")
     print(f"Estimated Retrofit Cost: {estimated_retrofit_cost}")
@@ -322,11 +573,20 @@ def get_valid_other_industry():
         else:
             return other_industry
 
+# Like float(), but also rejects "nan" and "inf", which float() accepts and
+# which slip past <= / >= range checks. Raises ValueError like float().
+def finite_float(text):
+    number = float(text)
+    if not math.isfinite(number):
+        raise ValueError("number must be finite")
+    return number
+
+
 # input of Company's Total Revenue
 def retrieve_total_revenue():
     while True:
         try:
-            total_revenue = float(input("Enter your Company's Total Revenue (in SGD): "))
+            total_revenue = finite_float(input("Enter your Company's Total Revenue (in SGD): "))
             if total_revenue < 0:
                 print("Total Revenue cannot be negative. Please try again.")
             elif total_revenue == 0:
@@ -358,7 +618,7 @@ def retrieve_local_equity():
             print("Equity % cannot be empty. Please try again.")
             continue
         try:
-            local_equity = float(raw_value)
+            local_equity = finite_float(raw_value)
             if local_equity <= 0 or local_equity > 100:
                 print("Equity % must be a value between 0 and 100. Please try again.")
                 continue
@@ -396,7 +656,7 @@ def retrieve_baseline_energy_expenditure():
             print("Baseline annual energy expenditure cannot be empty. Please try again.")
             continue
         try:
-            baseline_energy_expenditure = float(raw_value)
+            baseline_energy_expenditure = finite_float(raw_value)
             if baseline_energy_expenditure <= 0:
                 print("Baseline annual energy expenditure cannot be zero or negative. Please try again.")
                 continue
@@ -413,7 +673,7 @@ def retrieve_estimated_retrofit_cost():
             print("Estimated retrofit cost cannot be empty. Please try again.")
             continue
         try:
-            estimated_retrofit_cost = float(raw_value)
+            estimated_retrofit_cost = finite_float(raw_value)
             if estimated_retrofit_cost <= 0:
                 print("Estimated retrofit cost cannot be zero or negative. Please try again.")
                 continue
@@ -445,7 +705,7 @@ def retrieve_reporting_advisory_fee():
             print("Reporting/advisory fee cannot be empty. Please try again.")
             continue
         try:
-            reporting_advisory_fee = float(raw_value)
+            reporting_advisory_fee = finite_float(raw_value)
             if reporting_advisory_fee < 0:
                 print("Reporting/advisory fee cannot be negative. Please try again.")
                 continue
@@ -462,7 +722,7 @@ def retrieve_sustainability_grant():
         for grant in valid_grants:
             print(grant)
 
-        grant_choice = input(f"Enter the number corresponding to your choice (1-5): ").strip()
+        grant_choice = input("Enter the number corresponding to your choice (1-5): ").strip()
 
         if grant_choice == "":
             print("Sustainability Grant choice cannot be empty. Please select a valid option from 1 to 5.")
@@ -494,6 +754,18 @@ if __name__ == "__main__":
 
 
 # For displaying list of grants already applied for by the company
+# Records loaded from a file can be in the newer nested layout
+# (company_profile / proposal / ...) or be missing fields. This turns any
+# record into the flat, capitalised layout the screens and main.py use, so
+# a file that doesn't match exactly shows "N/A" instead of crashing.
+def flat_record(record):
+    if not isinstance(record, dict):
+        return {}
+    if isinstance(record.get("company_profile"), dict):
+        return dm.audit_record_to_display_format(record)
+    return record
+
+
 def display_applied_grants(scheme_grant_records, key):
     red = "\033[91m"
     reset = "\033[0m"
@@ -506,13 +778,14 @@ def display_applied_grants(scheme_grant_records, key):
     # Build the paper contents: one block per grant
     lines = []
     for i, grant in enumerate(scheme_grant_records, start=1):
+        grant = flat_record(grant)
         if i > 1:
             lines.append("")
-        lines.append(f"{i}. {grant['Company Name']} - {grant['Company Industry']}")
+        lines.append(f"{i}. {grant.get('Company Name', 'N/A')} - {grant.get('Company Industry', 'N/A')}")
         details = {
-            "Total Revenue": grant["Company Total Revenue"],
-            "Total Employees": grant["Total Employees"],
-            "Local Equity": grant["Local Equity"],
+            "Total Revenue": grant.get("Company Total Revenue", "N/A"),
+            "Total Employees": grant.get("Total Employees", "N/A"),
+            "Local Equity": grant.get("Local Equity", "N/A"),
             "Proposal Type": grant.get("Proposal Type", "N/A"),
             "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
             "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
@@ -538,8 +811,8 @@ def display_applied_grants(scheme_grant_records, key):
             "Proposal Type": grant.get("Proposal Type", "N/A"),
             "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
             "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
-            "Baseline Energy Expenditure": grant["Baseline Energy Expenditure"],
-            "Estimated Retrofit Cost": grant["Estimated Retrofit Cost"],
+            "Baseline Energy Expenditure": grant.get("Baseline Energy Expenditure", "N/A"),
+            "Estimated Retrofit Cost": grant.get("Estimated Retrofit Cost", "N/A"),
             "Reporting Advisory Fee": grant.get("Reporting Advisory Fee", 0.0),
         }
         lines.extend(format_pairs(details, indent="   "))
@@ -564,6 +837,7 @@ def display_applied_grants(scheme_grant_records, key):
 # Reporting Advisory Fee directly on the record, so no extra
 # parameters are needed here.
 def convert_record_to_profile(record):
+    record = flat_record(record)
     return {
         "company_name": record.get("Company Name", ""),
         "company_industry": record.get("Company Industry", ""),
