@@ -45,9 +45,17 @@ def run(verbose=False):
             function()
         except Exception:
             failures.append((name, traceback.format_exc()))
-            print(f"FAIL  {name}" if verbose else "F", end="\n" if verbose else "", flush=True)
+            print(
+                f"FAIL  {name}" if verbose else "F",
+                end="\n" if verbose else "",
+                flush=True,
+            )
         else:
-            print(f"ok    {name}" if verbose else ".", end="\n" if verbose else "", flush=True)
+            print(
+                f"ok    {name}" if verbose else ".",
+                end="\n" if verbose else "",
+                flush=True,
+            )
     print()
     for name, trace in failures:
         print("=" * 70)

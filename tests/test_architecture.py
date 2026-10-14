@@ -63,7 +63,9 @@ def test_no_class_definitions_anywhere():
     """The project is 100% procedural: no `class` in any .py file (tests too)."""
     offenders = []
     for folder, subfolders, files in os.walk(ROOT):
-        subfolders[:] = [name for name in subfolders if not name.startswith((".", "__"))]
+        subfolders[:] = [
+            name for name in subfolders if not name.startswith((".", "__"))
+        ]
         for name in files:
             if name.endswith(".py"):
                 path = os.path.join(folder, name)

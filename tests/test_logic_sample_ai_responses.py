@@ -20,6 +20,7 @@ import socket
 import subprocess
 import sys
 from contextlib import contextmanager
+import math
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -162,8 +163,13 @@ SAMPLE_SLOPPY_TYPES = """{
 }"""
 
 COMPLETE_RESULT_KEYS = {
-    "is_sme", "decision_status", "reasons", "recommendations",
-    "matched_schemes", "approved_subsidy_sgd", "audit_passed",
+    "is_sme",
+    "decision_status",
+    "reasons",
+    "recommendations",
+    "matched_schemes",
+    "approved_subsidy_sgd",
+    "audit_passed",
 }
 
 
@@ -198,6 +204,7 @@ def reporting_profile(fee):
 @contextmanager
 def network_blocked():
     """Any attempt to open a socket inside this block fails the test."""
+
     def refuse(*args, **kwargs):
         raise AssertionError("the Logic Manager tried to use the network")
 
@@ -282,7 +289,9 @@ def test_fossil_fuel_modification_goes_to_exclusion_review():
 
 def test_none_placeholder_keyword_is_not_an_exclusion():
     # SAMPLE_MODERATE_SCOPE1 lists "None" as its only keyword.
-    assert evaluate(SAMPLE_MODERATE_SCOPE1)["decision_status"] != "MANUAL_EXCLUSION_REVIEW"
+    assert (
+        evaluate(SAMPLE_MODERATE_SCOPE1)["decision_status"] != "MANUAL_EXCLUSION_REVIEW"
+    )
 
 
 def test_unclassifiable_proposal_goes_to_manual_review():
@@ -298,14 +307,18 @@ def test_a_failed_ai_call_never_approves_anything():
 
 
 def test_non_sme_is_rejected_even_with_a_perfect_ai_answer():
-    result = evaluate(SAMPLE_FLEET_ELECTRIFICATION, sme_profile(annual_revenue_sgd=250000000.0))
+    result = evaluate(
+        SAMPLE_FLEET_ELECTRIFICATION, sme_profile(annual_revenue_sgd=250000000.0)
+    )
     assert result["decision_status"] == "REJECT_NON_SME"
     assert result["is_sme"] is False
     assert result["approved_subsidy_sgd"] == 0.0
 
 
 def test_low_local_shareholding_is_rejected():
-    result = evaluate(SAMPLE_FLEET_ELECTRIFICATION, sme_profile(local_shareholding_pct=20.0))
+    result = evaluate(
+        SAMPLE_FLEET_ELECTRIFICATION, sme_profile(local_shareholding_pct=20.0)
+    )
     assert result["decision_status"] == "REJECT_NON_SME"
 
 
@@ -360,7 +373,9 @@ def test_every_sample_gives_a_complete_result():
     for name, sample in sorted(globals().items()):
         if not name.startswith("SAMPLE_"):
             continue
-        profile = reporting_profile(20000.0) if name == "SAMPLE_REPORTING_ONLY" else None
+        profile = (
+            reporting_profile(20000.0) if name == "SAMPLE_REPORTING_ONLY" else None
+        )
         result = evaluate(sample, profile)
         assert set(result) >= COMPLETE_RESULT_KEYS, name
         assert isinstance(result["reasons"], list), name
@@ -414,7 +429,8 @@ def test_logic_manager_loads_without_the_ai_library():
 # ========================================================
 def run_this_file():
     tests = [
-        (name, function) for name, function in globals().items()
+        (name, function)
+        for name, function in globals().items()
         if name.startswith("test_") and callable(function)
     ]  # dicts keep definition order
     failed = 0
@@ -428,18 +444,26 @@ def run_this_file():
     print(f"\n{len(tests) - failed}/{len(tests)} passed")
     return failed
 
+
 # ========================================================
 # Idiot-proof scenarios: hostile, silly and sloppy input
 # ========================================================
-import math
+
 
 KNOWN_STATUSES = {
-    "REJECT_NON_SME", "REJECT_LOW_IMPACT", "PRE_APPROVED_SRG",
-    "PRE_APPROVED_TIER_1", "PRE_APPROVED_TIER_1_ADVANCED",
-    "PROVISIONAL_APPROVAL_TIER_2", "MANUAL_REVIEW", "MANUAL_EXCLUSION_REVIEW",
+    "REJECT_NON_SME",
+    "REJECT_LOW_IMPACT",
+    "PRE_APPROVED_SRG",
+    "PRE_APPROVED_TIER_1",
+    "PRE_APPROVED_TIER_1_ADVANCED",
+    "PROVISIONAL_APPROVAL_TIER_2",
+    "MANUAL_REVIEW",
+    "MANUAL_EXCLUSION_REVIEW",
 }
 PAYING_STATUSES = {
-    "PRE_APPROVED_SRG", "PRE_APPROVED_TIER_1", "PRE_APPROVED_TIER_1_ADVANCED",
+    "PRE_APPROVED_SRG",
+    "PRE_APPROVED_TIER_1",
+    "PRE_APPROVED_TIER_1_ADVANCED",
     "PROVISIONAL_APPROVAL_TIER_2",
 }
 MAX_POSSIBLE_SUBSIDY = 350000.0  # the highest cap in the rules
@@ -520,7 +544,9 @@ def assert_safe_result(result, label=""):
     """What must be true of EVERY decision, however silly the input was."""
     assert isinstance(result, dict), label
     assert set(result) >= COMPLETE_RESULT_KEYS, label
-    assert result["decision_status"] in KNOWN_STATUSES, f"{label}: {result['decision_status']}"
+    assert result["decision_status"] in KNOWN_STATUSES, (
+        f"{label}: {result['decision_status']}"
+    )
     subsidy = result["approved_subsidy_sgd"]
     assert isinstance(subsidy, float), label
     assert math.isfinite(subsidy), label
@@ -534,10 +560,13 @@ def assert_safe_result(result, label=""):
         assert subsidy == 0.0, f"{label}: paid {subsidy} on {result['decision_status']}"
         assert result["audit_passed"] is False, label
         assert result["reasons"], f"{label}: a refusal must say why"
-    json.dumps(result, allow_nan=False)  # the result gets saved to JSON, so it must be plain
+    json.dumps(
+        result, allow_nan=False
+    )  # the result gets saved to JSON, so it must be plain
 
 
 # ---- Hostile AI answers ------------------------------------------------------
+
 
 def test_every_hostile_ai_answer_gives_a_safe_result():
     for name, raw in sorted(HOSTILE_SAMPLES.items()):
@@ -550,35 +579,51 @@ def test_every_hostile_answer_is_safe_for_a_reporting_proposal_too():
 
 
 def test_hostile_answers_never_reach_the_advanced_tier_without_real_numbers():
-    for name in ("HOSTILE_ALL_NULL", "HOSTILE_NAN", "HOSTILE_BOOLEANS_AS_NUMBERS",
-                 "HOSTILE_ONLY_JUNK_KEYS", "HOSTILE_EMPTY_STRINGS",
-                 "HOSTILE_AI_CLAIMS_A_DECISION", "HOSTILE_PROMPT_INJECTION"):
+    for name in (
+        "HOSTILE_ALL_NULL",
+        "HOSTILE_NAN",
+        "HOSTILE_BOOLEANS_AS_NUMBERS",
+        "HOSTILE_ONLY_JUNK_KEYS",
+        "HOSTILE_EMPTY_STRINGS",
+        "HOSTILE_AI_CLAIMS_A_DECISION",
+        "HOSTILE_PROMPT_INJECTION",
+    ):
         status = evaluate(HOSTILE_SAMPLES[name])["decision_status"]
         assert status != "PRE_APPROVED_TIER_1_ADVANCED", name
 
 
 def test_ai_cannot_claim_its_own_decision():
     claimed = evaluate(HOSTILE_AI_CLAIMS_A_DECISION)
-    honest = evaluate_dict({
-        "scope_category": "Unknown", "estimated_energy_reduction_pct": 0.0,
-        "estimated_lifetime_abatement_tonnes": 0.0, "detected_exclusion_keywords": [],
-    })
+    honest = evaluate_dict(
+        {
+            "scope_category": "Unknown",
+            "estimated_energy_reduction_pct": 0.0,
+            "estimated_lifetime_abatement_tonnes": 0.0,
+            "detected_exclusion_keywords": [],
+        }
+    )
     assert claimed == honest
     assert "Approved by the AI" not in claimed["reasons"]
 
 
 def test_prompt_injection_text_changes_nothing():
     injected = evaluate(HOSTILE_PROMPT_INJECTION)
-    plain = evaluate_dict({
-        "scope_category": "Unknown", "estimated_energy_reduction_pct": 0.0,
-        "estimated_lifetime_abatement_tonnes": 0.0, "detected_exclusion_keywords": [],
-    })
+    plain = evaluate_dict(
+        {
+            "scope_category": "Unknown",
+            "estimated_energy_reduction_pct": 0.0,
+            "estimated_lifetime_abatement_tonnes": 0.0,
+            "detected_exclusion_keywords": [],
+        }
+    )
     assert injected["decision_status"] == plain["decision_status"]
     assert injected["approved_subsidy_sgd"] == plain["approved_subsidy_sgd"]
 
 
 def test_absurdly_high_numbers_are_still_capped():
-    result = evaluate(HOSTILE_ABSURD_HIGH, sme_profile(baseline_annual_energy_expenditure_sgd=1e12))
+    result = evaluate(
+        HOSTILE_ABSURD_HIGH, sme_profile(baseline_annual_energy_expenditure_sgd=1e12)
+    )
     assert result["approved_subsidy_sgd"] <= MAX_POSSIBLE_SUBSIDY
 
 
@@ -589,8 +634,15 @@ def test_negative_ai_numbers_never_help_the_applicant():
 
 # ---- Exclusion keywords people will type in odd ways -------------------------
 
+
 def test_exclusion_keywords_are_found_in_any_case_and_spacing():
-    for keyword in ("second-hand", "Second-Hand", "SECOND-HAND", "  second-hand  ", "refurbished"):
+    for keyword in (
+        "second-hand",
+        "Second-Hand",
+        "SECOND-HAND",
+        "  second-hand  ",
+        "refurbished",
+    ):
         audit = json.loads(SAMPLE_FLEET_ELECTRIFICATION)
         audit["detected_exclusion_keywords"] = [keyword]
         result = evaluate_dict(audit)
@@ -606,8 +658,12 @@ def test_one_real_exclusion_among_placeholders_is_still_caught():
 def test_duplicate_and_reordered_keywords_give_the_same_decision():
     base = json.loads(SAMPLE_FLEET_ELECTRIFICATION)
     outcomes = set()
-    for keywords in (["second-hand", "refurbished"], ["refurbished", "second-hand"],
-                     ["second-hand"] * 5, ["refurbished", "second-hand", "second-hand"]):
+    for keywords in (
+        ["second-hand", "refurbished"],
+        ["refurbished", "second-hand"],
+        ["second-hand"] * 5,
+        ["refurbished", "second-hand", "second-hand"],
+    ):
         audit = dict(base, detected_exclusion_keywords=keywords)
         outcomes.add(evaluate_dict(audit)["decision_status"])
     assert outcomes == {"MANUAL_EXCLUSION_REVIEW"}
@@ -615,11 +671,14 @@ def test_duplicate_and_reordered_keywords_give_the_same_decision():
 
 def test_ten_thousand_keywords_do_not_hang_or_crash():
     audit = json.loads(SAMPLE_FLEET_ELECTRIFICATION)
-    audit["detected_exclusion_keywords"] = [f"item{i}" for i in range(10000)] + ["second-hand"]
+    audit["detected_exclusion_keywords"] = [f"item{i}" for i in range(10000)] + [
+        "second-hand"
+    ]
     assert_safe_result(evaluate_dict(audit), "10000 keywords")
 
 
 # ---- A failed AI call must never be rewarded ---------------------------------
+
 
 def test_failed_status_with_perfect_numbers_is_not_approved():
     audit = json.loads(SAMPLE_FLEET_ELECTRIFICATION)
@@ -628,6 +687,7 @@ def test_failed_status_with_perfect_numbers_is_not_approved():
     # If this fails, the Logic Manager ignores ai_status: add a rule that sends it to MANUAL_REVIEW.
     assert result["decision_status"] not in PAYING_STATUSES
     assert result["approved_subsidy_sgd"] == 0.0
+
 
 def test_a_failed_ai_status_goes_to_manual_review_even_with_good_numbers():
     audit = json.loads(SAMPLE_FLEET_ELECTRIFICATION)
@@ -647,6 +707,7 @@ def test_missing_ai_status_is_treated_with_caution_or_still_safe():
 
 # ---- Silly company details ---------------------------------------------------
 
+
 def test_silly_profiles_never_crash_and_are_never_paid_by_accident():
     silly = {
         "empty": {},
@@ -661,10 +722,14 @@ def test_silly_profiles_never_crash_and_are_never_paid_by_accident():
         "headcount negative": sme_profile(group_employment_size=-5),
         "headcount huge": sme_profile(group_employment_size=10**12),
         "baseline negative": sme_profile(baseline_annual_energy_expenditure_sgd=-100.0),
-        "baseline infinite": sme_profile(baseline_annual_energy_expenditure_sgd=float("inf")),
+        "baseline infinite": sme_profile(
+            baseline_annual_energy_expenditure_sgd=float("inf")
+        ),
         "retrofit negative": sme_profile(estimated_retrofit_cost_sgd=-1.0),
         "retrofit nan": sme_profile(estimated_retrofit_cost_sgd=float("nan")),
-        "proposal type missing": {k: v for k, v in sme_profile().items() if k != "proposal_type"},
+        "proposal type missing": {
+            k: v for k, v in sme_profile().items() if k != "proposal_type"
+        },
         "proposal type nonsense": sme_profile(proposal_type="Buy a yacht"),
         "grant is a number": sme_profile(sustainability_grant=42),
         "grant is a list": sme_profile(sustainability_grant=["1", "2"]),
@@ -674,7 +739,10 @@ def test_silly_profiles_never_crash_and_are_never_paid_by_accident():
 
 
 def test_negative_or_nan_money_never_creates_a_subsidy():
-    for field in ("baseline_annual_energy_expenditure_sgd", "estimated_retrofit_cost_sgd"):
+    for field in (
+        "baseline_annual_energy_expenditure_sgd",
+        "estimated_retrofit_cost_sgd",
+    ):
         for bad in (-1.0, -1e9, float("nan")):
             result = evaluate(SAMPLE_FLEET_ELECTRIFICATION, sme_profile(**{field: bad}))
             assert result["approved_subsidy_sgd"] >= 0.0, (field, bad)
@@ -682,7 +750,9 @@ def test_negative_or_nan_money_never_creates_a_subsidy():
 
 
 def test_reporting_fee_given_on_an_equipment_proposal_is_ignored():
-    with_fee = evaluate(SAMPLE_FLEET_ELECTRIFICATION, sme_profile(reporting_advisory_fee_sgd=500000.0))
+    with_fee = evaluate(
+        SAMPLE_FLEET_ELECTRIFICATION, sme_profile(reporting_advisory_fee_sgd=500000.0)
+    )
     without = evaluate(SAMPLE_FLEET_ELECTRIFICATION)
     assert with_fee == without
 
@@ -698,14 +768,21 @@ def test_energy_figures_given_on_a_reporting_proposal_do_not_change_the_grant():
 
 def test_a_strong_energy_answer_on_a_reporting_proposal_is_safe():
     # A user picks "reporting" but the narrative describes vans. Either grant is fine; it must be safe.
-    assert_safe_result(evaluate(SAMPLE_FLEET_ELECTRIFICATION, reporting_profile(20000.0)), "mixed up")
+    assert_safe_result(
+        evaluate(SAMPLE_FLEET_ELECTRIFICATION, reporting_profile(20000.0)), "mixed up"
+    )
 
 
 # ---- Sweeps: catch off-by-one and reversed-sign mistakes ---------------------
 
+
 def test_more_energy_saving_never_gives_a_worse_outcome():
-    rank = {"REJECT_LOW_IMPACT": 0, "MANUAL_REVIEW": 1,
-            "PROVISIONAL_APPROVAL_TIER_2": 2, "PRE_APPROVED_TIER_1": 3}
+    rank = {
+        "REJECT_LOW_IMPACT": 0,
+        "MANUAL_REVIEW": 1,
+        "PROVISIONAL_APPROVAL_TIER_2": 2,
+        "PRE_APPROVED_TIER_1": 3,
+    }
     audit = json.loads(SAMPLE_FLEET_ELECTRIFICATION)
     previous = -1
     for tenths in range(0, 1001):
@@ -730,7 +807,9 @@ def test_a_bigger_reporting_fee_never_lowers_the_subsidy():
     audit = json.loads(SAMPLE_REPORTING_ONLY)
     previous = 0.0
     for fee in (1, 100, 20000, 100000, 500000, 500001, 10**7):
-        subsidy = evaluate_dict(audit, reporting_profile(float(fee)))["approved_subsidy_sgd"]
+        subsidy = evaluate_dict(audit, reporting_profile(float(fee)))[
+            "approved_subsidy_sgd"
+        ]
         assert subsidy >= previous, f"subsidy fell at fee {fee}"
         previous = subsidy
 
@@ -738,11 +817,16 @@ def test_a_bigger_reporting_fee_never_lowers_the_subsidy():
 def test_sme_boundary_sweep_around_the_limits():
     for pct, expected in ((29.99, False), (30.0, True), (30.01, True), (100.0, True)):
         assert logic.check_sme_status(pct, 5000000.0, 50) is expected, pct
-    for revenue, expected in ((99999999.99, True), (100000000.0, True), (100000000.01, False)):
+    for revenue, expected in (
+        (99999999.99, True),
+        (100000000.0, True),
+        (100000000.01, False),
+    ):
         assert logic.check_sme_status(100.0, revenue, 50) is expected, revenue
 
 
 # ---- The result is a clean, self-contained answer ----------------------------
+
 
 def test_evaluation_does_not_change_the_company_profile():
     profile = sme_profile()
@@ -765,18 +849,28 @@ def test_every_normal_sample_result_can_be_saved_as_json():
     for name, sample in sorted(globals().items()):
         if not name.startswith("SAMPLE_"):
             continue
-        profile = reporting_profile(20000.0) if name == "SAMPLE_REPORTING_ONLY" else None
+        profile = (
+            reporting_profile(20000.0) if name == "SAMPLE_REPORTING_ONLY" else None
+        )
         assert_safe_result(evaluate(sample, profile), name)
 
 
 def test_hundred_repeats_give_one_answer():
-    outcomes = {json.dumps(evaluate(SAMPLE_BORDERLINE_IMPACT), sort_keys=True) for _ in range(100)}
+    outcomes = {
+        json.dumps(evaluate(SAMPLE_BORDERLINE_IMPACT), sort_keys=True)
+        for _ in range(100)
+    }
     assert len(outcomes) == 1
 
 
 def test_a_refusal_always_explains_itself():
-    for name in ("SAMPLE_LOW_IMPACT", "SAMPLE_UNKNOWN_SCOPE", "SAMPLE_EXCLUDED_ITEM",
-                 "SAMPLE_BORDERLINE_IMPACT", "SAMPLE_FAILED_CALL"):
+    for name in (
+        "SAMPLE_LOW_IMPACT",
+        "SAMPLE_UNKNOWN_SCOPE",
+        "SAMPLE_EXCLUDED_ITEM",
+        "SAMPLE_BORDERLINE_IMPACT",
+        "SAMPLE_FAILED_CALL",
+    ):
         result = evaluate(globals()[name])
         if result["decision_status"] not in PAYING_STATUSES:
             assert result["reasons"], name

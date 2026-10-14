@@ -8,6 +8,7 @@ import sys
 # Docker. Inside Docker the variable is injected via --env-file instead.
 try:
     from dotenv import load_dotenv
+
     load_dotenv(override=True)
 except ImportError:
     pass
@@ -31,14 +32,15 @@ Session = dict[str, Any]
 # Without this, pressing Ctrl+C at any prompt (or running Docker without
 # -it, so there is no keyboard input) ends the program with a long
 # traceback. Every other error still shows its normal traceback.
-def _handle_uncaught(exc_type: type[BaseException], exc: BaseException, tb: TracebackType | None) -> None:
+def _handle_uncaught(
+    exc_type: type[BaseException], exc: BaseException, tb: TracebackType | None
+) -> None:
     if issubclass(exc_type, KeyboardInterrupt):
         in_and_out.show_interrupted()
     elif issubclass(exc_type, EOFError):
         in_and_out.show_input_ended()
     else:
         sys.__excepthook__(exc_type, exc, tb)
-
 
 
 # ========================================================
@@ -67,7 +69,9 @@ def login_flow() -> str | None:
     stored_user = dm.get_user(username)
     # The format check also guards against a hand-edited users.json holding
     # a name that cannot be used for the user's folder.
-    if in_and_out.is_valid_username(username) and logic.verify_password(password, stored_user):
+    if in_and_out.is_valid_username(username) and logic.verify_password(
+        password, stored_user
+    ):
         in_and_out.show_login_success(username)
         return username
 
@@ -105,7 +109,9 @@ def run_audit(record: Record) -> tuple[AiAudit, dict[str, Any] | None]:
     in_and_out.display_ai_audit(ai_audit)
 
     ok, result = attempt(
-        logic.evaluate_grant_application, in_and_out.convert_record_to_profile(record), ai_audit
+        logic.evaluate_grant_application,
+        in_and_out.convert_record_to_profile(record),
+        ai_audit,
     )
     if not ok:
         return ai_audit, None
@@ -142,7 +148,9 @@ def audit_history_flow(username: str) -> None:
     audits = dm.get_user_audits(username)
     shown = audits
     while True:
-        if not in_and_out.display_audit_history(shown, username, filtered=shown is not audits):
+        if not in_and_out.display_audit_history(
+            shown, username, filtered=shown is not audits
+        ):
             return
         action, index = in_and_out.choose_history_action(shown)
         if action == "back":
@@ -191,10 +199,15 @@ def save_records_flow(records: Records, jsonfile_name: str) -> str:
 def load_records_flow(records: Records, jsonfile_name: str) -> tuple[Records, str]:
     """Confirms before replacing records in memory, loads, shows the result,
     and returns (records, jsonfile_name). On failure both are unchanged."""
-    if dm.is_data_loaded(records, jsonfile_name) and not in_and_out.confirm_overwrite_records():
+    if (
+        dm.is_data_loaded(records, jsonfile_name)
+        and not in_and_out.confirm_overwrite_records()
+    ):
         return records, jsonfile_name
 
-    name = in_and_out.retrieve_json_filename(dm.INVALID_FILENAME_CHARS, 3)  # 3 = show the 'load' disk
+    name = in_and_out.retrieve_json_filename(
+        dm.INVALID_FILENAME_CHARS, 3
+    )  # 3 = show the 'load' disk
     loaded, clean_name, status = dm.load_data_from_json(name)
     in_and_out.display_load_result(status, clean_name or name)
 
@@ -227,10 +240,17 @@ def collect_application() -> Record:
         reporting_advisory_fee = in_and_out.retrieve_reporting_advisory_fee()
 
     in_and_out.display_company_profile(
-        company_name, company_industry, total_revenue, total_employees,
-        local_equity, proposal_type, sustainability_grant,
-        proposal_narrative, baseline_energy_expenditure, retrofit_cost,
-        reporting_advisory_fee
+        company_name,
+        company_industry,
+        total_revenue,
+        total_employees,
+        local_equity,
+        proposal_type,
+        sustainability_grant,
+        proposal_narrative,
+        baseline_energy_expenditure,
+        retrofit_cost,
+        reporting_advisory_fee,
     )
     return {
         "Company Name": company_name,
@@ -271,7 +291,9 @@ def new_application_flow(session: Session, key: int) -> None:
         in_and_out.show_audit_saved_to_history(saved_audit)
 
     if in_and_out.confirm_save_to_json():
-        session["jsonfile_name"] = save_records_flow(session["records"], session["jsonfile_name"])
+        session["jsonfile_name"] = save_records_flow(
+            session["records"], session["jsonfile_name"]
+        )
 
 
 def update_record_flow(session: Session) -> None:
@@ -293,7 +315,9 @@ def update_record_flow(session: Session) -> None:
     session["records"], status = dm.update_record_field(records, index, field, value)
 
     if status == "updated":
-        in_and_out.show_record_updated(session["records"][index].get("Company Name") or "N/A", field)
+        in_and_out.show_record_updated(
+            session["records"][index].get("Company Name") or "N/A", field
+        )
     else:
         in_and_out.show_record_not_changed()
 
@@ -326,7 +350,9 @@ def rerun_ai_flow(session: Session) -> None:
     if not session["records"]:
         in_and_out.display_no_records_message()
         return
-    narrative = in_and_out.flat_record(session["records"][-1]).get("Proposal Narrative", "")
+    narrative = in_and_out.flat_record(session["records"][-1]).get(
+        "Proposal Narrative", ""
+    )
     ok, new_audit = attempt(ask_ai, narrative)
     if ok:
         session["ai_audit"] = new_audit
@@ -341,7 +367,9 @@ def rerun_logic_flow(session: Session) -> None:
         in_and_out.display_no_ai_audit()
     else:
         user_profile = in_and_out.convert_record_to_profile(session["records"][-1])
-        ok, result = attempt(logic.evaluate_grant_application, user_profile, session["ai_audit"])
+        ok, result = attempt(
+            logic.evaluate_grant_application, user_profile, session["ai_audit"]
+        )
         if ok:
             in_and_out.display_grant_decision(result)
 
@@ -367,7 +395,9 @@ def run_session(username: str) -> bool:
             case 1:
                 new_application_flow(session, key)
             case 2:  # Save to JSON
-                session["jsonfile_name"] = save_records_flow(session["records"], session["jsonfile_name"])
+                session["jsonfile_name"] = save_records_flow(
+                    session["records"], session["jsonfile_name"]
+                )
             case 3:  # Pull from JSON
                 session["records"], session["jsonfile_name"] = load_records_flow(
                     session["records"], session["jsonfile_name"]

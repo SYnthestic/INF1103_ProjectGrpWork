@@ -115,7 +115,7 @@ def test_history_refuses_unsafe_usernames():
 def test_logging_out_clears_the_active_user():
     with temp_data_dir():
         dm.set_active_user("alice")
-        dm.set_active_user(None)          # logout
+        dm.set_active_user(None)  # logout
         assert dm.get_active_user() is None
 
 
@@ -213,7 +213,12 @@ def test_corrupt_file_is_set_aside():
             file.write("{not json")
         assert dm.load_data_from_json("broken")[2] == "invalid_json"
         assert not os.path.exists(path)
-        assert any((name.startswith("broken") and "corrupt" in name for name in os.listdir(folder)))
+        assert any(
+            (
+                name.startswith("broken") and "corrupt" in name
+                for name in os.listdir(folder)
+            )
+        )
 
 
 def test_valid_json_of_the_wrong_shape_is_refused():
@@ -306,15 +311,23 @@ def test_damaged_user_record_still_blocks_the_name():
 def test_history_is_kept_per_user():
     with temp_data_dir():
         dm.append_user_audit(
-            "alice", {"Company Name": "A"}, {"x": 1}, {"decision_status": "MANUAL_REVIEW"}
+            "alice",
+            {"Company Name": "A"},
+            {"x": 1},
+            {"decision_status": "MANUAL_REVIEW"},
         )
         dm.append_user_audit(
-            "alice", {"Company Name": "B"}, {"x": 1}, {"decision_status": "MANUAL_REVIEW"}
+            "alice",
+            {"Company Name": "B"},
+            {"x": 1},
+            {"decision_status": "MANUAL_REVIEW"},
         )
         dm.append_user_audit(
             "bob", {"Company Name": "C"}, {"x": 1}, {"decision_status": "MANUAL_REVIEW"}
         )
-        assert [a["application"]["Company Name"] for a in dm.get_user_audits("alice")] == ["A", "B"]
+        assert [
+            a["application"]["Company Name"] for a in dm.get_user_audits("alice")
+        ] == ["A", "B"]
         assert len(dm.get_user_audits("bob")) == 1
         assert dm.get_user_audits("nobody") == []
 
@@ -413,12 +426,15 @@ def filter_records():
 
 def test_filter_by_status():
     assert [
-        r["audit_id"] for r in dm.filter_by_decision_status(filter_records(), "REJECT_NON_SME")
+        r["audit_id"]
+        for r in dm.filter_by_decision_status(filter_records(), "REJECT_NON_SME")
     ] == ["2"]
 
 
 def test_approved_records():
-    assert [r["audit_id"] for r in dm.filter_approved_records(filter_records())] == ["1"]
+    assert [r["audit_id"] for r in dm.filter_approved_records(filter_records())] == [
+        "1"
+    ]
 
 
 def test_company_search_is_an_exact_case_insensitive_match():
@@ -476,7 +492,10 @@ def test_audit_history_filters():
         history_audit(2, "Bolt Foods", "MANUAL_REVIEW"),
         {"audit_id": 3},
     ]
-    assert dm.available_audit_statuses(audits) == ["MANUAL_REVIEW", "PRE_APPROVED_TIER_1"]
+    assert dm.available_audit_statuses(audits) == [
+        "MANUAL_REVIEW",
+        "PRE_APPROVED_TIER_1",
+    ]
     assert dm.filter_audits_by_status(audits, "MANUAL_REVIEW") == [audits[1]]
     assert dm.search_audits_by_company(audits, " APEX ") == [audits[0]]
     assert dm.search_audits_by_company(audits, "nothing") == []
@@ -503,7 +522,9 @@ def test_pdf_file_name_is_safe():
 def test_export_audit_to_pdf_writes_a_pdf_with_the_decision():
     with temp_data_dir() as folder:
         dm.set_active_user("alice")
-        name, status = dm.export_audit_to_pdf(history_audit(1, "Apex", "PRE_APPROVED_TIER_1"))
+        name, status = dm.export_audit_to_pdf(
+            history_audit(1, "Apex", "PRE_APPROVED_TIER_1")
+        )
         if status == "missing_dependency":
             return  # reportlab is not installed on this machine
         assert status == "exported"
@@ -526,7 +547,11 @@ def test_logging_goes_to_the_data_folder_and_is_set_up_once():
         assert dm.setup_logging() is True
         assert dm.setup_logging() is True
         root = logging.getLogger()
-        handlers = [h for h in root.handlers if getattr(h, "baseFilename", "").startswith(folder)]
+        handlers = [
+            h
+            for h in root.handlers
+            if getattr(h, "baseFilename", "").startswith(folder)
+        ]
         try:
             assert len(handlers) == 1
             logging.getLogger("some.layer").error("something went wrong")
@@ -550,6 +575,7 @@ def test_logging_setup_fails_quietly_when_the_folder_cannot_be_used():
 
 # --- PDF report helpers (the pure-text parts, no ReportLab needed) ---
 
+
 def test_pdf_name_defaults_to_the_source_name():
     assert dm._resolve_pdf_name("audits.json", None) == "audits.pdf"
     assert dm._resolve_pdf_name("audits.json", "report") == "report.pdf"
@@ -569,15 +595,23 @@ def test_outcome_wording_follows_the_decision_status():
 
 def test_screening_result_for_unknown_status_goes_to_review():
     assert dm._screening_result_for({}) == "Not recorded"
-    assert dm._screening_result_for({"decision_status": "ODD"}) == "Further review required"
-    assert dm._screening_result_for({"decision_status": "X", "audit_passed": True}) == "Passed"
+    assert (
+        dm._screening_result_for({"decision_status": "ODD"})
+        == "Further review required"
+    )
+    assert (
+        dm._screening_result_for({"decision_status": "X", "audit_passed": True})
+        == "Passed"
+    )
 
 
 def test_report_values_are_written_as_prose():
     assert dm._readable_value(1234.5, "annual_revenue_sgd") == "SGD 1,234.50"
     assert dm._readable_value(True) == "Yes"
     assert dm._readable_value([], "x") == "None recorded"
-    assert dm._readable_value("REJECT_NON_SME", "decision_status").startswith("Did not qualify")
+    assert dm._readable_value("REJECT_NON_SME", "decision_status").startswith(
+        "Did not qualify"
+    )
 
 
 def test_report_sections_handle_both_record_layouts():

@@ -51,8 +51,6 @@ def test_equity_must_be_above_0_and_at_most_100():
     assert run_with_answers(io_mgr.retrieve_local_equity, answers) == 100.0
 
 
-
-
 def test_cost_fields_reject_bad_values_until_valid():
     for function in COST_PROMPTS:
         result = run_with_answers(function, ["", "x", "-1", "nan", "inf", "250.5"])
@@ -60,7 +58,9 @@ def test_cost_fields_reject_bad_values_until_valid():
 
 
 def test_baseline_energy_expenditure_rejects_zero():
-    assert run_with_answers(io_mgr.retrieve_baseline_energy_expenditure, ["0", "7"]) == 7.0
+    assert (
+        run_with_answers(io_mgr.retrieve_baseline_energy_expenditure, ["0", "7"]) == 7.0
+    )
 
 
 def test_retrofit_cost_rejects_zero():
@@ -73,12 +73,21 @@ def test_reporting_fee_accepts_zero():
 
 def test_proposal_type_choices():
     answers = ["", "3", "x", "2"]
-    assert run_with_answers(io_mgr.retrieve_proposal_type, answers) == "ESG Reporting / Advisory"
+    assert (
+        run_with_answers(io_mgr.retrieve_proposal_type, answers)
+        == "ESG Reporting / Advisory"
+    )
 
 
 def test_industry_is_case_insensitive_and_rejects_unknown():
-    assert run_with_answers(io_mgr.retrieve_company_industry, ["", "nonsense", "retail"]) == "Retail"
-    assert run_with_answers(io_mgr.retrieve_company_industry, ["others", "mining"]) == "Mining"
+    assert (
+        run_with_answers(io_mgr.retrieve_company_industry, ["", "nonsense", "retail"])
+        == "Retail"
+    )
+    assert (
+        run_with_answers(io_mgr.retrieve_company_industry, ["others", "mining"])
+        == "Mining"
+    )
 
 
 def test_grant_menu_rejects_out_of_range_choices():
@@ -103,8 +112,6 @@ def test_displays_do_not_crash_on_minimal_data():
                 "recommendations": [],
             }
         )
-
-
 
 
 def key_verifier_check(text):
@@ -195,7 +202,10 @@ def test_missing_fields_do_not_crash():
 
 
 def test_displaying_damaged_records_does_not_crash():
-    with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(io_mgr.gui, "return_button"):
+    with (
+        contextlib.redirect_stdout(io.StringIO()),
+        mock.patch.object(io_mgr.gui, "return_button"),
+    ):
         io_mgr.display_applied_grants([{}, {"Company Name": None}, 5], 4)
 
 
@@ -215,13 +225,18 @@ def record_picker_pick(function, answers, *args):
 
 def test_choosing_a_record():
     assert (
-        record_picker_pick(io_mgr.select_record_index, ["2"], RECORD_PICKER_RECORDS, "update") == 1
+        record_picker_pick(
+            io_mgr.select_record_index, ["2"], RECORD_PICKER_RECORDS, "update"
+        )
+        == 1
     )
 
 
 def test_zero_cancels():
     assert (
-        record_picker_pick(io_mgr.select_record_index, ["0"], RECORD_PICKER_RECORDS, "delete")
+        record_picker_pick(
+            io_mgr.select_record_index, ["0"], RECORD_PICKER_RECORDS, "delete"
+        )
         is None
     )
 
@@ -229,7 +244,10 @@ def test_zero_cancels():
 def test_bad_answers_are_asked_again():
     assert (
         record_picker_pick(
-            io_mgr.select_record_index, ["x", "", "3", "-1", "1"], RECORD_PICKER_RECORDS, "update"
+            io_mgr.select_record_index,
+            ["x", "", "3", "-1", "1"],
+            RECORD_PICKER_RECORDS,
+            "update",
         )
         == 0
     )
@@ -251,15 +269,26 @@ def test_every_editable_field_has_a_prompt():
 
 
 def test_choosing_a_field():
-    field = record_picker_pick(io_mgr.select_field_to_edit, ["1"], RECORD_PICKER_RECORDS[0])
+    field = record_picker_pick(
+        io_mgr.select_field_to_edit, ["1"], RECORD_PICKER_RECORDS[0]
+    )
     assert field == "Company Name"
-    assert record_picker_pick(io_mgr.select_field_to_edit, ["0"], RECORD_PICKER_RECORDS[0]) is None
+    assert (
+        record_picker_pick(io_mgr.select_field_to_edit, ["0"], RECORD_PICKER_RECORDS[0])
+        is None
+    )
 
 
 def test_existing_file_choices():
     for typed, expected in (("a", "add"), (" R ", "replace"), ("c", "cancel")):
-        assert record_picker_pick(io_mgr.ask_existing_file_action, [typed], "f.json") == expected
-    assert record_picker_pick(io_mgr.ask_existing_file_action, ["x", "", "a"], "f.json") == "add"
+        assert (
+            record_picker_pick(io_mgr.ask_existing_file_action, [typed], "f.json")
+            == expected
+        )
+    assert (
+        record_picker_pick(io_mgr.ask_existing_file_action, ["x", "", "a"], "f.json")
+        == "add"
+    )
 
 
 def test_delete_confirmation():
@@ -277,10 +306,19 @@ def run_with_answers(function, answers, *args):
 
 def test_history_action_choices():
     audits = [{"audit_id": 1}, {"audit_id": 5}]
-    assert run_with_answers(io_mgr.choose_history_action, [""], audits) == ("back", None)
-    assert run_with_answers(io_mgr.choose_history_action, ["f"], audits) == ("filter", None)
+    assert run_with_answers(io_mgr.choose_history_action, [""], audits) == (
+        "back",
+        None,
+    )
+    assert run_with_answers(io_mgr.choose_history_action, ["f"], audits) == (
+        "filter",
+        None,
+    )
     assert run_with_answers(io_mgr.choose_history_action, ["#5"], audits) == ("open", 1)
-    assert run_with_answers(io_mgr.choose_history_action, ["9", "x", "1"], audits) == ("open", 0)
+    assert run_with_answers(io_mgr.choose_history_action, ["9", "x", "1"], audits) == (
+        "open",
+        0,
+    )
 
 
 def test_history_filter_choices():
@@ -290,7 +328,9 @@ def test_history_filter_choices():
         "status",
         "REJECT_LOW_IMPACT",
     )
-    assert run_with_answers(io_mgr.retrieve_history_filter, ["c", "apex"], statuses) == (
+    assert run_with_answers(
+        io_mgr.retrieve_history_filter, ["c", "apex"], statuses
+    ) == (
         "company",
         "apex",
     )
@@ -298,7 +338,10 @@ def test_history_filter_choices():
         "status",
         "MANUAL_REVIEW",
     )
-    assert run_with_answers(io_mgr.retrieve_history_filter, ["c", "", ""], statuses) is None
+    assert (
+        run_with_answers(io_mgr.retrieve_history_filter, ["c", "", ""], statuses)
+        is None
+    )
 
 
 def test_export_confirmation_only_accepts_y_or_n():
@@ -321,16 +364,22 @@ def test_pdf_result_messages_name_the_file_and_the_failures():
 
 def test_company_name_and_narrative_have_length_limits():
     too_long_name = "x" * (io_mgr.COMPANY_NAME_MAX_LEN + 1)
-    assert run_with_answers(io_mgr.retrieve_company_name, [too_long_name, "  Apex  "]) == "Apex"
-    too_long_text = "y" * (io_mgr.NARRATIVE_MAX_LEN + 1)
-    assert run_with_answers(io_mgr.retrieve_proposal_narrative, [too_long_text, "EV vans"]) == (
-        "EV vans"
+    assert (
+        run_with_answers(io_mgr.retrieve_company_name, [too_long_name, "  Apex  "])
+        == "Apex"
     )
+    too_long_text = "y" * (io_mgr.NARRATIVE_MAX_LEN + 1)
+    assert run_with_answers(
+        io_mgr.retrieve_proposal_narrative, [too_long_text, "EV vans"]
+    ) == ("EV vans")
 
 
 def test_other_industry_and_grant_have_length_limits():
     long_text = "a" * (io_mgr.OTHER_TEXT_MAX_LEN + 1)
-    assert run_with_answers(io_mgr.get_valid_other_industry, [long_text, "mining"]) == "Mining"
+    assert (
+        run_with_answers(io_mgr.get_valid_other_industry, [long_text, "mining"])
+        == "Mining"
+    )
     assert run_with_answers(
         io_mgr.retrieve_sustainability_grant, ["5", long_text, "Green Fund"]
     ) == ("Green Fund")

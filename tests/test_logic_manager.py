@@ -21,13 +21,19 @@ def all_scenarios():
     """A spread of inputs that exercise most rules."""
     return [
         (make_profile(), make_audit()),
-        (make_profile(), make_audit(scope_category="Scope-2", estimated_energy_reduction_pct=16.0)),
+        (
+            make_profile(),
+            make_audit(scope_category="Scope-2", estimated_energy_reduction_pct=16.0),
+        ),
         (make_profile(), make_audit(estimated_energy_reduction_pct=12.0)),
         (make_profile(), make_audit(estimated_energy_reduction_pct=1.0)),
         (make_profile(), make_audit(scope_category="Unknown")),
         (make_profile(), make_audit(detected_exclusion_keywords=["second-hand"])),
         (make_profile(annual_revenue_sgd=250000000.0), make_audit()),
-        (reporting_grant_reporting_profile(20000.0), make_audit(scope_category="Unknown")),
+        (
+            reporting_grant_reporting_profile(20000.0),
+            make_audit(scope_category="Unknown"),
+        ),
         (
             make_profile(baseline_annual_energy_expenditure_sgd=1000000.0),
             make_audit(estimated_lifetime_abatement_tonnes=400.0),
@@ -36,6 +42,7 @@ def all_scenarios():
 
 
 # ---- SME and subsidy boundaries -------------------------------------------
+
 
 def test_sme_exactly_at_both_limits_passes():
     assert logic.check_sme_status(30.0, 100000000.0, 1)
@@ -49,13 +56,15 @@ def test_subsidy_with_zero_cost_rate_or_cap_is_zero():
 
 def test_srg_fee_where_30_percent_equals_the_cap():
     result = decide(
-        reporting_grant_reporting_profile(500000.0), make_audit(scope_category="Unknown")
+        reporting_grant_reporting_profile(500000.0),
+        make_audit(scope_category="Unknown"),
     )
     assert result["decision_status"] == "PRE_APPROVED_SRG"
     assert result["approved_subsidy_sgd"] == 150000.0
 
 
 # ---- Energy-reduction boundaries (Scope-1) ----------------------------------
+
 
 def test_scope1_reduction_boundaries():
     cases = [
@@ -68,10 +77,13 @@ def test_scope1_reduction_boundaries():
     ]
     for pct, expected in cases:
         result = decide(audit=make_audit(estimated_energy_reduction_pct=pct))
-        assert result["decision_status"] == expected, f"{pct}% gave {result['decision_status']}"
+        assert result["decision_status"] == expected, (
+            f"{pct}% gave {result['decision_status']}"
+        )
 
 
 # ---- Retrofit cost cap --------------------------------------------------------
+
 
 def test_retrofit_cost_of_zero_means_no_cap():
     result = decide(make_profile(estimated_retrofit_cost_sgd=0.0))
@@ -85,7 +97,8 @@ def test_tiny_retrofit_cost_caps_the_subsidy():
 
 def test_retrofit_cap_applies_to_the_advanced_tier():
     profile = make_profile(
-        baseline_annual_energy_expenditure_sgd=1000000.0, estimated_retrofit_cost_sgd=100000.0
+        baseline_annual_energy_expenditure_sgd=1000000.0,
+        estimated_retrofit_cost_sgd=100000.0,
     )
     result = decide(profile, make_audit(estimated_lifetime_abatement_tonnes=400.0))
     assert result["decision_status"] == "PRE_APPROVED_TIER_1_ADVANCED"
@@ -94,10 +107,12 @@ def test_retrofit_cap_applies_to_the_advanced_tier():
 
 # ---- Rule interactions --------------------------------------------------------
 
+
 def test_exclusion_beats_the_advanced_tier():
     profile = make_profile(baseline_annual_energy_expenditure_sgd=1000000.0)
     audit = make_audit(
-        estimated_lifetime_abatement_tonnes=400.0, detected_exclusion_keywords=["second-hand"]
+        estimated_lifetime_abatement_tonnes=400.0,
+        detected_exclusion_keywords=["second-hand"],
     )
     assert decide(profile, audit)["decision_status"] == "MANUAL_EXCLUSION_REVIEW"
 
@@ -126,6 +141,7 @@ def test_unused_cost_field_is_ignored():
 
 
 # ---- Bad or unexpected input ------------------------------------------------
+
 
 def test_empty_profile_does_not_crash_and_is_not_approved():
     result = decide(profile={})
@@ -184,10 +200,13 @@ def test_unknown_proposal_type_does_not_crash():
 
 # ---- Determinism and result shape --------------------------------------------
 
+
 def test_same_inputs_give_the_same_result_and_are_not_modified():
     for profile, audit in all_scenarios():
         profile_before = dict(profile)
-        audit_before = {k: (list(v) if isinstance(v, list) else v) for k, v in audit.items()}
+        audit_before = {
+            k: (list(v) if isinstance(v, list) else v) for k, v in audit.items()
+        }
         first = decide(profile, audit)
         second = decide(profile, audit)
         assert first == second
@@ -233,6 +252,7 @@ def test_rejections_and_reviews_never_pay_a_subsidy():
 
 # ---- Scheme mismatch note -----------------------------------------------------
 
+
 def test_missing_grant_choice_gives_no_note():
     assert logic.scheme_mismatch_note(None, ["Anything"]) is None
     result = decide(make_profile(sustainability_grant=None))
@@ -244,6 +264,7 @@ def test_mismatch_note_with_no_matched_schemes_does_not_crash():
 
 
 # ---- Passwords ----------------------------------------------------------------
+
 
 def test_password_is_case_sensitive():
     record = logic.build_new_user_record("alice", "correct horse")
@@ -290,7 +311,9 @@ def test_record_with_missing_or_damaged_fields_fails_safely():
     for field in ("salt", "password_hash"):
         damaged = dict(record)
         del damaged[field]
-        assert not logic.verify_password("correct horse", damaged), f"missing {field} still verified"
+        assert not logic.verify_password("correct horse", damaged), (
+            f"missing {field} still verified"
+        )
     truncated = dict(record, password_hash=record["password_hash"][:10])
     assert not logic.verify_password("correct horse", truncated)
     not_hex = dict(record, password_hash="not-hex!")
@@ -395,12 +418,16 @@ def test_scope1_between_15_and_20_is_provisional():
 
 
 def test_scope2_at_15_percent_is_provisional():
-    result = decide(audit=make_audit(scope_category="Scope-2", estimated_energy_reduction_pct=15.0))
+    result = decide(
+        audit=make_audit(scope_category="Scope-2", estimated_energy_reduction_pct=15.0)
+    )
     assert result["decision_status"] == "PROVISIONAL_APPROVAL_TIER_2"
 
 
 def test_scope2_at_30_percent_is_not_fast_tracked():
-    result = decide(audit=make_audit(scope_category="Scope-2", estimated_energy_reduction_pct=30.0))
+    result = decide(
+        audit=make_audit(scope_category="Scope-2", estimated_energy_reduction_pct=30.0)
+    )
     assert result["decision_status"] == "PROVISIONAL_APPROVAL_TIER_2"
 
 
@@ -420,7 +447,10 @@ def test_advanced_tier_needs_over_350_tonnes():
     profile = make_profile(baseline_annual_energy_expenditure_sgd=1000000.0)
     result = decide(
         profile,
-        make_audit(estimated_lifetime_abatement_tonnes=400.0, estimated_energy_reduction_pct=12.0),
+        make_audit(
+            estimated_lifetime_abatement_tonnes=400.0,
+            estimated_energy_reduction_pct=12.0,
+        ),
     )
     assert result["decision_status"] == "PRE_APPROVED_TIER_1_ADVANCED"
     assert result["approved_subsidy_sgd"] == 350000.0
@@ -434,7 +464,8 @@ def test_350_tonnes_exactly_is_not_advanced():
 def test_claimed_tonnes_without_energy_reduction_is_not_advanced():
     result = decide(
         audit=make_audit(
-            estimated_lifetime_abatement_tonnes=900.0, estimated_energy_reduction_pct=0.0
+            estimated_lifetime_abatement_tonnes=900.0,
+            estimated_energy_reduction_pct=0.0,
         )
     )
     assert result["decision_status"] == "REJECT_LOW_IMPACT"
@@ -458,7 +489,9 @@ def test_none_placeholder_is_not_an_exclusion():
 
 
 def test_fossil_fuel_modification_goes_to_exclusion_review():
-    result = decide(audit=make_audit(primary_intervention_type="Fossil Fuel Modification"))
+    result = decide(
+        audit=make_audit(primary_intervention_type="Fossil Fuel Modification")
+    )
     assert result["decision_status"] == "MANUAL_EXCLUSION_REVIEW"
 
 
@@ -513,13 +546,16 @@ def test_srg_pays_30_percent_of_the_fee():
 
 def test_srg_is_capped():
     result = decide(
-        reporting_grant_reporting_profile(10000000.0), make_audit(scope_category="Unknown")
+        reporting_grant_reporting_profile(10000000.0),
+        make_audit(scope_category="Unknown"),
     )
     assert result["approved_subsidy_sgd"] == 150000.0
 
 
 def test_srg_without_a_fee_needs_manual_review():
-    result = decide(reporting_grant_reporting_profile(0.0), make_audit(scope_category="Unknown"))
+    result = decide(
+        reporting_grant_reporting_profile(0.0), make_audit(scope_category="Unknown")
+    )
     assert result["decision_status"] == "MANUAL_REVIEW"
 
 
@@ -550,7 +586,9 @@ def test_note_ignores_a_non_string_choice():
 
 def test_bad_numbers_do_not_crash():
     profile = make_profile(
-        annual_revenue_sgd=float("nan"), group_employment_size=None, local_shareholding_pct="lots"
+        annual_revenue_sgd=float("nan"),
+        group_employment_size=None,
+        local_shareholding_pct="lots",
     )
     result = decide(profile)
     assert result["decision_status"] == "REJECT_NON_SME"
@@ -664,7 +702,9 @@ def test_unknown_user_fails():
 
 
 def test_damaged_record_fails_instead_of_crashing():
-    assert not logic.verify_password("x", {"salt": "zz", "password_hash": "1", "iterations": 5})
+    assert not logic.verify_password(
+        "x", {"salt": "zz", "password_hash": "1", "iterations": 5}
+    )
     assert not logic.verify_password("x", {"salt": 5, "password_hash": None})
 
 

@@ -49,7 +49,9 @@ def test_save_to_an_existing_file_can_be_cancelled():
     with temp_data_dir():
         dm.save_data_to_json([rec("old")], "mine")
         with (
-            mock.patch.object(main.in_and_out, "ask_existing_file_action", return_value="cancel"),
+            mock.patch.object(
+                main.in_and_out, "ask_existing_file_action", return_value="cancel"
+            ),
             mock.patch.object(main.in_and_out, "display_save_result"),
         ):
             main.save_records_flow([rec("new")], "mine")
@@ -60,18 +62,25 @@ def test_save_to_an_existing_file_can_add_to_it():
     with temp_data_dir():
         dm.save_data_to_json([rec("old")], "mine")
         with (
-            mock.patch.object(main.in_and_out, "ask_existing_file_action", return_value="add"),
+            mock.patch.object(
+                main.in_and_out, "ask_existing_file_action", return_value="add"
+            ),
             mock.patch.object(main.in_and_out, "display_save_result"),
         ):
             main.save_records_flow([rec("new")], "mine")
-        assert [r["Company Name"] for r in dm.load_data_from_json("mine")[0]] == ["old", "new"]
+        assert [r["Company Name"] for r in dm.load_data_from_json("mine")[0]] == [
+            "old",
+            "new",
+        ]
 
 
 def test_save_to_an_existing_file_can_replace_it():
     with temp_data_dir():
         dm.save_data_to_json([rec("old")], "mine")
         with (
-            mock.patch.object(main.in_and_out, "ask_existing_file_action", return_value="replace"),
+            mock.patch.object(
+                main.in_and_out, "ask_existing_file_action", return_value="replace"
+            ),
             mock.patch.object(main.in_and_out, "display_save_result"),
         ):
             main.save_records_flow([rec("new")], "mine")
@@ -90,7 +99,9 @@ def test_load_replaces_the_records():
     with temp_data_dir():
         dm.save_data_to_json([rec("saved")], "mine")
         with (
-            mock.patch.object(main.in_and_out, "retrieve_json_filename", return_value="mine"),
+            mock.patch.object(
+                main.in_and_out, "retrieve_json_filename", return_value="mine"
+            ),
             mock.patch.object(main.in_and_out, "display_load_result"),
         ):
             records, name = main.load_records_flow([], "")
@@ -101,7 +112,9 @@ def test_load_can_be_cancelled_when_records_exist():
     with temp_data_dir():
         current = [rec("mine")]
         with (
-            mock.patch.object(main.in_and_out, "confirm_overwrite_records", return_value=False),
+            mock.patch.object(
+                main.in_and_out, "confirm_overwrite_records", return_value=False
+            ),
             mock.patch.object(main.in_and_out, "retrieve_json_filename") as ask,
         ):
             records, name = main.load_records_flow(current, "x.json")
@@ -112,7 +125,9 @@ def test_load_can_be_cancelled_when_records_exist():
 def test_failed_load_keeps_the_current_records():
     with temp_data_dir():
         with (
-            mock.patch.object(main.in_and_out, "retrieve_json_filename", return_value="missing"),
+            mock.patch.object(
+                main.in_and_out, "retrieve_json_filename", return_value="missing"
+            ),
             mock.patch.object(main.in_and_out, "display_load_result") as shown,
         ):
             records, name = main.load_records_flow([], "")
@@ -128,7 +143,9 @@ def audit_flow_run_flow(ai_audit, result):
     session = audit_flow_session()
     io = main.in_and_out
     with (
-        mock.patch.object(main, "collect_application", return_value={"Company Name": "A"}),
+        mock.patch.object(
+            main, "collect_application", return_value={"Company Name": "A"}
+        ),
         mock.patch.object(main, "run_audit", return_value=(ai_audit, result)),
         mock.patch.object(io, "display_applied_grants"),
         mock.patch.object(io, "confirm_save_to_json", return_value=False),
@@ -172,7 +189,10 @@ def edit_and_delete_flow_session():
         "username": "alice",
         "ai_audit": {},
         "jsonfile_name": "",
-        "records": [dict(rec("A"), **{"Proposal Type": "Equipment / Energy Upgrade"}), rec("B")],
+        "records": [
+            dict(rec("A"), **{"Proposal Type": "Equipment / Energy Upgrade"}),
+            rec("B"),
+        ],
     }
 
 
@@ -302,7 +322,9 @@ def test_logout_returns_to_the_login_screen_and_clears_the_user():
     with temp_data_dir():
         with (
             mock.patch.object(
-                main.in_and_out, "get_menu_choice", side_effect=[main.in_and_out.MENU_LOGOUT]
+                main.in_and_out,
+                "get_menu_choice",
+                side_effect=[main.in_and_out.MENU_LOGOUT],
             ),
             mock.patch.object(main.in_and_out, "show_logged_out"),
         ):
@@ -314,7 +336,9 @@ def test_records_are_saved_in_the_users_own_folder():
     with temp_data_dir() as folder:
         with (
             mock.patch.object(main.in_and_out, "get_menu_choice", side_effect=[2, 0]),
-            mock.patch.object(main.in_and_out, "retrieve_json_filename", return_value="mine"),
+            mock.patch.object(
+                main.in_and_out, "retrieve_json_filename", return_value="mine"
+            ),
             mock.patch.object(main.in_and_out, "display_save_result"),
             mock.patch.object(main.in_and_out, "show_goodbye"),
         ):
@@ -368,7 +392,9 @@ def test_taken_usernames_are_asked_for_again():
         io = main.in_and_out
         dm.save_new_user({"username": "alice"})
         with (
-            mock.patch.object(io, "retrieve_new_username", side_effect=["alice", "bob"]),
+            mock.patch.object(
+                io, "retrieve_new_username", side_effect=["alice", "bob"]
+            ),
             mock.patch.object(io, "retrieve_new_password", return_value="password123"),
             mock.patch.object(io, "show_username_taken") as taken,
             mock.patch.object(io, "show_account_created") as created,
@@ -390,7 +416,9 @@ def test_login_screen_exit_returns_none():
 def test_login_screen_retries_until_success():
     with temp_data_dir():
         with (
-            mock.patch.object(main.in_and_out, "get_auth_choice", side_effect=[1, 7, 1]),
+            mock.patch.object(
+                main.in_and_out, "get_auth_choice", side_effect=[1, 7, 1]
+            ),
             mock.patch.object(main, "login_flow", side_effect=[None, "alice"]),
             mock.patch.object(main.in_and_out, "show_wrong_option_error"),
         ):
@@ -408,11 +436,18 @@ def make_audit(audit_id, company, status):
 
 
 def test_history_filter_returns_only_matching_audits():
-    audits = [make_audit(1, "Apex", "PRE_APPROVED_TIER_1"), make_audit(2, "Bolt", "MANUAL_REVIEW")]
+    audits = [
+        make_audit(1, "Apex", "PRE_APPROVED_TIER_1"),
+        make_audit(2, "Bolt", "MANUAL_REVIEW"),
+    ]
     io = main.in_and_out
-    with mock.patch.object(io, "retrieve_history_filter", return_value=("status", "MANUAL_REVIEW")):
+    with mock.patch.object(
+        io, "retrieve_history_filter", return_value=("status", "MANUAL_REVIEW")
+    ):
         assert main.apply_history_filter(audits) == [audits[1]]
-    with mock.patch.object(io, "retrieve_history_filter", return_value=("company", "ape")):
+    with mock.patch.object(
+        io, "retrieve_history_filter", return_value=("company", "ape")
+    ):
         assert main.apply_history_filter(audits) == [audits[0]]
 
 
@@ -422,7 +457,9 @@ def test_history_filter_cancel_or_no_match_returns_none():
     with mock.patch.object(io, "retrieve_history_filter", return_value=None):
         assert main.apply_history_filter(audits) is None
     with (
-        mock.patch.object(io, "retrieve_history_filter", return_value=("company", "zzz")),
+        mock.patch.object(
+            io, "retrieve_history_filter", return_value=("company", "zzz")
+        ),
         mock.patch.object(io, "show_no_matching_audits") as shown,
     ):
         assert main.apply_history_filter(audits) is None
@@ -430,16 +467,25 @@ def test_history_filter_cancel_or_no_match_returns_none():
 
 
 def test_history_flow_filters_then_opens_and_exports_the_audit():
-    audits = [make_audit(1, "Apex", "PRE_APPROVED_TIER_1"), make_audit(2, "Bolt", "MANUAL_REVIEW")]
+    audits = [
+        make_audit(1, "Apex", "PRE_APPROVED_TIER_1"),
+        make_audit(2, "Bolt", "MANUAL_REVIEW"),
+    ]
     io = main.in_and_out
     with (
         mock.patch.object(dm, "get_user_audits", return_value=audits),
         mock.patch.object(io, "display_audit_history", return_value=True) as listing,
-        mock.patch.object(io, "choose_history_action", side_effect=[("filter", None), ("open", 0)]),
-        mock.patch.object(io, "retrieve_history_filter", return_value=("company", "bolt")),
+        mock.patch.object(
+            io, "choose_history_action", side_effect=[("filter", None), ("open", 0)]
+        ),
+        mock.patch.object(
+            io, "retrieve_history_filter", return_value=("company", "bolt")
+        ),
         mock.patch.object(io, "display_audit_detail") as detail,
         mock.patch.object(io, "confirm_export_pdf", return_value=True),
-        mock.patch.object(dm, "export_audit_to_pdf", return_value=("a.pdf", "exported")) as export,
+        mock.patch.object(
+            dm, "export_audit_to_pdf", return_value=("a.pdf", "exported")
+        ) as export,
         mock.patch.object(io, "show_pdf_result") as result,
         mock.patch.object(io, "wait_for_return"),
     ):

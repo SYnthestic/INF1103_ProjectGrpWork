@@ -28,7 +28,12 @@ def test_get_ai_response_returns_a_cleaned_audit():
 
 
 def test_get_ai_response_never_raises_on_api_errors():
-    for error in (RuntimeError("boom"), TimeoutError(), ConnectionError(), ValueError("x")):
+    for error in (
+        RuntimeError("boom"),
+        TimeoutError(),
+        ConnectionError(),
+        ValueError("x"),
+    ):
         client = fake_client(error=error)
         with mock.patch.object(ai, "setup_ai_client", return_value=client):
             audit = ai.get_ai_response("anything")
@@ -37,7 +42,9 @@ def test_get_ai_response_never_raises_on_api_errors():
 
 
 def test_get_ai_response_survives_a_missing_key():
-    with mock.patch.object(ai, "setup_ai_client", side_effect=RuntimeError("OPENROUTER_API_KEY")):
+    with mock.patch.object(
+        ai, "setup_ai_client", side_effect=RuntimeError("OPENROUTER_API_KEY")
+    ):
         assert ai.ai_call_failed(ai.get_ai_response("anything"))
 
 
@@ -79,7 +86,12 @@ def test_the_model_cannot_smuggle_in_a_decision():
         is_sme=True,
     )
     audit = ai.parse_ai_audit(reply)
-    for forbidden in ("decision_status", "approved_subsidy_sgd", "audit_passed", "is_sme"):
+    for forbidden in (
+        "decision_status",
+        "approved_subsidy_sgd",
+        "audit_passed",
+        "is_sme",
+    ):
         assert forbidden not in audit, forbidden
 
 
@@ -123,7 +135,7 @@ def test_first_json_object_wins_when_there_are_several():
     first = parse_ai_audit_good_json(scope_category="Scope-1")
     second = parse_ai_audit_good_json(scope_category="Scope-2")
     audit = ai.parse_ai_audit(first + "\nand also\n" + second)
-    assert audit["scope_category"] in ("Scope-1", "Unknown")   # pin down what you want
+    assert audit["scope_category"] in ("Scope-1", "Unknown")  # pin down what you want
 
 
 def test_braces_inside_strings_do_not_break_parsing():
@@ -133,7 +145,9 @@ def test_braces_inside_strings_do_not_break_parsing():
 
 
 def test_very_long_text_is_handled():
-    audit = ai.parse_ai_audit(parse_ai_audit_good_json(ai_reasoning_summary="x" * 200000))
+    audit = ai.parse_ai_audit(
+        parse_ai_audit_good_json(ai_reasoning_summary="x" * 200000)
+    )
     assert isinstance(audit["ai_reasoning_summary"], str)
     assert ai.parse_ai_audit("a" * 1000000) is not None
 
@@ -141,11 +155,11 @@ def test_very_long_text_is_handled():
 def test_more_number_edge_cases():
     assert ai._to_number(False, 7.0) == 7.0
     assert ai._to_number("  42 % ") == 42.0
-    assert ai._to_number("1e3") in (1000.0, 1.0, 0.0)          # decide what you want here
+    assert ai._to_number("1e3") in (1000.0, 1.0, 0.0)  # decide what you want here
     assert ai._to_number("-5", minimum=0.0) == 0.0
     assert ai._to_number(10**30, maximum=100.0) == 100.0
     for value in ("−5x", "one hundred", "", " "):
-        assert ai._to_number(value, 3.0) in (3.0, 5.0, -5.0)    # must not raise
+        assert ai._to_number(value, 3.0) in (3.0, 5.0, -5.0)  # must not raise
 
 
 def test_more_scope_spellings():
@@ -265,9 +279,9 @@ def test_keywords_from_a_string_are_split():
 
 
 def test_placeholder_keywords_are_dropped():
-    assert ai._to_string_list(["None", "N/A", " ", "second-hand", "none detected."]) == [
-        "second-hand"
-    ]
+    assert ai._to_string_list(
+        ["None", "N/A", " ", "second-hand", "none detected."]
+    ) == ["second-hand"]
 
 
 def test_non_list_keywords_give_empty_list():

@@ -4,8 +4,8 @@ import math
 import secrets
 from typing import Any
 
-Case = dict[str, Any]       # numbers and labels the rules look at
-Decision = dict[str, Any]   # what one rule returns
+Case = dict[str, Any]  # numbers and labels the rules look at
+Decision = dict[str, Any]  # what one rule returns
 
 
 def module_description() -> str:
@@ -52,9 +52,22 @@ def _number(value: Any, default: float = 0.0) -> float:
 
 
 _PLACEHOLDER_KEYWORDS = {
-    "none", "no", "nil", "null", "n/a", "na", "-", "--", "not applicable",
-    "none detected", "no exclusions", "no exclusion", "no keywords",
-    "none found", "nothing", "unknown",
+    "none",
+    "no",
+    "nil",
+    "null",
+    "n/a",
+    "na",
+    "-",
+    "--",
+    "not applicable",
+    "none detected",
+    "no exclusions",
+    "no exclusion",
+    "no keywords",
+    "none found",
+    "nothing",
+    "unknown",
 }
 
 
@@ -72,7 +85,11 @@ def _string_list(value: Any) -> list[str]:
             continue
         text = str(item).strip()
         lowered = text.lower().strip(".")
-        if text and lowered not in _PLACEHOLDER_KEYWORDS and not lowered.startswith("none "):
+        if (
+            text
+            and lowered not in _PLACEHOLDER_KEYWORDS
+            and not lowered.startswith("none ")
+        ):
             items.append(text)
     return items
 
@@ -92,8 +109,9 @@ HASH_ITERATIONS = 200_000
 SALT_BYTES = 16
 
 
-def hash_password(password: str, salt_hex: str | None = None,
-                  iterations: int = HASH_ITERATIONS) -> dict[str, Any]:
+def hash_password(
+    password: str, salt_hex: str | None = None, iterations: int = HASH_ITERATIONS
+) -> dict[str, Any]:
     """
     Hashes a password with SHA-256 (PBKDF2-HMAC-SHA256).
 
@@ -108,17 +126,14 @@ def hash_password(password: str, salt_hex: str | None = None,
         salt_hex = secrets.token_hex(SALT_BYTES)
 
     digest = hashlib.pbkdf2_hmac(
-        "sha256",
-        password.encode("utf-8"),
-        bytes.fromhex(salt_hex),
-        iterations
+        "sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), iterations
     )
 
     return {
         "algorithm": HASH_ALGORITHM,
         "iterations": iterations,
         "salt": salt_hex,
-        "password_hash": digest.hex()
+        "password_hash": digest.hex(),
     }
 
 
@@ -174,8 +189,7 @@ def verify_password(password: Any, user_record: Any) -> bool:
     try:
         attempt = hash_password(password, salt_hex=salt, iterations=iterations)
         return hmac.compare_digest(
-            attempt["password_hash"].encode("ascii"),
-            stored_hash.encode("ascii")
+            attempt["password_hash"].encode("ascii"), stored_hash.encode("ascii")
         )
     except (ValueError, TypeError, UnicodeError):
         return False
@@ -217,7 +231,9 @@ def scheme_mismatch_note(chosen_scheme: Any, matched_schemes: list[str]) -> str 
     return None
 
 
-def check_sme_status(local_equity_pct: float, annual_revenue: float, headcount: int) -> bool:
+def check_sme_status(
+    local_equity_pct: float, annual_revenue: float, headcount: int
+) -> bool:
     """
     Checks whether the company meets the statutory SME requirements.
 
@@ -237,7 +253,9 @@ def check_sme_status(local_equity_pct: float, annual_revenue: float, headcount: 
     return has_local_equity and within_revenue_cap
 
 
-def get_sme_fail_reasons(local_equity_pct: float, annual_revenue: float, headcount: int) -> list[str]:
+def get_sme_fail_reasons(
+    local_equity_pct: float, annual_revenue: float, headcount: int
+) -> list[str]:
     """
     Identifies exactly which SME requirements the company failed.
 
@@ -262,7 +280,9 @@ def get_sme_fail_reasons(local_equity_pct: float, annual_revenue: float, headcou
     return reasons
 
 
-def calculate_subsidy(baseline_spend: float, cofund_percentage: float, maximum_subsidy: float) -> float:
+def calculate_subsidy(
+    baseline_spend: float, cofund_percentage: float, maximum_subsidy: float
+) -> float:
     """
     Calculates the maximum potential subsidy.
 
@@ -308,10 +328,13 @@ PASSING_STATUSES = (
 )
 
 
-def _decision(status: str, reasons: list[str] | None = None,
-              recommendations: list[str] | None = None,
-              matched_schemes: list[str] | None = None,
-              subsidy: float = 0.0) -> Decision:
+def _decision(
+    status: str,
+    reasons: list[str] | None = None,
+    recommendations: list[str] | None = None,
+    matched_schemes: list[str] | None = None,
+    subsidy: float = 0.0,
+) -> Decision:
     """What a rule returns: the outcome plus everything the report shows."""
     return {
         "decision_status": status,
@@ -337,16 +360,20 @@ def build_case(user_profile: dict[str, Any], ai_audit: dict[str, Any]) -> Case:
         "headcount": headcount,
         "local_equity": local_equity,
         "is_sme": check_sme_status(local_equity, annual_revenue, headcount),
-        "sme_fail_reasons": get_sme_fail_reasons(local_equity, annual_revenue, headcount),
-
+        "sme_fail_reasons": get_sme_fail_reasons(
+            local_equity, annual_revenue, headcount
+        ),
         # Proposal (self-declared by the applicant in io_manager.py, so it
         # is taken from the profile rather than inferred by the AI)
-        "proposal_type": user_profile.get("proposal_type", "Equipment / Energy Upgrade"),
+        "proposal_type": user_profile.get(
+            "proposal_type", "Equipment / Energy Upgrade"
+        ),
         "chosen_scheme": user_profile.get("sustainability_grant", 0),
-        "baseline_spend": _number(user_profile.get("baseline_annual_energy_expenditure_sgd")),
+        "baseline_spend": _number(
+            user_profile.get("baseline_annual_energy_expenditure_sgd")
+        ),
         "retrofit_cost": _number(user_profile.get("estimated_retrofit_cost_sgd")),
         "advisory_fee": _number(user_profile.get("reporting_advisory_fee_sgd")),
-
         # AI audit
         "scope": ai_audit.get("scope_category", "Unknown"),
         "energy_reduction_pct": _number(ai_audit.get("estimated_energy_reduction_pct")),
@@ -356,14 +383,19 @@ def build_case(user_profile: dict[str, Any], ai_audit: dict[str, Any]) -> Case:
         "ai_failed": str(ai_audit.get("ai_status", "ok")).strip().lower() == "failed",
     }
 
+
 def rule_ai_failed(case):
     """The AI could not analyse the narrative, so no approval is safe."""
     if not case["ai_failed"]:
         return None
     return _decision(
         "MANUAL_REVIEW",
-        reasons=["The AI analysis failed, so the proposal could not be assessed automatically."],
-        recommendations=["Run the analysis again, or send the proposal for manual review."],
+        reasons=[
+            "The AI analysis failed, so the proposal could not be assessed automatically."
+        ],
+        recommendations=[
+            "Run the analysis again, or send the proposal for manual review."
+        ],
     )
 
 
@@ -371,12 +403,15 @@ def rule_ai_failed(case):
 # Rules, in priority order (each returns a decision or None)
 # ---------------------------------------------------------
 
+
 def rule_exclusion_keywords(case: Case) -> Decision | None:
     """1. Prohibited equipment named by the AI -> exclusion review."""
     if not case["exclusions"]:
         return None
 
-    reasons = ["Potentially prohibited equipment or modification was detected in the proposal."]
+    reasons = [
+        "Potentially prohibited equipment or modification was detected in the proposal."
+    ]
     reasons += [f"Detected exclusion: {exclusion}" for exclusion in case["exclusions"]]
 
     return _decision(
@@ -398,8 +433,10 @@ def rule_fossil_fuel_modification(case: Case) -> Decision | None:
 
     return _decision(
         "MANUAL_EXCLUSION_REVIEW",
-        ["The proposed intervention involves fossil-fuel modification, "
-         "which may fall under a grant exclusion."],
+        [
+            "The proposed intervention involves fossil-fuel modification, "
+            "which may fall under a grant exclusion."
+        ],
         [
             "Consider replacing the fossil-fuel modification with an "
             "energy-efficiency or low-carbon alternative.",
@@ -433,12 +470,14 @@ def rule_not_an_sme(case: Case) -> Decision | None:
         "(EFS-Green) as an alternative financing route."
     )
 
-    return _decision("REJECT_NON_SME", case["sme_fail_reasons"],
-                     recommendations, [EFS_GREEN_NAME])
+    return _decision(
+        "REJECT_NON_SME", case["sme_fail_reasons"], recommendations, [EFS_GREEN_NAME]
+    )
 
 
 # A reporting/advisory proposal has no GHG scope to classify, so the two
 # reporting rules run before the scope check further down.
+
 
 def rule_reporting_without_fee(case: Case) -> Decision | None:
     """4a. The grant is a percentage of the fee, so no fee = nothing to approve."""
@@ -447,10 +486,14 @@ def rule_reporting_without_fee(case: Case) -> Decision | None:
 
     return _decision(
         "MANUAL_REVIEW",
-        ["No valid external ESG reporting/advisory fee was provided, "
-         "so a subsidy cannot be calculated."],
-        ["Provide the quoted reporting/advisory fee (more than SGD 0) "
-         "and resubmit the proposal."],
+        [
+            "No valid external ESG reporting/advisory fee was provided, "
+            "so a subsidy cannot be calculated."
+        ],
+        [
+            "Provide the quoted reporting/advisory fee (more than SGD 0) "
+            "and resubmit the proposal."
+        ],
     )
 
 
@@ -466,9 +509,11 @@ def rule_reporting_grant(case: Case) -> Decision | None:
             "Proposal covers an inaugural ESG assurance report "
             "rather than an equipment or capability upgrade.",
         ],
-        ["Ensure the external assurance statement covers, at "
-         "minimum, Scope 1 and Scope 2 emissions in line with "
-         "ISSB and GRI standards."],
+        [
+            "Ensure the external assurance statement covers, at "
+            "minimum, Scope 1 and Scope 2 emissions in line with "
+            "ISSB and GRI standards."
+        ],
         [SRG_NAME],
         calculate_subsidy(case["advisory_fee"], *SRG_FUNDING),
     )
@@ -482,10 +527,14 @@ def rule_missing_baseline_spend(case: Case) -> Decision | None:
 
     return _decision(
         "MANUAL_REVIEW",
-        ["No valid baseline annual energy expenditure was provided, "
-         "so a subsidy cannot be calculated."],
-        ["Provide the company's baseline annual energy expenditure "
-         "(more than SGD 0) and resubmit the proposal."],
+        [
+            "No valid baseline annual energy expenditure was provided, "
+            "so a subsidy cannot be calculated."
+        ],
+        [
+            "Provide the company's baseline annual energy expenditure "
+            "(more than SGD 0) and resubmit the proposal."
+        ],
     )
 
 
@@ -496,9 +545,13 @@ def rule_unclassified_scope(case: Case) -> Decision | None:
 
     return _decision(
         "MANUAL_REVIEW",
-        [f"GHG Protocol scope could not be determined (AI returned '{case['scope']}')."],
-        ["Provide a clearer description of the intervention so "
-         "the AI Manager can classify it under Scope 1, 2, or 3."],
+        [
+            f"GHG Protocol scope could not be determined (AI returned '{case['scope']}')."
+        ],
+        [
+            "Provide a clearer description of the intervention so "
+            "the AI Manager can classify it under Scope 1, 2, or 3."
+        ],
     )
 
 
@@ -506,8 +559,10 @@ def rule_eeg_advanced_tier(case: Case) -> Decision | None:
     """7. More than 350 tonnes of lifetime abatement. The AI's tonnes figure
     is only an estimate, so the proposal must also reach the minimum energy
     reduction (a claimed 400 tonnes with 0% reduction does not qualify)."""
-    if not (case["lifetime_tonnes"] > EEG_ADVANCED_MIN_TONNES
-            and case["energy_reduction_pct"] >= MINIMUM_IMPACT_PCT):
+    if not (
+        case["lifetime_tonnes"] > EEG_ADVANCED_MIN_TONNES
+        and case["energy_reduction_pct"] >= MINIMUM_IMPACT_PCT
+    ):
         return None
 
     return _decision(
@@ -518,8 +573,10 @@ def rule_eeg_advanced_tier(case: Case) -> Decision | None:
             f"{case['lifetime_tonnes']:.1f} tonnes exceeds the "
             "350-tonne Advanced Tier threshold.",
         ],
-        ["Engage an independent energy assessor to verify the "
-         "lifetime abatement estimate before final disbursement."],
+        [
+            "Engage an independent energy assessor to verify the "
+            "lifetime abatement estimate before final disbursement."
+        ],
         [EEG_ADVANCED_NAME],
         calculate_subsidy(case["baseline_spend"], *EEG_ADVANCED_FUNDING),
     )
@@ -527,8 +584,10 @@ def rule_eeg_advanced_tier(case: Case) -> Decision | None:
 
 def rule_eeg_base_tier(case: Case) -> Decision | None:
     """8. Scope-1 fast track: at least 20% energy reduction."""
-    if not (case["scope"] == "Scope-1"
-            and case["energy_reduction_pct"] >= FAST_TRACK_MIN_PCT):
+    if not (
+        case["scope"] == "Scope-1"
+        and case["energy_reduction_pct"] >= FAST_TRACK_MIN_PCT
+    ):
         return None
 
     return _decision(
@@ -559,8 +618,10 @@ def rule_esp_provisional(case: Case) -> Decision | None:
             f"Estimated energy reduction of {case['energy_reduction_pct']:.1f}% "
             "meets the 15% threshold for provisional capability-support approval.",
         ],
-        ["Prepare supporting baseline energy and emissions "
-         "documentation for final assessment."],
+        [
+            "Prepare supporting baseline energy and emissions "
+            "documentation for final assessment."
+        ],
         [ESP_NAME],
         calculate_subsidy(case["baseline_spend"], *ESP_FUNDING),
     )
@@ -575,9 +636,11 @@ def rule_borderline_impact(case: Case) -> Decision | None:
 
     return _decision(
         "MANUAL_REVIEW",
-        [f"Estimated energy reduction of {case['energy_reduction_pct']:.1f}% meets the "
-         f"minimum of {MINIMUM_IMPACT_PCT:.0f}% but is below the "
-         f"{PROVISIONAL_MIN_PCT:.0f}% needed for provisional approval."],
+        [
+            f"Estimated energy reduction of {case['energy_reduction_pct']:.1f}% meets the "
+            f"minimum of {MINIMUM_IMPACT_PCT:.0f}% but is below the "
+            f"{PROVISIONAL_MIN_PCT:.0f}% needed for provisional approval."
+        ],
         [
             "Submit supporting baseline and measurement data so a "
             "reviewer can assess the proposal.",
@@ -591,9 +654,11 @@ def rule_low_impact(case: Case) -> Decision:
     """11. Everything else: under 10% is rejected."""
     return _decision(
         "REJECT_LOW_IMPACT",
-        [f"Estimated energy reduction of {case['energy_reduction_pct']:.1f}% "
-         f"is below the minimum threshold of {MINIMUM_IMPACT_PCT:.1f}% "
-         "used by this system."],
+        [
+            f"Estimated energy reduction of {case['energy_reduction_pct']:.1f}% "
+            f"is below the minimum threshold of {MINIMUM_IMPACT_PCT:.1f}% "
+            "used by this system."
+        ],
         [
             "Consider increasing the projected energy-efficiency "
             "improvement to at least 15%.",
@@ -628,6 +693,7 @@ DECISION_RULES = (
 # Adjustments applied to whichever decision was chosen
 # ---------------------------------------------------------
 
+
 def cap_subsidy_at_retrofit_cost(decision: Decision, case: Case) -> None:
     """Equipment subsidies are worked out from the baseline energy spend, so
     a small retrofit could otherwise be "granted" more than it costs.
@@ -639,20 +705,23 @@ def cap_subsidy_at_retrofit_cost(decision: Decision, case: Case) -> None:
     ):
         decision["approved_subsidy_sgd"] = round(retrofit_cost, 2)
         decision["reasons"].append(
-            f"Subsidy limited to the stated retrofit cost of "
-            f"SGD {retrofit_cost:,.2f}."
+            f"Subsidy limited to the stated retrofit cost of SGD {retrofit_cost:,.2f}."
         )
 
 
 def add_scheme_mismatch_note(decision: Decision, case: Case) -> None:
     """Tells the applicant if they picked a different scheme from the match."""
-    if decision["decision_status"] in EQUIPMENT_SUBSIDY_STATUSES + ("PRE_APPROVED_SRG",):
+    if decision["decision_status"] in EQUIPMENT_SUBSIDY_STATUSES + (
+        "PRE_APPROVED_SRG",
+    ):
         note = scheme_mismatch_note(case["chosen_scheme"], decision["matched_schemes"])
         if note:
             decision["recommendations"].append(note)
 
 
-def evaluate_grant_application(user_profile: dict[str, Any], ai_audit: dict[str, Any]) -> dict[str, Any]:
+def evaluate_grant_application(
+    user_profile: dict[str, Any], ai_audit: dict[str, Any]
+) -> dict[str, Any]:
     """
     Main Logic Layer function.
 

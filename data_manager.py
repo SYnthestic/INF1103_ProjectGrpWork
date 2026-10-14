@@ -38,6 +38,7 @@ REQUIRED_RECORD_SECTIONS = ("company_profile", "proposal", "ai_audit", "evaluati
 # Logging
 # ---------------------------------------------------------------------------
 
+
 def setup_logging() -> bool:
     """Sends the app's log messages (AI failures, unreadable files, ...) to
     DATA_DIR/app.log so problems can be looked into afterwards while the app
@@ -53,7 +54,9 @@ def setup_logging() -> bool:
         handler = logging.FileHandler(path, encoding="utf-8")
     except OSError:
         return False
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
     root.addHandler(handler)
     root.setLevel(logging.WARNING)
     return True
@@ -63,12 +66,13 @@ def setup_logging() -> bool:
 # Filename helpers
 # ---------------------------------------------------------------------------
 
+
 def normalise_filename(jsonfile_name: str) -> str:
     """Strips whitespace and makes sure the name ends with .json
     (any capitalisation of the extension is accepted)."""
     jsonfile_name = str(jsonfile_name).strip()
-    if jsonfile_name and not jsonfile_name.lower().endswith('.json'):
-        jsonfile_name += '.json'
+    if jsonfile_name and not jsonfile_name.lower().endswith(".json"):
+        jsonfile_name += ".json"
     return jsonfile_name
 
 
@@ -78,7 +82,11 @@ def is_valid_filename(jsonfile_name: str) -> bool:
         return False
     if any(ord(char) < 32 for char in jsonfile_name):
         return False
-    stem = jsonfile_name[:-len('.json')] if jsonfile_name.lower().endswith('.json') else jsonfile_name
+    stem = (
+        jsonfile_name[: -len(".json")]
+        if jsonfile_name.lower().endswith(".json")
+        else jsonfile_name
+    )
     # Rejects ".json", "..json", " .json" and similar nameless files.
     return stem.strip(" .") != ""
 
@@ -100,6 +108,8 @@ def _full_path(jsonfile_name: str) -> str:
 RECORDS_DIR_NAME = "records"
 _USERNAME_FOR_PATH = re.compile(r"[a-z0-9_]{1,64}")
 _active_user = None
+
+
 def _is_safe_username(username) -> bool:
     # move the exact condition from set_active_user here
     return (
@@ -107,6 +117,7 @@ def _is_safe_username(username) -> bool:
         and 0 < len(username) <= 64
         and re.fullmatch(r"[a-z0-9_]+", username) is not None
     )
+
 
 def set_active_user(username: str | None) -> None:
     """Chooses whose folder the record files are saved to / loaded from.
@@ -158,13 +169,16 @@ def generate_company_save_filename(company_name: str) -> str:
 # Record helpers
 # ---------------------------------------------------------------------------
 
+
 def is_valid_audit_record(record: Any) -> bool:
     """Accept both canonical audit records and the current IO Manager record shape."""
     if not isinstance(record, dict):
         return False
 
     # Canonical records used by the newer manager architecture.
-    if all(isinstance(record.get(section), dict) for section in REQUIRED_RECORD_SECTIONS):
+    if all(
+        isinstance(record.get(section), dict) for section in REQUIRED_RECORD_SECTIONS
+    ):
         return True
 
     # Flat, display-oriented records created by the attached main.py.
@@ -185,6 +199,7 @@ def _section(record: Any, section_name: str) -> dict[str, Any]:
 # Audit record management
 # ---------------------------------------------------------------------------
 
+
 def generate_audit_id(records: Any) -> int:
     """Return the next ID for either nested or flat audit records."""
     if not isinstance(records, list) or not records:
@@ -200,17 +215,21 @@ def generate_audit_id(records: Any) -> int:
     return highest_id + 1
 
 
-def create_audit_record(audit_id: int, user_profile: dict[str, Any], proposal: dict[str, Any], ai_audit: AiAudit, evaluation: dict[str, Any]) -> Record:
+def create_audit_record(
+    audit_id: int,
+    user_profile: dict[str, Any],
+    proposal: dict[str, Any],
+    ai_audit: AiAudit,
+    evaluation: dict[str, Any],
+) -> Record:
     """Combine all assessment information into one audit record."""
     return {
         "audit_id": audit_id,
         "created_at": datetime.now().isoformat(),
         "company_profile": user_profile,
-        "proposal": {
-            "raw_narrative": proposal
-        },
+        "proposal": {"raw_narrative": proposal},
         "ai_audit": ai_audit,
-        "evaluation": evaluation
+        "evaluation": evaluation,
     }
 
 
@@ -225,6 +244,7 @@ def add_audit_record(records: Records, audit_record: Record) -> Records:
 # ---------------------------------------------------------------------------
 # Loading
 # ---------------------------------------------------------------------------
+
 
 def inspect_save_file(jsonfile_name: str) -> tuple[str, str]:
     """
@@ -279,7 +299,7 @@ def load_data_from_json(jsonfile_name: str) -> tuple[Records, str, str]:
         return [], name, "not_found"
 
     try:
-        with open(path, 'r', encoding='utf-8') as file:
+        with open(path, "r", encoding="utf-8") as file:
             data = json.load(file)
     except ValueError:  # JSONDecodeError and UnicodeDecodeError
         logger.error("%s contains invalid JSON.", path)
@@ -300,6 +320,7 @@ def load_data_from_json(jsonfile_name: str) -> tuple[Records, str, str]:
 
     return data, name, "loaded"
 
+
 def is_data_loaded(data: Records, jsonfile_name: str) -> bool:
     """True if there is already data/filename in memory (io_manager should
     then ask the user before overwriting it)."""
@@ -309,6 +330,7 @@ def is_data_loaded(data: Records, jsonfile_name: str) -> bool:
 # ---------------------------------------------------------------------------
 # Saving
 # ---------------------------------------------------------------------------
+
 
 def save_data_to_json(data: Records, jsonfile_name: str) -> tuple[str | None, str]:
     """
@@ -330,7 +352,7 @@ def save_data_to_json(data: Records, jsonfile_name: str) -> tuple[str | None, st
     tmp_path = path + ".tmp"
     try:
         os.makedirs(_records_dir(), exist_ok=True)
-        with open(tmp_path, 'w', encoding='utf-8') as file:
+        with open(tmp_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
         os.replace(tmp_path, path)
         return name, "saved"
@@ -341,8 +363,6 @@ def save_data_to_json(data: Records, jsonfile_name: str) -> tuple[str | None, st
         except OSError:
             pass
         return None, "io_error"
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -369,7 +389,7 @@ def read_json_file(filename: str, default: Any) -> Any:
     if not os.path.isfile(path):
         return default
     try:
-        with open(path, 'r', encoding='utf-8') as file:
+        with open(path, "r", encoding="utf-8") as file:
             data = json.load(file)
     except ValueError:  # JSONDecodeError and UnicodeDecodeError
         logger.error("%s contains invalid JSON.", path)
@@ -393,7 +413,7 @@ def write_json_file(filename: str, data: Any) -> bool:
     tmp_path = path + ".tmp"
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
-        with open(tmp_path, 'w', encoding='utf-8') as file:
+        with open(tmp_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
         os.replace(tmp_path, path)
         return True
@@ -514,7 +534,9 @@ def get_user_audits(username: str) -> list[Record]:
     return [audit for audit in audits if isinstance(audit, dict)]
 
 
-def append_user_audit(username: str, application: Record, ai_audit: AiAudit, result: dict[str, Any] | None) -> Record | None:
+def append_user_audit(
+    username: str, application: Record, ai_audit: AiAudit, result: dict[str, Any] | None
+) -> Record | None:
     """Saves one completed audit (inputs + AI output + decision) under the
     logged-in user. Returns the saved record, or None on failure."""
     if not _is_safe_username(username):
@@ -548,40 +570,39 @@ def append_user_audit(username: str, application: Record, ai_audit: AiAudit, res
 # Filtering / querying
 # ---------------------------------------------------------------------------
 
+
 def filter_by_decision_status(records: Records, decision_status: str) -> Records:
     """Records whose evaluation decision_status matches exactly.
     Example: filter_by_decision_status(records, "PRE_APPROVED_TIER_1")"""
     return [
-        r for r in records
+        r
+        for r in records
         if _section(r, "evaluation").get("decision_status") == decision_status
     ]
 
 
 def filter_approved_records(records: Records) -> Records:
     """Records where the audit passed."""
-    return [
-        r for r in records
-        if _section(r, "evaluation").get("audit_passed") is True
-    ]
+    return [r for r in records if _section(r, "evaluation").get("audit_passed") is True]
 
 
 def find_records_by_company(records: Records, company_name: str) -> Records:
     """Case-insensitive exact match on company name."""
     wanted = str(company_name).strip().lower()
     return [
-        r for r in records
-        if str(_section(r, "company_profile").get("company_name", "")).strip().lower() == wanted
+        r
+        for r in records
+        if str(_section(r, "company_profile").get("company_name", "")).strip().lower()
+        == wanted
     ]
 
 
 def available_decision_statuses(records: Records) -> list[str]:
     """Sorted list of the distinct decision statuses present in the records
     (lets io_manager offer only filters that can match something)."""
-    statuses = {
-        _section(r, "evaluation").get("decision_status")
-        for r in records
-    }
+    statuses = {_section(r, "evaluation").get("decision_status") for r in records}
     return sorted(status for status in statuses if isinstance(status, str) and status)
+
 
 def merge_records(existing: Records, new_records: Records) -> Records:
     """Existing records first, then any new ones not already present."""
@@ -618,7 +639,9 @@ def _valid_index(records: Any, index: Any) -> bool:
     )
 
 
-def update_record_field(records: Records, index: int, field: str, value: Any) -> tuple[Records, str]:
+def update_record_field(
+    records: Records, index: int, field: str, value: Any
+) -> tuple[Records, str]:
     """Returns (new_records, status). status is "updated", "bad_index",
     "bad_field" or "not_editable" (the record is not in the display layout)."""
     if not _valid_index(records, index):
@@ -630,19 +653,20 @@ def update_record_field(records: Records, index: int, field: str, value: Any) ->
 
     changed = dict(records[index])
     changed[field] = value
-    return records[:index] + [changed] + records[index + 1:], "updated"
+    return records[:index] + [changed] + records[index + 1 :], "updated"
 
 
 def delete_record(records: Records, index: int) -> tuple[Records, str]:
     """Returns (new_records, status). status is "deleted" or "bad_index"."""
     if not _valid_index(records, index):
         return records, "bad_index"
-    return records[:index] + records[index + 1:], "deleted"
+    return records[:index] + records[index + 1 :], "deleted"
 
 
 # ---------------------------------------------------------------------------
 # Filtering the audit history (option 9)
 # ---------------------------------------------------------------------------
+
 
 def audit_decision_status(audit: Any) -> str:
     """The decision status stored in one history entry, or "" if missing."""
@@ -658,14 +682,17 @@ def available_audit_statuses(audits: list[Record]) -> list[str]:
 
 def filter_audits_by_status(audits: list[Record], decision_status: str) -> list[Record]:
     """History entries whose decision status matches exactly."""
-    return [audit for audit in audits if audit_decision_status(audit) == decision_status]
+    return [
+        audit for audit in audits if audit_decision_status(audit) == decision_status
+    ]
 
 
 def search_audits_by_company(audits: list[Record], text: str) -> list[Record]:
     """History entries whose company name contains `text` (ignoring case)."""
     wanted = str(text).strip().lower()
     return [
-        audit for audit in audits
+        audit
+        for audit in audits
         if wanted in str(_section(audit, "application").get("Company Name", "")).lower()
     ]
 
@@ -673,6 +700,7 @@ def search_audits_by_company(audits: list[Record], text: str) -> list[Record]:
 # ---------------------------------------------------------------------------
 # PDF export of one saved audit (option 9)
 # ---------------------------------------------------------------------------
+
 
 def audit_to_report_record(audit: Record) -> Record:
     """Turns one audit-history entry into the flat record layout the PDF
@@ -689,7 +717,9 @@ def audit_to_report_record(audit: Record) -> Record:
 def audit_pdf_filename(audit: Record) -> str:
     """A safe default PDF name such as 'audit_3_Apex Haulage.pdf'."""
     company = _section(audit, "application").get("Company Name", "")
-    safe_company = generate_company_save_filename(company)[len("audit_"):-len(".json")]
+    safe_company = generate_company_save_filename(company)[
+        len("audit_") : -len(".json")
+    ]
     audit_id = audit.get("audit_id", "") if isinstance(audit, dict) else ""
     return f"audit_{audit_id}_{safe_company}.pdf"
 
@@ -699,7 +729,9 @@ def export_audit_to_pdf(audit: Record) -> tuple[str | None, str]:
     folder. Returns (pdf_filename, status), as export_records_to_pdf does."""
     if not isinstance(audit, dict) or not audit:
         return None, "pdf_error"
-    return export_records_to_pdf([audit_to_report_record(audit)], "audit", audit_pdf_filename(audit))
+    return export_records_to_pdf(
+        [audit_to_report_record(audit)], "audit", audit_pdf_filename(audit)
+    )
 
 
 def get_records_folder() -> str:
@@ -711,7 +743,10 @@ def get_records_folder() -> str:
 # PDF export
 # ---------------------------------------------------------------------------
 
-def export_json_to_pdf(jsonfile_name: str, pdf_filename: str | None = None) -> tuple[str | None, str]:
+
+def export_json_to_pdf(
+    jsonfile_name: str, pdf_filename: str | None = None
+) -> tuple[str | None, str]:
     """Create a polished, company-facing assessment report from saved JSON.
 
     The report includes every audit record in the source file. It is saved in
@@ -779,9 +814,18 @@ def _readable_value(value: Any, key: str = "") -> str:
         return "Yes" if value else "No"
     if isinstance(value, (int, float)):
         lowered = str(key).lower()
-        if any(term in lowered for term in (
-            "_sgd", "revenue", "cost", "fee", "expenditure", "subsidy", "grant amount"
-        )):
+        if any(
+            term in lowered
+            for term in (
+                "_sgd",
+                "revenue",
+                "cost",
+                "fee",
+                "expenditure",
+                "subsidy",
+                "grant amount",
+            )
+        ):
             return f"SGD {value:,.2f}"
         if "pct" in lowered or "percent" in lowered:
             return f"{value:,.1f}%"
@@ -789,7 +833,11 @@ def _readable_value(value: Any, key: str = "") -> str:
             return f"{value:,.1f} tonnes CO2e"
         return f"{value:,}" if isinstance(value, int) else f"{value:,.2f}"
     if isinstance(value, list):
-        return "\n".join(f"- {_readable_value(item)}" for item in value) if value else "None recorded"
+        return (
+            "\n".join(f"- {_readable_value(item)}" for item in value)
+            if value
+            else "None recorded"
+        )
     if isinstance(value, dict):
         return "\n".join(
             f"{_nice_label(item_key)}: {_readable_value(item_value, item_key)}"
@@ -847,10 +895,14 @@ def _screening_result_for(evaluation: dict[str, Any]) -> str:
 
 
 def _is_nested_record(record: Record) -> bool:
-    return all(isinstance(record.get(section), dict) for section in REQUIRED_RECORD_SECTIONS)
+    return all(
+        isinstance(record.get(section), dict) for section in REQUIRED_RECORD_SECTIONS
+    )
 
 
-def _report_sections(record: Record, index: int) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], Any, Any]:
+def _report_sections(
+    record: Record, index: int
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], Any, Any]:
     """Returns (profile, proposal, ai_audit, evaluation, record_id, created_at)
     for either record layout (nested audit record or the flat menu record)."""
     if _is_nested_record(record):
@@ -870,7 +922,9 @@ def _report_sections(record: Record, index: int) -> tuple[dict[str, Any], dict[s
         "local_shareholding_pct": record.get("Local Equity", 0.0),
         "proposal_type": record.get("Proposal Type", ""),
         "sustainability_grant": record.get("Sustainability Grant", ""),
-        "baseline_annual_energy_expenditure_sgd": record.get("Baseline Energy Expenditure", 0.0),
+        "baseline_annual_energy_expenditure_sgd": record.get(
+            "Baseline Energy Expenditure", 0.0
+        ),
         "estimated_retrofit_cost_sgd": record.get("Estimated Retrofit Cost", 0.0),
         "reporting_advisory_fee_sgd": record.get("Reporting Advisory Fee", 0.0),
     }
@@ -881,8 +935,14 @@ def _report_sections(record: Record, index: int) -> tuple[dict[str, Any], dict[s
         ai_audit = {}
     if not isinstance(evaluation, dict):
         evaluation = {}
-    return (profile, proposal, ai_audit, evaluation,
-            record.get("Audit ID", index + 1), record.get("Created At", ""))
+    return (
+        profile,
+        proposal,
+        ai_audit,
+        evaluation,
+        record.get("Audit ID", index + 1),
+        record.get("Created At", ""),
+    )
 
 
 def _report_company_name(records: Records) -> str:
@@ -891,7 +951,9 @@ def _report_company_name(records: Records) -> str:
     if records:
         first = records[0]
         if _is_nested_record(first):
-            name = str(_section(first, "company_profile").get("company_name") or name).strip()
+            name = str(
+                _section(first, "company_profile").get("company_name") or name
+            ).strip()
         else:
             name = str(first.get("Company Name") or name).strip()
     return name
@@ -944,13 +1006,19 @@ def _register_report_fonts() -> tuple[str, str]:
     font_candidates = []
     if configured_regular:
         font_candidates.append((configured_regular, configured_bold))
-    font_candidates.extend([
-        (r"C:\Windows\Fonts\times.ttf", r"C:\Windows\Fonts\timesbd.ttf"),
-        ("/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf",
-         "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Bold.ttf"),
-        ("/Library/Fonts/Times New Roman.ttf",
-         "/Library/Fonts/Times New Roman Bold.ttf"),
-    ])
+    font_candidates.extend(
+        [
+            (r"C:\Windows\Fonts\times.ttf", r"C:\Windows\Fonts\timesbd.ttf"),
+            (
+                "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf",
+                "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Bold.ttf",
+            ),
+            (
+                "/Library/Fonts/Times New Roman.ttf",
+                "/Library/Fonts/Times New Roman Bold.ttf",
+            ),
+        ]
+    )
     for regular_path, bold_path in font_candidates:
         if regular_path and os.path.isfile(regular_path):
             pdfmetrics.registerFont(TTFont("CompanyAudit", regular_path))
@@ -993,69 +1061,115 @@ def _build_report_theme() -> dict[str, Any]:
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
-        "CompanyAuditTitle", parent=styles["Title"], fontName=bold_font,
-        fontSize=20, leading=24, alignment=1, textColor=navy,
+        "CompanyAuditTitle",
+        parent=styles["Title"],
+        fontName=bold_font,
+        fontSize=20,
+        leading=24,
+        alignment=1,
+        textColor=navy,
         spaceAfter=2 * mm,
     )
     subtitle_style = ParagraphStyle(
-        "CompanyAuditSubtitle", parent=styles["Normal"], fontName=bold_font,
-        fontSize=9, leading=12, alignment=1, textColor=navy,
+        "CompanyAuditSubtitle",
+        parent=styles["Normal"],
+        fontName=bold_font,
+        fontSize=9,
+        leading=12,
+        alignment=1,
+        textColor=navy,
         spaceAfter=5 * mm,
     )
     section_style = ParagraphStyle(
-        "CompanyAuditSection", parent=styles["Heading2"], fontName=bold_font,
-        fontSize=11, leading=14, textColor=navy,
-        spaceBefore=4 * mm, spaceAfter=2 * mm, keepWithNext=True,
+        "CompanyAuditSection",
+        parent=styles["Heading2"],
+        fontName=bold_font,
+        fontSize=11,
+        leading=14,
+        textColor=navy,
+        spaceBefore=4 * mm,
+        spaceAfter=2 * mm,
+        keepWithNext=True,
     )
     body_style = ParagraphStyle(
-        "CompanyAuditBody", parent=styles["BodyText"], fontName=regular_font,
-        fontSize=9, leading=13, textColor=ink, splitLongWords=True,
+        "CompanyAuditBody",
+        parent=styles["BodyText"],
+        fontName=regular_font,
+        fontSize=9,
+        leading=13,
+        textColor=ink,
+        splitLongWords=True,
     )
     label_style = ParagraphStyle(
-        "CompanyAuditLabel", parent=body_style, fontName=bold_font,
+        "CompanyAuditLabel",
+        parent=body_style,
+        fontName=bold_font,
         textColor=navy,
     )
     small_style = ParagraphStyle(
-        "CompanyAuditSmall", parent=body_style, fontSize=8, leading=10,
+        "CompanyAuditSmall",
+        parent=body_style,
+        fontSize=8,
+        leading=10,
         textColor=muted,
     )
     disclaimer_style = ParagraphStyle(
-        "CompanyAuditDisclaimer", parent=small_style, fontName=bold_font,
-        fontSize=9, leading=12,
+        "CompanyAuditDisclaimer",
+        parent=small_style,
+        fontName=bold_font,
+        fontSize=9,
+        leading=12,
     )
-    theme.update({
-        "title": title_style,
-        "subtitle": subtitle_style,
-        "section": section_style,
-        "body": body_style,
-        "label": label_style,
-        "small": small_style,
-        "black_small": ParagraphStyle(
-            "CompanyAuditBlackSmall", parent=small_style,
-            textColor=colors.black,
-        ),
-        "black_disclaimer": ParagraphStyle(
-            "CompanyAuditBlackDisclaimer", parent=disclaimer_style,
-            textColor=colors.black,
-        ),
-        "ai_note": ParagraphStyle(
-            "CompanyAuditAINote", parent=disclaimer_style,
-            textColor=colors.black,
-        ),
-        "outcome": ParagraphStyle(
-            "CompanyAuditOutcome", parent=body_style, fontName=bold_font,
-            fontSize=13, leading=17, textColor=navy,
-        ),
-        "narrative": ParagraphStyle(
-            "CompanyAuditNarrative", parent=body_style, leftIndent=3 * mm,
-            rightIndent=3 * mm, borderColor=line, borderWidth=0.5,
-            borderPadding=8, backColor=theme["pale_blue"],
-        ),
-        "summary": ParagraphStyle(
-            "CompanyAuditSummary", parent=body_style, fontSize=9,
-            leading=13, textColor=ink,
-        ),
-    })
+    theme.update(
+        {
+            "title": title_style,
+            "subtitle": subtitle_style,
+            "section": section_style,
+            "body": body_style,
+            "label": label_style,
+            "small": small_style,
+            "black_small": ParagraphStyle(
+                "CompanyAuditBlackSmall",
+                parent=small_style,
+                textColor=colors.black,
+            ),
+            "black_disclaimer": ParagraphStyle(
+                "CompanyAuditBlackDisclaimer",
+                parent=disclaimer_style,
+                textColor=colors.black,
+            ),
+            "ai_note": ParagraphStyle(
+                "CompanyAuditAINote",
+                parent=disclaimer_style,
+                textColor=colors.black,
+            ),
+            "outcome": ParagraphStyle(
+                "CompanyAuditOutcome",
+                parent=body_style,
+                fontName=bold_font,
+                fontSize=13,
+                leading=17,
+                textColor=navy,
+            ),
+            "narrative": ParagraphStyle(
+                "CompanyAuditNarrative",
+                parent=body_style,
+                leftIndent=3 * mm,
+                rightIndent=3 * mm,
+                borderColor=line,
+                borderWidth=0.5,
+                borderPadding=8,
+                backColor=theme["pale_blue"],
+            ),
+            "summary": ParagraphStyle(
+                "CompanyAuditSummary",
+                parent=body_style,
+                fontSize=9,
+                leading=13,
+                textColor=ink,
+            ),
+        }
+    )
     return theme
 
 
@@ -1074,13 +1188,19 @@ def _pdf_heading(theme: dict[str, Any], text: str) -> Any:
     return Paragraph(escape(text), theme["section"])
 
 
-def _add_detail_table(story: list[Any], theme: dict[str, Any], items: list[tuple[str, Any]]) -> None:
+def _add_detail_table(
+    story: list[Any], theme: dict[str, Any], items: list[tuple[str, Any]]
+) -> None:
     from reportlab.lib import colors
     from reportlab.lib.units import mm
     from reportlab.platypus import Spacer, Table, TableStyle
 
     if not items:
-        story.append(_pdf_para(theme, "No information was recorded for this section.", theme["small"]))
+        story.append(
+            _pdf_para(
+                theme, "No information was recorded for this section.", theme["small"]
+            )
+        )
         return
     rows = [
         [
@@ -1090,20 +1210,31 @@ def _add_detail_table(story: list[Any], theme: dict[str, Any], items: list[tuple
         for key, value in items
     ]
     table = Table(rows, colWidths=[53 * mm, 117 * mm], hAlign="LEFT")
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), theme["pale_blue"]),
-        ("ROWBACKGROUNDS", (1, 0), (1, -1), [theme["white"], colors.HexColor("#FAFBFC")]),
-        ("GRID", (0, 0), (-1, -1), 0.35, theme["line"]),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 7),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (0, -1), theme["pale_blue"]),
+                (
+                    "ROWBACKGROUNDS",
+                    (1, 0),
+                    (1, -1),
+                    [theme["white"], colors.HexColor("#FAFBFC")],
+                ),
+                ("GRID", (0, 0), (-1, -1), 0.35, theme["line"]),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     story.extend([table, Spacer(1, 2 * mm)])
 
 
-def _add_bullets(story: list[Any], theme: dict[str, Any], heading: str, items: Any, color: Any = None) -> None:
+def _add_bullets(
+    story: list[Any], theme: dict[str, Any], heading: str, items: Any, color: Any = None
+) -> None:
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import mm
 
@@ -1113,14 +1244,20 @@ def _add_bullets(story: list[Any], theme: dict[str, Any], heading: str, items: A
     if not isinstance(items, list):
         items = [items]
     bullet_style = ParagraphStyle(
-        "CompanyAuditBullet", parent=theme["body"], leftIndent=5 * mm,
-        firstLineIndent=-3 * mm, textColor=color or theme["ink"], spaceAfter=2,
+        "CompanyAuditBullet",
+        parent=theme["body"],
+        leftIndent=5 * mm,
+        firstLineIndent=-3 * mm,
+        textColor=color or theme["ink"],
+        spaceAfter=2,
     )
     for item in items:
         story.append(_pdf_para(theme, f"- {_readable_value(item)}", bullet_style))
 
 
-def _add_outcome_panel(story: list[Any], theme: dict[str, Any], evaluation: dict[str, Any]) -> str:
+def _add_outcome_panel(
+    story: list[Any], theme: dict[str, Any], evaluation: dict[str, Any]
+) -> str:
     """Adds the coloured outcome box and disclaimer. Returns the headline."""
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import mm
@@ -1131,81 +1268,117 @@ def _add_outcome_panel(story: list[Any], theme: dict[str, Any], evaluation: dict
     outcome_color = theme[colour_name]
     outcome_bg = theme["pale_" + colour_name]
     coloured_style = ParagraphStyle(
-        "CompanyAuditOutcomeColored", parent=theme["outcome"],
+        "CompanyAuditOutcomeColored",
+        parent=theme["outcome"],
         textColor=outcome_color,
     )
     panel = Table(
-        [[Paragraph(escape(headline), coloured_style)],
-         [_pdf_para(theme, explanation, theme["summary"])]],
-        colWidths=[170 * mm], hAlign="LEFT",
+        [
+            [Paragraph(escape(headline), coloured_style)],
+            [_pdf_para(theme, explanation, theme["summary"])],
+        ],
+        colWidths=[170 * mm],
+        hAlign="LEFT",
     )
-    panel.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), outcome_bg),
-        ("BOX", (0, 0), (-1, -1), 0.8, outcome_color),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-        ("TOPPADDING", (0, 0), (-1, -1), 7),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-    ]))
+    panel.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), outcome_bg),
+                ("BOX", (0, 0), (-1, -1), 0.8, outcome_color),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
     story.extend([panel, Spacer(1, 2 * mm)])
-    story.append(_pdf_para(
-        theme,
-        "This is a preliminary automated screening report, not an official grant decision or funding offer.",
-        theme["black_disclaimer"],
-    ))
+    story.append(
+        _pdf_para(
+            theme,
+            "This is a preliminary automated screening report, not an official grant decision or funding offer.",
+            theme["black_disclaimer"],
+        )
+    )
     return headline
 
 
-def _add_ai_section(story: list[Any], theme: dict[str, Any], ai_audit: dict[str, Any]) -> None:
+def _add_ai_section(
+    story: list[Any], theme: dict[str, Any], ai_audit: dict[str, Any]
+) -> None:
     from reportlab.lib.units import mm
     from reportlab.platypus import Spacer
 
     story.append(_pdf_heading(theme, "AI-generated scope and impact analysis"))
-    story.append(_pdf_para(
-        theme,
-        "Supporting analysis generated by AI from the proposal description. "
-        "It does not determine grant eligibility; the Logic Manager applies "
-        "the programmed rules shown in the eligibility assessment above.",
-        theme["ai_note"],
-    ))
+    story.append(
+        _pdf_para(
+            theme,
+            "Supporting analysis generated by AI from the proposal description. "
+            "It does not determine grant eligibility; the Logic Manager applies "
+            "the programmed rules shown in the eligibility assessment above.",
+            theme["ai_note"],
+        )
+    )
     story.append(Spacer(1, 3 * mm))
-    _add_detail_table(story, theme, [
-        (key, value) for key, value in ai_audit.items() if key != "ai_reasoning_summary"
-    ])
+    _add_detail_table(
+        story,
+        theme,
+        [
+            (key, value)
+            for key, value in ai_audit.items()
+            if key != "ai_reasoning_summary"
+        ],
+    )
     if ai_audit.get("ai_reasoning_summary"):
         story.append(_pdf_para(theme, "AI-generated proposal summary", theme["label"]))
         story.append(_pdf_para(theme, ai_audit["ai_reasoning_summary"], theme["body"]))
 
 
-def _add_record_pages(story: list[Any], theme: dict[str, Any], record: Record, index: int) -> None:
+def _add_record_pages(
+    story: list[Any], theme: dict[str, Any], record: Record, index: int
+) -> None:
     """Adds the pages for one audit record: summary page, then AI analysis."""
     from reportlab.lib.units import mm
     from reportlab.platypus import PageBreak, Paragraph, Spacer
 
-    profile, proposal, ai_audit, evaluation, record_id, created_at = _report_sections(record, index)
+    profile, proposal, ai_audit, evaluation, record_id, created_at = _report_sections(
+        record, index
+    )
 
-    story.extend([
-        Spacer(1, 4 * mm),
-        Paragraph("GREEN GRANT ELIGIBILITY ASSESSMENT", theme["title"]),
-        Paragraph("Company audit report", theme["subtitle"]),
-    ])
-    story.append(_pdf_heading(theme, str(profile.get("company_name") or "Company name not recorded")))
+    story.extend(
+        [
+            Spacer(1, 4 * mm),
+            Paragraph("GREEN GRANT ELIGIBILITY ASSESSMENT", theme["title"]),
+            Paragraph("Company audit report", theme["subtitle"]),
+        ]
+    )
+    story.append(
+        _pdf_heading(
+            theme, str(profile.get("company_name") or "Company name not recorded")
+        )
+    )
 
     assessment_date, assessment_time = _assessment_date_time(created_at)
     story.append(_pdf_para(theme, f"Assessment ID: {record_id}", theme["black_small"]))
-    story.append(_pdf_para(theme, f"Date: {assessment_date} (YYYY-MM-DD)", theme["black_small"]))
+    story.append(
+        _pdf_para(theme, f"Date: {assessment_date} (YYYY-MM-DD)", theme["black_small"])
+    )
     story.append(_pdf_para(theme, f"Time: {assessment_time}", theme["black_small"]))
     story.append(Spacer(1, 3 * mm))
 
     headline = _add_outcome_panel(story, theme, evaluation)
 
     story.append(_pdf_heading(theme, "Logic Manager eligibility assessment"))
-    _add_detail_table(story, theme, [
-        ("Decision status", evaluation.get("decision_status", "Not recorded")),
-        ("Meets SME criteria", evaluation.get("is_sme", "Not recorded")),
-        ("Potential grant amount", evaluation.get("approved_subsidy_sgd", 0)),
-        ("Screening outcome", _screening_result_for(evaluation)),
-    ])
+    _add_detail_table(
+        story,
+        theme,
+        [
+            ("Decision status", evaluation.get("decision_status", "Not recorded")),
+            ("Meets SME criteria", evaluation.get("is_sme", "Not recorded")),
+            ("Potential grant amount", evaluation.get("approved_subsidy_sgd", 0)),
+            ("Screening outcome", _screening_result_for(evaluation)),
+        ],
+    )
 
     story.append(_pdf_heading(theme, "Company profile"))
     _add_detail_table(story, theme, list(profile.items()))
@@ -1216,8 +1389,12 @@ def _add_record_pages(story: list[Any], theme: dict[str, Any], record: Record, i
     if narrative:
         story.append(_pdf_para(theme, narrative, theme["narrative"]))
     else:
-        story.append(_pdf_para(theme, "No proposal narrative was recorded.", theme["small"]))
-    other_proposal = [(key, value) for key, value in proposal.items() if key != "raw_narrative"]
+        story.append(
+            _pdf_para(theme, "No proposal narrative was recorded.", theme["small"])
+        )
+    other_proposal = [
+        (key, value) for key, value in proposal.items() if key != "raw_narrative"
+    ]
     if other_proposal:
         story.append(Spacer(1, 2 * mm))
         _add_detail_table(story, theme, other_proposal)
@@ -1229,16 +1406,35 @@ def _add_record_pages(story: list[Any], theme: dict[str, Any], record: Record, i
     reasons = evaluation.get("reasons", [])
     if not reasons and did_not_qualify:
         reasons = ["No detailed reason was recorded in the saved assessment."]
-    _add_bullets(story, theme, "Why this result was reached", reasons,
-                 color=theme["red"] if did_not_qualify else theme["ink"])
-    _add_bullets(story, theme, "Recommended next steps", evaluation.get("recommendations", []))
-    _add_bullets(story, theme, "Potentially matched grants", evaluation.get("matched_schemes", []))
+    _add_bullets(
+        story,
+        theme,
+        "Why this result was reached",
+        reasons,
+        color=theme["red"] if did_not_qualify else theme["ink"],
+    )
+    _add_bullets(
+        story, theme, "Recommended next steps", evaluation.get("recommendations", [])
+    )
+    _add_bullets(
+        story,
+        theme,
+        "Potentially matched grants",
+        evaluation.get("matched_schemes", []),
+    )
 
     other_evaluation = [
-        (key, value) for key, value in evaluation.items()
-        if key not in {
-            "decision_status", "approved_subsidy_sgd", "audit_passed", "is_sme",
-            "reasons", "recommendations", "matched_schemes",
+        (key, value)
+        for key, value in evaluation.items()
+        if key
+        not in {
+            "decision_status",
+            "approved_subsidy_sgd",
+            "audit_passed",
+            "is_sme",
+            "reasons",
+            "recommendations",
+            "matched_schemes",
         }
     ]
     if other_evaluation:
@@ -1246,7 +1442,9 @@ def _add_record_pages(story: list[Any], theme: dict[str, Any], record: Record, i
         _add_detail_table(story, theme, other_evaluation)
 
 
-def _make_page_chrome(theme: dict[str, Any], company_name: str) -> Callable[[Any, Any], None]:
+def _make_page_chrome(
+    theme: dict[str, Any], company_name: str
+) -> Callable[[Any, Any], None]:
     """Returns the function ReportLab calls to draw each page's header bar and footer."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
@@ -1266,8 +1464,15 @@ def _make_page_chrome(theme: dict[str, Any], company_name: str) -> Callable[[Any
         footer_company_name = company_name
         footer_text = f"CONFIDENTIAL | Prepared for {footer_company_name}"
         max_footer_width = A4[0] - 50 * mm
-        while footer_text and pdfmetrics.stringWidth(footer_text, regular_font, 8) > max_footer_width:
-            footer_company_name = footer_company_name[:-4] + "..." if len(footer_company_name) > 4 else "..."
+        while (
+            footer_text
+            and pdfmetrics.stringWidth(footer_text, regular_font, 8) > max_footer_width
+        ):
+            footer_company_name = (
+                footer_company_name[:-4] + "..."
+                if len(footer_company_name) > 4
+                else "..."
+            )
             footer_text = f"CONFIDENTIAL | Prepared for {footer_company_name}"
         canvas.drawString(20 * mm, 10 * mm, footer_text)
         canvas.drawRightString(A4[0] - 20 * mm, 10 * mm, f"Page {doc.page}")
@@ -1284,20 +1489,27 @@ def _build_pdf_report(records: Records, pdf_path: str) -> None:
 
     theme = _build_report_theme()
     document = SimpleDocTemplate(
-        pdf_path, pagesize=A4,
-        rightMargin=20 * mm, leftMargin=20 * mm,
-        topMargin=14 * mm, bottomMargin=22 * mm,
+        pdf_path,
+        pagesize=A4,
+        rightMargin=20 * mm,
+        leftMargin=20 * mm,
+        topMargin=14 * mm,
+        bottomMargin=22 * mm,
         title="Company Green Grant Eligibility Assessment",
         author="SME Green Grant Eligibility Auditor",
     )
     story: list[Any] = []
     if not records:
-        story.extend([
-            Spacer(1, 5 * mm),
-            Paragraph("GREEN GRANT ELIGIBILITY ASSESSMENT", theme["title"]),
-            Paragraph("Company audit report", theme["subtitle"]),
-            _pdf_para(theme, "No audit records were found in the selected JSON file."),
-        ])
+        story.extend(
+            [
+                Spacer(1, 5 * mm),
+                Paragraph("GREEN GRANT ELIGIBILITY ASSESSMENT", theme["title"]),
+                Paragraph("Company audit report", theme["subtitle"]),
+                _pdf_para(
+                    theme, "No audit records were found in the selected JSON file."
+                ),
+            ]
+        )
     for index, record in enumerate(records):
         if index:
             story.append(PageBreak())
@@ -1307,7 +1519,9 @@ def _build_pdf_report(records: Records, pdf_path: str) -> None:
     document.build(story, onFirstPage=chrome, onLaterPages=chrome)
 
 
-def export_records_to_pdf(records: Records, source_name: str, pdf_filename: str | None = None) -> tuple[str | None, str]:
+def export_records_to_pdf(
+    records: Records, source_name: str, pdf_filename: str | None = None
+) -> tuple[str | None, str]:
     """Builds the PDF report for a list of audit records (nested or flat) and
     saves it next to the user's other record files. `source_name` is only used
     to pick the default PDF name and in log messages.
@@ -1319,7 +1533,9 @@ def export_records_to_pdf(records: Records, source_name: str, pdf_filename: str 
         import reportlab  # noqa: F401  (checked up front so the status is clear)
         import reportlab.platypus  # noqa: F401
     except ImportError:
-        logger.error("PDF export requires ReportLab. Install it with: python -m pip install reportlab")
+        logger.error(
+            "PDF export requires ReportLab. Install it with: python -m pip install reportlab"
+        )
         return None, "missing_dependency"
 
     pdf_name = _resolve_pdf_name(source_name, pdf_filename)
@@ -1331,8 +1547,7 @@ def export_records_to_pdf(records: Records, source_name: str, pdf_filename: str 
         _build_pdf_report(records, _record_path(pdf_name))
         return pdf_name, "exported"
     except Exception as err:
-        logger.exception("Could not export audit records from %s to PDF: %s", source_name, err)
+        logger.exception(
+            "Could not export audit records from %s to PDF: %s", source_name, err
+        )
         return None, "pdf_error"
-
-
-

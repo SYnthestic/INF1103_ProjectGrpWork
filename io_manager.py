@@ -82,7 +82,9 @@ def enable_mouse_tracking() -> None:
         hInput = kernel32.GetStdHandle(STD_INPUT_HANDLE)
         kernel32.GetConsoleMode(hInput, ctypes.byref(_saved_console_mode))
         mode = _saved_console_mode.value
-        kernel32.SetConsoleMode(hInput, (mode & ~ENABLE_EXTENDED_FLAGS) | ENABLE_MOUSE_INPUT)
+        kernel32.SetConsoleMode(
+            hInput, (mode & ~ENABLE_EXTENDED_FLAGS) | ENABLE_MOUSE_INPUT
+        )
 
 
 def disable_mouse_tracking() -> None:
@@ -100,7 +102,7 @@ def _read_event() -> tuple[str, Any] | None:
     """Return ("key", char), ("click", column), or None for anything ignorable."""
     b = _getb()
 
-    if is_windows and b in (b"\x00", b"\xe0"):   # arrow/function key: skip 2nd byte
+    if is_windows and b in (b"\x00", b"\xe0"):  # arrow/function key: skip 2nd byte
         _getb()
         return None
 
@@ -110,17 +112,19 @@ def _read_event() -> tuple[str, Any] | None:
     # ESC: either a lone Esc press or the start of an escape sequence
     if not _pending() or _getb() != b"[":
         return None
-    if not _pending() or _getb() != b"M":        # some other sequence (e.g. arrows)
+    if not _pending() or _getb() != b"M":  # some other sequence (e.g. arrows)
         return None
 
     # Mouse report: ESC [ M <button> <x> <y>
     btn, x, _y = _getb(), _getb(), _getb()
-    if btn[0] - 32 == 0:                          # left button press
+    if btn[0] - 32 == 0:  # left button press
         return ("click", x[0] - 32)
     return None
 
 
-def wait_for_choice(art: str, regions: dict[Any, tuple[int, int]], keys: dict[str, Any]) -> Any:
+def wait_for_choice(
+    art: str, regions: dict[Any, tuple[int, int]], keys: dict[str, Any]
+) -> Any:
     """Show `art`, then wait for a mapped key or a left click inside a region.
 
     regions: {value: (min_x, max_x)}    keys: {"y": value, "\\r": value, ...}
@@ -149,11 +153,15 @@ def wait_for_choice(art: str, regions: dict[Any, tuple[int, int]], keys: dict[st
 
 
 # Thin wrappers so existing callers don't change
-def execute_button_interaction(button_art: str, min_x: int = 5, max_x: int = 35) -> None:
+def execute_button_interaction(
+    button_art: str, min_x: int = 5, max_x: int = 35
+) -> None:
     wait_for_choice(button_art, {True: (min_x, max_x)}, {"\r": True, "\n": True})
 
 
-def execute_choice_interaction(art: str, regions: dict[Any, tuple[int, int]], keys: dict[str, Any]) -> Any:
+def execute_choice_interaction(
+    art: str, regions: dict[Any, tuple[int, int]], keys: dict[str, Any]
+) -> Any:
     return wait_for_choice(art, regions, keys)
 
 
@@ -171,7 +179,7 @@ def _read_key() -> str:
             msvcrt.getwch()
             return ""
         return ch
-    while True:                                   # assemble multi-byte UTF-8 characters
+    while True:  # assemble multi-byte UTF-8 characters
         s = _decoder.decode(_getb())
         if s:
             return s
@@ -180,7 +188,7 @@ def _read_key() -> str:
 def read_limited(max_len: int, blocked: str = "") -> str:
     """Read a line, silently ignoring keys once max_len characters are typed."""
     buf = []
-    with _raw_input():                            # set once, not per keystroke
+    with _raw_input():  # set once, not per keystroke
         while True:
             ch = _read_key()
 
@@ -206,17 +214,20 @@ def read_limited(max_len: int, blocked: str = "") -> str:
     return "".join(buf)
 
 
-
-
 # Shows welcome sequence with ASCII art and sustainability banner
 def show_welcome_sequence() -> None:
     print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
-    print("This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant.")
+    print(
+        "This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant."
+    )
     print()
-    print("Please provide the following information about your company to proceed with the assessment. Thankyou!")
+    print(
+        "Please provide the following information about your company to proceed with the assessment. Thankyou!"
+    )
     print()
     print(gui.hello())
     print(gui.framed_sustainability_banner())
+
 
 # Verifies that the input is a valid integer key for the menu options.
 def key_verifier(key: Any, max_digits: int = 2) -> int | None:
@@ -228,7 +239,9 @@ def key_verifier(key: Any, max_digits: int = 2) -> int | None:
     if not key:  # Empty response
         print("Empty Response!")
         return None
-    if not (key.isascii() and key.isdigit()):  # Letters, symbols, negatives, decimals, floats
+    if not (
+        key.isascii() and key.isdigit()
+    ):  # Letters, symbols, negatives, decimals, floats
         print("Error! Please enter a whole number (no letters, symbols or decimals).")
         return None
     if len(key) > max_digits:  # Also protects int() from huge inputs
@@ -237,12 +250,15 @@ def key_verifier(key: Any, max_digits: int = 2) -> int | None:
 
     return int(key)
 
+
 # Menu Options
 def get_menu_choice(username: str | None = None) -> int:
     key = None
-    while key is None: #Prints the menu and then asks you to get the key
+    while key is None:  # Prints the menu and then asks you to get the key
         print(gui.boxed_menu(username))
-        key = key_verifier(input("➔   ")) #This function calls the key_verifier function which checks if the key is an integer
+        key = key_verifier(
+            input("➔   ")
+        )  # This function calls the key_verifier function which checks if the key is an integer
     return key
 
 
@@ -287,10 +303,14 @@ def is_valid_username(username: Any) -> bool:
 # against stored data in main.py via the Data Manager).
 def retrieve_new_username() -> str:
     while True:
-        username = input(
-            f"Choose a username ({USERNAME_MIN_LEN}-{USERNAME_MAX_LEN} characters, "
-            "letters/digits/underscore): "
-        ).strip().lower()
+        username = (
+            input(
+                f"Choose a username ({USERNAME_MIN_LEN}-{USERNAME_MAX_LEN} characters, "
+                "letters/digits/underscore): "
+            )
+            .strip()
+            .lower()
+        )
         if username == "":
             print("Username cannot be empty. Please try again.")
         elif not is_valid_username(username):
@@ -352,7 +372,9 @@ def retrieve_password() -> str:
         elif len(password) > PASSWORD_MAX_LEN:
             # Accounts can never have a password this long, so don't bother
             # hashing it - and don't allow huge inputs.
-            print(f"Passwords are at most {PASSWORD_MAX_LEN} characters long. Please try again.")
+            print(
+                f"Passwords are at most {PASSWORD_MAX_LEN} characters long. Please try again."
+            )
         else:
             return password
 
@@ -403,16 +425,22 @@ def show_audit_saved_to_history(audit_record: Record) -> None:
 def show_unexpected_error(error: BaseException) -> None:
     red = "\033[91m"
     reset = "\033[0m"
-    print(f"\n{red}Something went wrong and this step was skipped "
-          f"({type(error).__name__}: {error}).")
+    print(
+        f"\n{red}Something went wrong and this step was skipped "
+        f"({type(error).__name__}: {error})."
+    )
     print(f"Nothing was saved. Please try again.{reset}\n")
 
 
 def show_audit_not_saved_ai_failed() -> None:
     yellow = "\033[93m"
     reset = "\033[0m"
-    print(f"{yellow}The AI analysis failed, so this audit was NOT added to your history.")
-    print(f"Check your internet connection and OPENROUTER_API_KEY, then run option 1 again.{reset}")
+    print(
+        f"{yellow}The AI analysis failed, so this audit was NOT added to your history."
+    )
+    print(
+        f"Check your internet connection and OPENROUTER_API_KEY, then run option 1 again.{reset}"
+    )
 
 
 # Helpers so one damaged field in audit_history.json (null, wrong type)
@@ -426,7 +454,11 @@ def _as_text(value: Any, default: str = "") -> str:
 
 
 def _as_money(value: Any) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+    ):
         return 0.0
     return float(value)
 
@@ -436,9 +468,13 @@ def _audit_stamp(audit: Any) -> str:
 
 
 # Summary table of every audit the user has done.
-def display_audit_history(audits: list[Record], username: str, filtered: bool = False) -> bool:
+def display_audit_history(
+    audits: list[Record], username: str, filtered: bool = False
+) -> bool:
     if len(audits) == 0:
-        print(f"\nNo past audits found for '{username}'. Choose option 1 to start one.\n")
+        print(
+            f"\nNo past audits found for '{username}'. Choose option 1 to start one.\n"
+        )
         gui.return_button()
         return False
 
@@ -458,7 +494,8 @@ def display_audit_history(audits: list[Record], username: str, filtered: bool = 
     print_on_paper(
         lines,
         title=f"PAST AUDITS - {username}",
-        footer=f"{count} audit{'s' if count != 1 else ''}" + (" (filtered)" if filtered else "")
+        footer=f"{count} audit{'s' if count != 1 else ''}"
+        + (" (filtered)" if filtered else ""),
     )
     return True
 
@@ -467,7 +504,11 @@ def display_audit_history(audits: list[Record], username: str, filtered: bool = 
 def select_audit_record(audits: list[Record]) -> int | None:
     valid_ids = [_as_dict(audit).get("audit_id") for audit in audits]
     while True:
-        choice = input("Enter an audit # to view in full (or press Enter to return): ").strip().lstrip("#")
+        choice = (
+            input("Enter an audit # to view in full (or press Enter to return): ")
+            .strip()
+            .lstrip("#")
+        )
         if choice == "":
             return None
         if choice.isascii() and choice.isdigit() and int(choice) in valid_ids:
@@ -480,10 +521,14 @@ def select_audit_record(audits: list[Record]) -> int | None:
 def choose_history_action(audits: list[Record]) -> tuple[str, int | None]:
     valid_ids = [_as_dict(audit).get("audit_id") for audit in audits]
     while True:
-        choice = input(
-            "Enter an audit # to view in full, F to filter the list, "
-            "or press Enter to return: "
-        ).strip().lstrip("#")
+        choice = (
+            input(
+                "Enter an audit # to view in full, F to filter the list, "
+                "or press Enter to return: "
+            )
+            .strip()
+            .lstrip("#")
+        )
         if choice == "":
             return "back", None
         if choice.lower() == "f":
@@ -509,7 +554,9 @@ def retrieve_history_filter(statuses: list[str]) -> tuple[str, str] | None:
             if text:
                 return "company", text
             print("Nothing to search for.")
-        elif choice.isascii() and choice.isdigit() and 1 <= int(choice) <= len(statuses):
+        elif (
+            choice.isascii() and choice.isdigit() and 1 <= int(choice) <= len(statuses)
+        ):
             return "status", statuses[int(choice) - 1]
         else:
             print("Invalid choice. Please try again.")
@@ -548,7 +595,9 @@ def wait_for_continue() -> None:
 # Shown right after login so the user sees their saved history is loaded.
 def show_audit_count(count: int) -> None:
     if count:
-        print(f"You have {count} saved audit{'s' if count != 1 else ''} (menu option 9).\n")
+        print(
+            f"You have {count} saved audit{'s' if count != 1 else ''} (menu option 9).\n"
+        )
     else:
         print("You have no saved audits yet. Choose option 1 to start one.\n")
 
@@ -559,8 +608,10 @@ def show_interrupted() -> None:
 
 
 def show_input_ended() -> None:
-    print("\n\nNo more input available. If you run the app in Docker, "
-          "start it with 'docker run -it ...' so you can type into it.")
+    print(
+        "\n\nNo more input available. If you run the app in Docker, "
+        "start it with 'docker run -it ...' so you can type into it."
+    )
 
 
 # Full view of one saved audit, reusing the existing report layouts.
@@ -584,7 +635,19 @@ def display_audit_detail(audit: Record) -> None:
 
 
 # Display Company Profile
-def display_company_profile(company_name: str, company_industry: str, total_revenue: float, total_employees: int, local_equity: float, proposal_type: str, sustainability_grant: str, proposal_narrative: str, baseline_energy_expenditure: float, estimated_retrofit_cost: float, reporting_advisory_fee: float) -> None:
+def display_company_profile(
+    company_name: str,
+    company_industry: str,
+    total_revenue: float,
+    total_employees: int,
+    local_equity: float,
+    proposal_type: str,
+    sustainability_grant: str,
+    proposal_narrative: str,
+    baseline_energy_expenditure: float,
+    estimated_retrofit_cost: float,
+    reporting_advisory_fee: float,
+) -> None:
     print(f"Company Name: {company_name}")
     print(f"Company Industry: {company_industry}")
     print(f"Company Total Revenue: {total_revenue}")
@@ -596,6 +659,7 @@ def display_company_profile(company_name: str, company_industry: str, total_reve
     print(f"Baseline Energy Expenditure: {baseline_energy_expenditure}")
     print(f"Estimated Retrofit Cost: {estimated_retrofit_cost}")
     print(f"Reporting Advisory Fee: {reporting_advisory_fee}")
+
 
 # input of Company's name
 COMPANY_NAME_MAX_LEN = 100
@@ -609,16 +673,38 @@ def retrieve_company_name() -> str:
         if company_name == "":
             print("Company Name cannot be empty. Please try again.")
         elif len(company_name) > COMPANY_NAME_MAX_LEN:
-            print(f"Company Name must be at most {COMPANY_NAME_MAX_LEN} characters. Please try again.")
+            print(
+                f"Company Name must be at most {COMPANY_NAME_MAX_LEN} characters. Please try again."
+            )
         else:
             return company_name
 
+
 # input of Company's industry
 def retrieve_company_industry() -> str:
-    valid_industries = ["Logistics", "Manufacturing", "Retail", "Food & Beverage", "Healthcare", "Information Technology", "Construction", "Education", "Finance", "Hospitality", "Aerospace", "Others"]
+    valid_industries = [
+        "Logistics",
+        "Manufacturing",
+        "Retail",
+        "Food & Beverage",
+        "Healthcare",
+        "Information Technology",
+        "Construction",
+        "Education",
+        "Finance",
+        "Hospitality",
+        "Aerospace",
+        "Others",
+    ]
 
     while True:
-        company_industry = input(f"Enter your Company's Industry Sector (choose from {', '.join(valid_industries)}): ").strip().title()
+        company_industry = (
+            input(
+                f"Enter your Company's Industry Sector (choose from {', '.join(valid_industries)}): "
+            )
+            .strip()
+            .title()
+        )
 
         if company_industry.strip() == "":
             print("Company Industry Sector cannot be empty. Please try again.")
@@ -629,17 +715,23 @@ def retrieve_company_industry() -> str:
         else:
             return company_industry
 
+
 def get_valid_other_industry() -> str:
     while True:
-        other_industry = input("Please specify your Company's Industry Sector: ").strip().title()
+        other_industry = (
+            input("Please specify your Company's Industry Sector: ").strip().title()
+        )
         if other_industry == "":
             print("Industry Sector cannot be empty. Please try again.")
         elif len(other_industry) > OTHER_TEXT_MAX_LEN:
             print(f"Industry Sector must be at most {OTHER_TEXT_MAX_LEN} characters.")
         elif not other_industry.replace(" ", "").isalpha():
-            print("Invalid. Please provide a valid Industry Sector containing only alphabetic characters.")
+            print(
+                "Invalid. Please provide a valid Industry Sector containing only alphabetic characters."
+            )
         else:
             return other_industry
+
 
 # Like float(), but also rejects "nan" and "inf", which float() accepts and
 # which slip past <= / >= range checks. Raises ValueError like float().
@@ -654,7 +746,9 @@ def finite_float(text: Any) -> float | None:
 def retrieve_total_revenue() -> float:
     while True:
         try:
-            total_revenue = finite_float(input("Enter your Company's Total Revenue (in SGD): "))
+            total_revenue = finite_float(
+                input("Enter your Company's Total Revenue (in SGD): ")
+            )
             if total_revenue < 0:
                 print("Total Revenue cannot be negative. Please try again.")
             elif total_revenue == 0:
@@ -664,11 +758,14 @@ def retrieve_total_revenue() -> float:
         except ValueError:
             print("Invalid input. Please enter a numeric value for total revenue.")
 
+
 # input of Company's Total Number of Employees
 def retrieve_total_employees() -> int:
     while True:
         try:
-            total_employees = int(input("Enter your Company's Total Number of Employees: "))
+            total_employees = int(
+                input("Enter your Company's Total Number of Employees: ")
+            )
             if total_employees < 0:
                 print("Total Number of Employees cannot be negative. Please try again.")
             elif total_employees == 0:
@@ -676,7 +773,10 @@ def retrieve_total_employees() -> int:
             else:
                 return total_employees
         except ValueError:
-            print("Invalid input. Please enter a numeric value for total number of employees.")
+            print(
+                "Invalid input. Please enter a numeric value for total number of employees."
+            )
+
 
 # input of Company's Local Equity
 def retrieve_local_equity() -> float:
@@ -695,6 +795,7 @@ def retrieve_local_equity() -> float:
         except ValueError:
             print("Invalid input. Please enter a numeric value for your local equity.")
 
+
 # NEW: applicant self-declares which kind of proposal this is, so we
 # only collect the cost fields that are actually relevant, and so
 # ai_manager.py gets a strong prior instead of guessing purely from
@@ -706,32 +807,40 @@ def retrieve_proposal_type() -> str:
     }
 
     while True:
-        choice = input('''What type of proposal is this?\n
+        choice = input("""What type of proposal is this?\n
                 1. Equipment / Energy Upgrade (e.g. fleet electrification, HVAC retrofit, lighting)\n
                 2. ESG Reporting / Advisory (e.g. inaugural sustainability report, external assurance)\n
-                    Enter 1 or 2: ''').strip()
+                    Enter 1 or 2: """).strip()
 
         if choice in valid_types:
             return valid_types[choice]
         else:
             print("Invalid choice. Please enter 1 or 2.")
 
+
 # Input of Baseline Annual Energy Expenditure
 def retrieve_baseline_energy_expenditure() -> float:
     while True:
         raw_value = input("Enter baseline annual energy expenditure (in SGD): ").strip()
         if raw_value == "":
-            print("Baseline annual energy expenditure cannot be empty. Please try again.")
+            print(
+                "Baseline annual energy expenditure cannot be empty. Please try again."
+            )
             continue
         try:
             baseline_energy_expenditure = finite_float(raw_value)
             if baseline_energy_expenditure <= 0:
-                print("Baseline annual energy expenditure cannot be zero or negative. Please try again.")
+                print(
+                    "Baseline annual energy expenditure cannot be zero or negative. Please try again."
+                )
                 continue
             else:
                 return baseline_energy_expenditure
         except ValueError:
-            print("Invalid input. Please enter a numeric value for baseline annual energy expenditure.")
+            print(
+                "Invalid input. Please enter a numeric value for baseline annual energy expenditure."
+            )
+
 
 # Input of Estimated Retrofit Cost
 def retrieve_estimated_retrofit_cost() -> float:
@@ -743,12 +852,17 @@ def retrieve_estimated_retrofit_cost() -> float:
         try:
             estimated_retrofit_cost = finite_float(raw_value)
             if estimated_retrofit_cost <= 0:
-                print("Estimated retrofit cost cannot be zero or negative. Please try again.")
+                print(
+                    "Estimated retrofit cost cannot be zero or negative. Please try again."
+                )
                 continue
             else:
                 return estimated_retrofit_cost
         except ValueError:
-            print("Invalid input. Please enter a numeric value for estimated retrofit cost.")
+            print(
+                "Invalid input. Please enter a numeric value for estimated retrofit cost."
+            )
+
 
 # NEW: free-text description of the proposed upgrade. This is the raw
 # narrative ai_manager.py needs in order to classify GHG scope, detect
@@ -763,15 +877,20 @@ def retrieve_proposal_narrative() -> str:
         if narrative == "":
             print("Proposal description cannot be empty. Please try again.")
         elif len(narrative) > NARRATIVE_MAX_LEN:
-            print(f"Please keep the description under {NARRATIVE_MAX_LEN} characters "
-                  f"(yours has {len(narrative)}).")
+            print(
+                f"Please keep the description under {NARRATIVE_MAX_LEN} characters "
+                f"(yours has {len(narrative)})."
+            )
         else:
             return narrative
+
 
 # Input of Reporting/Advisory Fee (only collected for ESG Reporting / Advisory proposals)
 def retrieve_reporting_advisory_fee() -> float:
     while True:
-        raw_value = input("Enter estimated external ESG reporting/advisory fee (in SGD): ").strip()
+        raw_value = input(
+            "Enter estimated external ESG reporting/advisory fee (in SGD): "
+        ).strip()
         if raw_value == "":
             print("Reporting/advisory fee cannot be empty. Please try again.")
             continue
@@ -783,43 +902,62 @@ def retrieve_reporting_advisory_fee() -> float:
             else:
                 return reporting_advisory_fee
         except ValueError:
-            print("Invalid input. Please enter a numeric value for the reporting/advisory fee.")
+            print(
+                "Invalid input. Please enter a numeric value for the reporting/advisory fee."
+            )
+
 
 # Sustainability Grant that Company's want to apply
 def retrieve_sustainability_grant() -> str:
-    valid_grants = ['1. Energy Efficiency Grant (EEG) -Base Tier', '2. Energy Efficiency Grant (EEG) -Advanced Tier', '3. Enterprise Development Grant (EDG)', '4. Sustainability Reporting Programme (SRP)', '5. Others']
+    valid_grants = [
+        "1. Energy Efficiency Grant (EEG) -Base Tier",
+        "2. Energy Efficiency Grant (EEG) -Advanced Tier",
+        "3. Enterprise Development Grant (EDG)",
+        "4. Sustainability Reporting Programme (SRP)",
+        "5. Others",
+    ]
     while True:
-        print('\nWhich Sustainability Grant would your company like to apply for?')
+        print("\nWhich Sustainability Grant would your company like to apply for?")
         for grant in valid_grants:
             print(grant)
 
-        grant_choice = input("Enter the number corresponding to your choice (1-5): ").strip()
+        grant_choice = input(
+            "Enter the number corresponding to your choice (1-5): "
+        ).strip()
 
         if grant_choice == "":
-            print("Sustainability Grant choice cannot be empty. Please select a valid option from 1 to 5.")
+            print(
+                "Sustainability Grant choice cannot be empty. Please select a valid option from 1 to 5."
+            )
             continue
-        
-        if grant_choice not in ['1', '2', '3', '4', '5']:
+
+        if grant_choice not in ["1", "2", "3", "4", "5"]:
             print("Invalid choice. Please select a valid option (1-5).")
             continue
 
-
-        if grant_choice == '5':
+        if grant_choice == "5":
             while True:
-                other_grant = input("Please specify the Sustainability Grant that is not stated in the options: ").strip()
+                other_grant = input(
+                    "Please specify the Sustainability Grant that is not stated in the options: "
+                ).strip()
                 if other_grant == "":
-                    print("Sustainability Grant cannot be empty. Please provide a valid grant name.")
+                    print(
+                        "Sustainability Grant cannot be empty. Please provide a valid grant name."
+                    )
                 elif len(other_grant) > OTHER_TEXT_MAX_LEN:
-                    print(f"Grant name must be at most {OTHER_TEXT_MAX_LEN} characters.")
+                    print(
+                        f"Grant name must be at most {OTHER_TEXT_MAX_LEN} characters."
+                    )
                 elif not other_grant.replace(" ", "").isalpha():
                     print("Invalid input. Please enter a valid grant name.")
                 else:
                     other_grant = other_grant
                     return other_grant
-        
+
         else:
-                selected_grant = valid_grants[int(grant_choice) - 1]
-                return selected_grant
+            selected_grant = valid_grants[int(grant_choice) - 1]
+            return selected_grant
+
 
 # For displaying list of grants already applied for by the company
 # Records loaded from a file can be in the newer nested layout
@@ -852,8 +990,12 @@ def audit_record_to_display_format(audit_record: Record) -> Record:
         "Local Equity": profile.get("local_shareholding_pct", 0.0),
         "Proposal Type": profile.get("proposal_type", ""),
         "Sustainability Grant": profile.get("sustainability_grant", ""),
-        "Proposal Narrative": _section(audit_record, "proposal").get("raw_narrative", ""),
-        "Baseline Energy Expenditure": profile.get("baseline_annual_energy_expenditure_sgd", 0.0),
+        "Proposal Narrative": _section(audit_record, "proposal").get(
+            "raw_narrative", ""
+        ),
+        "Baseline Energy Expenditure": profile.get(
+            "baseline_annual_energy_expenditure_sgd", 0.0
+        ),
         "Estimated Retrofit Cost": profile.get("estimated_retrofit_cost_sgd", 0.0),
         "Reporting Advisory Fee": profile.get("reporting_advisory_fee_sgd", 0.0),
     }
@@ -874,7 +1016,9 @@ def display_applied_grants(scheme_grant_records: Records, key: int) -> Records |
         grant = flat_record(grant)
         if i > 1:
             lines.append("")
-        lines.append(f"{i}. {grant.get('Company Name', 'N/A')} - {grant.get('Company Industry', 'N/A')}")
+        lines.append(
+            f"{i}. {grant.get('Company Name', 'N/A')} - {grant.get('Company Industry', 'N/A')}"
+        )
         details = {
             "Total Revenue": grant.get("Company Total Revenue", "N/A"),
             "Total Employees": grant.get("Total Employees", "N/A"),
@@ -882,7 +1026,9 @@ def display_applied_grants(scheme_grant_records: Records, key: int) -> Records |
             "Proposal Type": grant.get("Proposal Type", "N/A"),
             "Proposal Narrative": grant.get("Proposal Narrative", "N/A"),
             "Sustainability Grant": grant.get("Sustainability Grant", "N/A"),
-            "Baseline Energy Expenditure": grant.get("Baseline Energy Expenditure", "N/A"),
+            "Baseline Energy Expenditure": grant.get(
+                "Baseline Energy Expenditure", "N/A"
+            ),
             "Estimated Retrofit Cost": grant.get("Estimated Retrofit Cost", "N/A"),
             "Reporting Advisory Fee": grant.get("Reporting Advisory Fee", 0.0),
         }
@@ -901,6 +1047,7 @@ def display_applied_grants(scheme_grant_records: Records, key: int) -> Records |
 
     return scheme_grant_records
 
+
 # Bridges main.py's case-1 record format (capitalised, display-oriented
 # keys, built one company at a time into scheme_grant_records) onto the
 # snake_case keys logic_manager.py's evaluate_grant_application()
@@ -916,8 +1063,10 @@ def convert_record_to_profile(record: Record) -> dict[str, Any]:
         "group_employment_size": record.get("Total Employees", 0),
         "local_shareholding_pct": record.get("Local Equity", 0.0),
         "proposal_type": record.get("Proposal Type", "Equipment / Energy Upgrade"),
-        "sustainability_grant":  record.get("Sustainability Grant", "Not Specified"),
-        "baseline_annual_energy_expenditure_sgd": record.get("Baseline Energy Expenditure", 0.0),
+        "sustainability_grant": record.get("Sustainability Grant", "Not Specified"),
+        "baseline_annual_energy_expenditure_sgd": record.get(
+            "Baseline Energy Expenditure", 0.0
+        ),
         "estimated_retrofit_cost_sgd": record.get("Estimated Retrofit Cost", 0.0),
         "reporting_advisory_fee_sgd": record.get("Reporting Advisory Fee", 0.0),
     }
@@ -926,6 +1075,7 @@ def convert_record_to_profile(record: Record) -> dict[str, Any]:
 # Y/N confirmation for whether to save the just-processed record to
 # JSON, used right after the automated AI + Logic audit in main.py.
 # io_manager.py
+
 
 # Asks for a save/load file name using the floppy-disk label prompt.
 # Re-prompts until a non-empty name is entered.
@@ -950,7 +1100,13 @@ def retrieve_json_filename(blocked_chars: str = "", *args: Any) -> str:
 
 def confirm_overwrite_records() -> bool:
     while True:
-        choice = input("This will replace the records currently in memory. Continue? (y/n): ").strip().lower()
+        choice = (
+            input(
+                "This will replace the records currently in memory. Continue? (y/n): "
+            )
+            .strip()
+            .lower()
+        )
         if choice == "y":
             return True
         if choice == "n":
@@ -961,10 +1117,14 @@ def confirm_overwrite_records() -> bool:
 def ask_existing_file_action(file_name: str) -> str:
     """The file already exists: returns "add", "replace" or "cancel"."""
     while True:
-        choice = input(
-            f"'{file_name}' already exists. "
-            "(a = add to it, r = replace it, c = cancel): "
-        ).strip().lower()
+        choice = (
+            input(
+                f"'{file_name}' already exists. "
+                "(a = add to it, r = replace it, c = cancel): "
+            )
+            .strip()
+            .lower()
+        )
         if choice in ("a", "r", "c"):
             return {"a": "add", "r": "replace", "c": "cancel"}[choice]
         print("Invalid input. Please enter 'a', 'r' or 'c'.")
@@ -999,13 +1159,14 @@ def confirm_save_to_json() -> bool:
     art, regions = gui.yes_no_buttons("Save this record to JSON now?")
     return execute_choice_interaction(art, regions, {"y": True, "n": False})
 
+
 # Shows the floppy disk and lets the user type the file name on its label.
 def prompt_filename_on_disk(*args: Any, max_len: int = 50, blocked: str = "") -> str:
-    key = args[0] if args else None   # first extra value, or None if nothing was passed
+    key = args[0] if args else None  # first extra value, or None if nothing was passed
 
-    if key == 3: #When loading the file
+    if key == 3:  # When loading the file
         art, rows_up, col = gui.load_disk_prompt_art(max_len=max_len)
-    else: #When saving the file
+    else:  # When saving the file
         art, rows_up, col = gui.save_disk_prompt_art(max_len=max_len)
     print(art)
 
@@ -1019,13 +1180,19 @@ def prompt_filename_on_disk(*args: Any, max_len: int = 50, blocked: str = "") ->
         # (no newline is echoed now, so move down the full rows_up)
         sys.stdout.write(f"{gui.RESET}\033[{rows_up}B\r")
         sys.stdout.flush()
-        
+
+
 # Enables paper format
-#So it looks abit like you are reading your work on paper while also looking at a command console
+# So it looks abit like you are reading your work on paper while also looking at a command console
 PAPER_WIDTH = 110
 
 
-def print_on_paper(lines: list[str], title: str = "REPORT", footer: str = "End of report", width: int = PAPER_WIDTH) -> None:
+def print_on_paper(
+    lines: list[str],
+    title: str = "REPORT",
+    footer: str = "End of report",
+    width: int = PAPER_WIDTH,
+) -> None:
     """Print a list of text lines inside a paper-style frame."""
     inner = width - 4  # usable space between "| " and " |"
 
@@ -1070,6 +1237,7 @@ def format_pairs(data: Any, width: int = PAPER_WIDTH, indent: str = "") -> list[
         lines.extend(indent + hang + extra for extra in wrapped[1:])
     return lines
 
+
 # Renders the AI Manager's structured output for the CLI. All console
 # print statements in the codebase belong in io_manager.py per the
 # architecture, so ai_manager.py and logic_manager.py never print
@@ -1077,29 +1245,30 @@ def format_pairs(data: Any, width: int = PAPER_WIDTH, indent: str = "") -> list[
 def display_ai_audit(ai_audit: AiAudit) -> None:
     print_on_paper(format_pairs(ai_audit), title="AI AUDIT REPORT")
 
+
 # Runs whenever AI Manager is using the get_ai_response() function. It gives one bar for every second passed
 def run_ai_analysis_bar(stop_event: threading.Event, timeout_seconds: int = 60) -> None:
     """
-    Animates the progress bar. Stops instantly if stop_event is flagged 
+    Animates the progress bar. Stops instantly if stop_event is flagged
     or when it hits the maximum timeout.
     """
     cyan = "\033[96m"
     reset = "\033[0m"
-    
+
     print("\nAnalysing your proposal with the AI Manager, please wait...\n")
     sys.stdout.write("\033[?25l")  # Hide text cursor
     sys.stdout.flush()
-    
+
     try:
         # Loop for the maximum allowed duration
         for i in range(1, timeout_seconds + 1):
             # Check if the API background thread has finished and flagged us to stop
             if stop_event.is_set():
                 break
-                
+
             percent = int((i / timeout_seconds) * 100)
             progress_bar = f"\r   Time Taken: [{cyan}{'█' * i}{' ' * (timeout_seconds - i)}{reset}] {percent}% ({i}/{timeout_seconds}s)"
-            
+
             sys.stdout.write(progress_bar)
             sys.stdout.flush()
             time.sleep(1)
@@ -1130,6 +1299,7 @@ def display_grant_decision(result: dict[str, Any]) -> None:
             lines.extend(f"  - {item}" for item in items)
     print_on_paper(lines, title="GRANT ELIGIBILITY DECISION")
 
+
 # When there is no records
 # ---------- Menu options 5 and 6: pick, edit and delete records ----------
 
@@ -1149,8 +1319,13 @@ FIELD_PROMPTS = {
 }
 
 COMMON_FIELDS = (
-    "Company Name", "Company Industry", "Company Total Revenue",
-    "Total Employees", "Local Equity", "Sustainability Grant", "Proposal Narrative",
+    "Company Name",
+    "Company Industry",
+    "Company Total Revenue",
+    "Total Employees",
+    "Local Equity",
+    "Sustainability Grant",
+    "Proposal Narrative",
 )
 
 
@@ -1176,8 +1351,10 @@ def select_record_index(records: Records, action: str) -> int | None:
     print(f"\nWhich record do you want to {action}?")
     for number, record in enumerate(records, start=1):
         record = flat_record(record)
-        print(f"  {number}. {record.get('Company Name') or 'N/A'}"
-              f"  ({record.get('Proposal Type') or 'N/A'})")
+        print(
+            f"  {number}. {record.get('Company Name') or 'N/A'}"
+            f"  ({record.get('Proposal Type') or 'N/A'})"
+        )
     print("  0. Cancel")
 
     while True:
@@ -1218,7 +1395,9 @@ def retrieve_field_value(field: str) -> Any:
 
 def confirm_delete_record(company_name: str) -> bool:
     while True:
-        choice = input(f"Delete the record for '{company_name}'? (y/n): ").strip().lower()
+        choice = (
+            input(f"Delete the record for '{company_name}'? (y/n): ").strip().lower()
+        )
         if choice in ("y", "n"):
             return choice == "y"
         print("Invalid input. Please enter 'y' or 'n'.")
@@ -1230,8 +1409,10 @@ def show_record_updated(company_name: str, field: str) -> None:
 
 
 def show_record_deleted(company_name: str) -> None:
-    print(f"Deleted the record for '{company_name}'. "
-          "Use option 2 (choose replace) to remove it from a saved file too.")
+    print(
+        f"Deleted the record for '{company_name}'. "
+        "Use option 2 (choose replace) to remove it from a saved file too."
+    )
     gui.return_button()
 
 
@@ -1244,10 +1425,12 @@ def display_no_records_message() -> None:
     print("No records yet. Please select option 1 first.")
     gui.return_button()
 
+
 # When AI hasn't yet audited the machine. The AI will audit right after finishing the input for the company grant so it only activates in practice when no data exists
 def display_no_ai_audit() -> None:
     print("No AI audit yet. Please run option 7 first.")
     gui.return_button()
+
 
 # ASCII related
 # io_manager.py
@@ -1255,6 +1438,7 @@ def show_wrong_option_error() -> None:
     print(gui.wrong_sign_red())
     gui.return_button()
 
-# 
+
+#
 def show_goodbye() -> None:
     print(gui.goodbye_art())
