@@ -307,7 +307,6 @@ def test_non_dict_is_failed():
 
 
 def test_missing_key_gives_a_clear_error():
-    import os
 
     saved = os.environ.pop("OPENROUTER_API_KEY", None)
     try:
