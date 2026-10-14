@@ -7,6 +7,104 @@ import io
 from unittest import mock
 import io_manager as io_mgr
 from tests.helpers import raises
+import ast
+import pathlib
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+COST_PROMPTS = (
+    io_mgr.retrieve_baseline_energy_expenditure,
+    io_mgr.retrieve_estimated_retrofit_cost,
+    io_mgr.retrieve_reporting_advisory_fee,
+)
+
+
+def test_only_the_io_manager_prints_or_asks_for_input():
+    files = list(ROOT.glob("*.py")) + list((ROOT / "sme_interface_stores").glob("*.py"))
+    offenders = []
+    for path in files:
+        if path.name == "io_manager.py":
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in ("print", "input")
+            ):
+                offenders.append(f"{path.name}:{node.lineno}")
+    assert offenders == []
+
+
+def test_revenue_rejects_bad_values_until_valid():
+    answers = ["", "abc", "-5", "0", "nan", "inf", "1500.50"]
+    assert run_with_answers(io_mgr.retrieve_total_revenue, answers) == 1500.5
+
+
+def test_employees_must_be_a_positive_whole_number():
+    answers = ["", "x", "1.5", "-3", "0", "12"]
+    assert run_with_answers(io_mgr.retrieve_total_employees, answers) == 12
+
+
+def test_equity_must_be_above_0_and_at_most_100():
+    answers = ["", "x", "0", "-1", "100.5", "100"]
+    assert run_with_answers(io_mgr.retrieve_local_equity, answers) == 100.0
+
+
+
+
+def test_cost_fields_reject_bad_values_until_valid():
+    for function in COST_PROMPTS:
+        result = run_with_answers(function, ["", "x", "-1", "nan", "inf", "250.5"])
+        assert result == 250.5, function.__name__
+
+
+def test_baseline_energy_expenditure_rejects_zero():
+    assert run_with_answers(io_mgr.retrieve_baseline_energy_expenditure, ["0", "7"]) == 7.0
+
+
+def test_retrofit_cost_rejects_zero():
+    assert run_with_answers(io_mgr.retrieve_estimated_retrofit_cost, ["0", "7"]) == 7.0
+
+
+def test_reporting_fee_accepts_zero():
+    assert run_with_answers(io_mgr.retrieve_reporting_advisory_fee, ["0", "7"]) == 0.0
+
+
+def test_proposal_type_choices():
+    answers = ["", "3", "x", "2"]
+    assert run_with_answers(io_mgr.retrieve_proposal_type, answers) == "ESG Reporting / Advisory"
+
+
+def test_industry_is_case_insensitive_and_rejects_unknown():
+    assert run_with_answers(io_mgr.retrieve_company_industry, ["", "nonsense", "retail"]) == "Retail"
+    assert run_with_answers(io_mgr.retrieve_company_industry, ["others", "mining"]) == "Mining"
+
+
+def test_grant_menu_rejects_out_of_range_choices():
+    answers = ["", "0", "6", "x", "1"]
+    result = run_with_answers(io_mgr.retrieve_sustainability_grant, answers)
+    assert isinstance(result, str) and result
+
+
+def test_displays_do_not_crash_on_minimal_data():
+    with contextlib.redirect_stdout(io.StringIO()):
+        io_mgr.display_ai_audit({})
+        io_mgr.display_save_result("something_new", "x.json")
+        io_mgr.display_load_result("something_new", "x.json")
+        io_mgr.display_grant_decision(
+            {
+                "is_sme": False,
+                "decision_status": "REJECT_NON_SME",
+                "audit_passed": False,
+                "approved_subsidy_sgd": 0.0,
+                "matched_schemes": [],
+                "reasons": [],
+                "recommendations": [],
+            }
+        )
+
+
 
 
 def key_verifier_check(text):

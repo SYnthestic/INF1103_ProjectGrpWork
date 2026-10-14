@@ -25,7 +25,7 @@ AI_TIMEOUT_SECONDS = 60
 
 def setup_ai_client() -> OpenAI:
 
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
     if not api_key:
         raise RuntimeError(
             "OPENROUTER_API_KEY is not set. Add it to your .env file (see README)."
@@ -108,6 +108,7 @@ def get_ai_response(proposal_narrative: str, show_progress: Callable[[threading.
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": proposal_narrative}
                 ],
+                temperature=0,
                 timeout=AI_TIMEOUT_SECONDS
             )
             thread_results["output"] = response.choices[0].message.content
@@ -279,6 +280,8 @@ def _to_string_list(value: Any) -> list[str]:
 
 
 def sanitise_ai_audit(parsed: Any) -> AiAudit:
+    if not isinstance(parsed, dict):
+        return copy.deepcopy(DEFAULT_AI_AUDIT)
     """Builds a complete, correctly typed ai_audit dict from parsed JSON."""
     ai_audit = default_ai_audit()
     ai_audit["scope_category"] = _to_scope(parsed.get("scope_category"))

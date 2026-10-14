@@ -353,7 +353,18 @@ def build_case(user_profile: dict[str, Any], ai_audit: dict[str, Any]) -> Case:
         "lifetime_tonnes": _number(ai_audit.get("estimated_lifetime_abatement_tonnes")),
         "exclusions": _string_list(ai_audit.get("detected_exclusion_keywords")),
         "intervention": ai_audit.get("primary_intervention_type", ""),
+        "ai_failed": str(ai_audit.get("ai_status", "ok")).strip().lower() == "failed",
     }
+
+def rule_ai_failed(case):
+    """The AI could not analyse the narrative, so no approval is safe."""
+    if not case["ai_failed"]:
+        return None
+    return _decision(
+        "MANUAL_REVIEW",
+        reasons=["The AI analysis failed, so the proposal could not be assessed automatically."],
+        recommendations=["Run the analysis again, or send the proposal for manual review."],
+    )
 
 
 # ---------------------------------------------------------
@@ -600,6 +611,7 @@ DECISION_RULES = (
     rule_exclusion_keywords,
     rule_fossil_fuel_modification,
     rule_not_an_sme,
+    rule_ai_failed,
     rule_reporting_without_fee,
     rule_reporting_grant,
     rule_missing_baseline_spend,

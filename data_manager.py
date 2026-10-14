@@ -100,11 +100,19 @@ def _full_path(jsonfile_name: str) -> str:
 RECORDS_DIR_NAME = "records"
 _USERNAME_FOR_PATH = re.compile(r"[a-z0-9_]{1,64}")
 _active_user = None
-
+def _is_safe_username(username) -> bool:
+    # move the exact condition from set_active_user here
+    return (
+        isinstance(username, str)
+        and 0 < len(username) <= 64
+        and re.fullmatch(r"[a-z0-9_]+", username) is not None
+    )
 
 def set_active_user(username: str | None) -> None:
     """Chooses whose folder the record files are saved to / loaded from.
     Pass None to go back to no active user."""
+    if username is not None and not _is_safe_username(username):
+        raise ValueError("unsafe username")
     global _active_user
     if username is None:
         _active_user = None
@@ -496,6 +504,8 @@ def load_audit_history() -> dict[str, Any]:
 
 def get_user_audits(username: str) -> list[Record]:
     """All audits saved by `username`, oldest first."""
+    if not _is_safe_username(username):
+        return []
     history = load_audit_history()
     audits = history.get(username, []) if history else []
     if not isinstance(audits, list):
@@ -507,6 +517,8 @@ def get_user_audits(username: str) -> list[Record]:
 def append_user_audit(username: str, application: Record, ai_audit: AiAudit, result: dict[str, Any] | None) -> Record | None:
     """Saves one completed audit (inputs + AI output + decision) under the
     logged-in user. Returns the saved record, or None on failure."""
+    if not _is_safe_username(username):
+        raise ValueError("unsafe username")
     with _file_lock(AUDIT_HISTORY_FILE) as locked:
         if not locked:
             return None

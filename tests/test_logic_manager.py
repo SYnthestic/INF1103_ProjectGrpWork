@@ -3,6 +3,299 @@ and password hashing. No network, files or AI are involved."""
 
 import logic_manager as logic
 
+import math
+
+VALID_STATUSES = {
+    "REJECT_NON_SME",
+    "REJECT_LOW_IMPACT",
+    "PRE_APPROVED_SRG",
+    "PRE_APPROVED_TIER_1",
+    "PRE_APPROVED_TIER_1_ADVANCED",
+    "PROVISIONAL_APPROVAL_TIER_2",
+    "MANUAL_REVIEW",
+    "MANUAL_EXCLUSION_REVIEW",
+}
+
+
+def all_scenarios():
+    """A spread of inputs that exercise most rules."""
+    return [
+        (make_profile(), make_audit()),
+        (make_profile(), make_audit(scope_category="Scope-2", estimated_energy_reduction_pct=16.0)),
+        (make_profile(), make_audit(estimated_energy_reduction_pct=12.0)),
+        (make_profile(), make_audit(estimated_energy_reduction_pct=1.0)),
+        (make_profile(), make_audit(scope_category="Unknown")),
+        (make_profile(), make_audit(detected_exclusion_keywords=["second-hand"])),
+        (make_profile(annual_revenue_sgd=250000000.0), make_audit()),
+        (reporting_grant_reporting_profile(20000.0), make_audit(scope_category="Unknown")),
+        (
+            make_profile(baseline_annual_energy_expenditure_sgd=1000000.0),
+            make_audit(estimated_lifetime_abatement_tonnes=400.0),
+        ),
+    ]
+
+
+# ---- SME and subsidy boundaries -------------------------------------------
+
+def test_sme_exactly_at_both_limits_passes():
+    assert logic.check_sme_status(30.0, 100000000.0, 1)
+
+
+def test_subsidy_with_zero_cost_rate_or_cap_is_zero():
+    assert logic.calculate_subsidy(0, 0.5, 20000) == 0.0
+    assert logic.calculate_subsidy(10000, 0.0, 20000) == 0.0
+    assert logic.calculate_subsidy(10000, 0.5, 0) == 0.0
+
+
+def test_srg_fee_where_30_percent_equals_the_cap():
+    result = decide(
+        reporting_grant_reporting_profile(500000.0), make_audit(scope_category="Unknown")
+    )
+    assert result["decision_status"] == "PRE_APPROVED_SRG"
+    assert result["approved_subsidy_sgd"] == 150000.0
+
+
+# ---- Energy-reduction boundaries (Scope-1) ----------------------------------
+
+def test_scope1_reduction_boundaries():
+    cases = [
+        (9.99, "REJECT_LOW_IMPACT"),
+        (10.0, "MANUAL_REVIEW"),
+        (14.99, "MANUAL_REVIEW"),
+        (15.0, "PROVISIONAL_APPROVAL_TIER_2"),
+        (19.99, "PROVISIONAL_APPROVAL_TIER_2"),
+        (20.0, "PRE_APPROVED_TIER_1"),
+    ]
+    for pct, expected in cases:
+        result = decide(audit=make_audit(estimated_energy_reduction_pct=pct))
+        assert result["decision_status"] == expected, f"{pct}% gave {result['decision_status']}"
+
+
+# ---- Retrofit cost cap --------------------------------------------------------
+
+def test_retrofit_cost_of_zero_means_no_cap():
+    result = decide(make_profile(estimated_retrofit_cost_sgd=0.0))
+    assert result["approved_subsidy_sgd"] == 30000.0
+
+
+def test_tiny_retrofit_cost_caps_the_subsidy():
+    result = decide(make_profile(estimated_retrofit_cost_sgd=0.01))
+    assert result["approved_subsidy_sgd"] == 0.01
+
+
+def test_retrofit_cap_applies_to_the_advanced_tier():
+    profile = make_profile(
+        baseline_annual_energy_expenditure_sgd=1000000.0, estimated_retrofit_cost_sgd=100000.0
+    )
+    result = decide(profile, make_audit(estimated_lifetime_abatement_tonnes=400.0))
+    assert result["decision_status"] == "PRE_APPROVED_TIER_1_ADVANCED"
+    assert result["approved_subsidy_sgd"] == 100000.0
+
+
+# ---- Rule interactions --------------------------------------------------------
+
+def test_exclusion_beats_the_advanced_tier():
+    profile = make_profile(baseline_annual_energy_expenditure_sgd=1000000.0)
+    audit = make_audit(
+        estimated_lifetime_abatement_tonnes=400.0, detected_exclusion_keywords=["second-hand"]
+    )
+    assert decide(profile, audit)["decision_status"] == "MANUAL_EXCLUSION_REVIEW"
+
+
+def test_non_sme_beats_the_advanced_tier():
+    profile = make_profile(
+        annual_revenue_sgd=250000000.0, baseline_annual_energy_expenditure_sgd=1000000.0
+    )
+    result = decide(profile, make_audit(estimated_lifetime_abatement_tonnes=400.0))
+    assert result["decision_status"] == "REJECT_NON_SME"
+    assert result["approved_subsidy_sgd"] == 0.0
+
+
+def test_fossil_fuel_modification_beats_the_non_sme_rejection():
+    result = decide(
+        make_profile(annual_revenue_sgd=250000000.0),
+        make_audit(primary_intervention_type="Fossil Fuel Modification"),
+    )
+    assert result["decision_status"] == "MANUAL_EXCLUSION_REVIEW"
+
+
+def test_unused_cost_field_is_ignored():
+    with_fee = decide(make_profile(reporting_advisory_fee_sgd=99999.0))
+    without_fee = decide(make_profile(reporting_advisory_fee_sgd=0.0))
+    assert with_fee == without_fee
+
+
+# ---- Bad or unexpected input ------------------------------------------------
+
+def test_empty_profile_does_not_crash_and_is_not_approved():
+    result = decide(profile={})
+    assert result["decision_status"] in VALID_STATUSES
+    assert not result["audit_passed"]
+    assert result["approved_subsidy_sgd"] == 0.0
+
+
+def test_infinite_and_negative_numbers_do_not_crash():
+    bad_profiles = [
+        make_profile(annual_revenue_sgd=float("inf")),
+        make_profile(annual_revenue_sgd=-5.0),
+        make_profile(baseline_annual_energy_expenditure_sgd=-1.0),
+        make_profile(estimated_retrofit_cost_sgd=-100.0),
+        make_profile(local_shareholding_pct=150.0),
+        make_profile(local_shareholding_pct=-10.0),
+    ]
+    for profile in bad_profiles:
+        result = decide(profile)
+        assert result["decision_status"] in VALID_STATUSES
+        assert math.isfinite(result["approved_subsidy_sgd"])
+        assert result["approved_subsidy_sgd"] >= 0.0
+
+
+def test_wrong_types_in_the_ai_audit_do_not_crash():
+    bad_audits = [
+        make_audit(estimated_energy_reduction_pct="high"),
+        make_audit(estimated_energy_reduction_pct=None),
+        make_audit(estimated_energy_reduction_pct=float("nan")),
+        make_audit(estimated_lifetime_abatement_tonnes="lots"),
+        make_audit(detected_exclusion_keywords=None),
+        make_audit(detected_exclusion_keywords={"a": 1}),
+        make_audit(detected_exclusion_keywords=[1, None, "second-hand"]),
+        make_audit(scope_category=None),
+    ]
+    for audit in bad_audits:
+        assert decide(audit=audit)["decision_status"] in VALID_STATUSES
+
+
+def test_placeholder_keywords_in_any_case_are_not_exclusions():
+    result = decide(audit=make_audit(detected_exclusion_keywords=["NONE", " n/a ", ""]))
+    assert result["decision_status"] == "PRE_APPROVED_TIER_1"
+
+
+def test_odd_scope_spellings_never_pre_approve_by_accident():
+    for scope in ("scope-1", "Scope 1", "Scope-3", "", "SCOPE-1"):
+        result = decide(audit=make_audit(scope_category=scope))
+        assert result["decision_status"] in VALID_STATUSES
+
+
+def test_unknown_proposal_type_does_not_crash():
+    for proposal_type in ("Something Else", "", None):
+        result = decide(make_profile(proposal_type=proposal_type))
+        assert result["decision_status"] in VALID_STATUSES
+
+
+# ---- Determinism and result shape --------------------------------------------
+
+def test_same_inputs_give_the_same_result_and_are_not_modified():
+    for profile, audit in all_scenarios():
+        profile_before = dict(profile)
+        audit_before = {k: (list(v) if isinstance(v, list) else v) for k, v in audit.items()}
+        first = decide(profile, audit)
+        second = decide(profile, audit)
+        assert first == second
+        assert profile == profile_before
+        assert audit == audit_before
+
+
+def test_result_lists_are_not_shared_between_calls():
+    first = decide()
+    first["reasons"].append("tampered")
+    first["recommendations"].append("tampered")
+    first["matched_schemes"].append("tampered")
+    second = decide()
+    assert "tampered" not in second["reasons"]
+    assert "tampered" not in second["recommendations"]
+    assert "tampered" not in second["matched_schemes"]
+
+
+def test_output_types_are_the_same_on_every_path():
+    for profile, audit in all_scenarios():
+        result = decide(profile, audit)
+        assert isinstance(result["is_sme"], bool)
+        assert isinstance(result["audit_passed"], bool)
+        assert isinstance(result["approved_subsidy_sgd"], float)
+        assert isinstance(result["reasons"], list)
+        assert all(isinstance(r, str) for r in result["reasons"])
+        assert isinstance(result["recommendations"], list)
+        assert isinstance(result["matched_schemes"], list)
+
+
+def test_every_status_the_logic_returns_is_a_known_status():
+    for profile, audit in all_scenarios():
+        assert decide(profile, audit)["decision_status"] in VALID_STATUSES
+
+
+def test_rejections_and_reviews_never_pay_a_subsidy():
+    for profile, audit in all_scenarios():
+        result = decide(profile, audit)
+        if result["decision_status"].startswith(("REJECT", "MANUAL")):
+            assert result["approved_subsidy_sgd"] == 0.0
+            assert not result["audit_passed"]
+
+
+# ---- Scheme mismatch note -----------------------------------------------------
+
+def test_missing_grant_choice_gives_no_note():
+    assert logic.scheme_mismatch_note(None, ["Anything"]) is None
+    result = decide(make_profile(sustainability_grant=None))
+    assert not any("You selected" in text for text in result["recommendations"])
+
+
+def test_mismatch_note_with_no_matched_schemes_does_not_crash():
+    logic.scheme_mismatch_note("1. Energy Efficiency Grant (EEG) - Base Tier", [])
+
+
+# ---- Passwords ----------------------------------------------------------------
+
+def test_password_is_case_sensitive():
+    record = logic.build_new_user_record("alice", "correct horse")
+    assert not logic.verify_password("Correct Horse", record)
+
+
+def test_spaces_around_a_password_are_not_stripped():
+    record = logic.build_new_user_record("alice", "correct horse")
+    assert not logic.verify_password(" correct horse", record)
+    assert not logic.verify_password("correct horse ", record)
+
+
+def test_unicode_password_round_trips():
+    record = logic.build_new_user_record("alice", "pässwörd✓")
+    assert logic.verify_password("pässwörd✓", record)
+    assert not logic.verify_password("passwoerd", record)
+
+
+def test_password_at_the_limit_works_and_beyond_is_refused():
+    limit = logic.MAX_PASSWORD_CHARS_CHECKED
+    ok = "x" * limit
+    record = logic.build_new_user_record("alice", ok)
+    assert logic.verify_password(ok, record)
+
+    too_long = "x" * (limit + 1)
+    assert not logic.verify_password(too_long, record)
+
+
+def test_zero_or_negative_iterations_are_refused():
+    for iterations in (0, -1):
+        record = logic.build_new_user_record("alice", "correct horse")
+        record["iterations"] = iterations
+        assert not logic.verify_password("correct horse", record)
+
+
+def test_missing_iterations_falls_back_to_the_default():
+    record = logic.build_new_user_record("alice", "correct horse")
+    del record["iterations"]
+    assert logic.verify_password("correct horse", record)
+
+
+def test_record_with_missing_or_damaged_fields_fails_safely():
+    record = logic.build_new_user_record("alice", "correct horse")
+    for field in ("salt", "password_hash"):
+        damaged = dict(record)
+        del damaged[field]
+        assert not logic.verify_password("correct horse", damaged), f"missing {field} still verified"
+    truncated = dict(record, password_hash=record["password_hash"][:10])
+    assert not logic.verify_password("correct horse", truncated)
+    not_hex = dict(record, password_hash="not-hex!")
+    assert not logic.verify_password("correct horse", not_hex)
+
 
 def make_profile(**changes):
     """A valid SME equipment proposal; override fields per test."""
@@ -294,7 +587,8 @@ def test_rules_run_in_priority_order():
     names = [rule.__name__ for rule in logic.DECISION_RULES]
     assert names[0] == "rule_exclusion_keywords"
     assert names.index("rule_fossil_fuel_modification") < names.index("rule_not_an_sme")
-    assert names.index("rule_not_an_sme") < names.index("rule_reporting_grant")
+    assert names.index("rule_not_an_sme") < names.index("rule_ai_failed")
+    assert names.index("rule_ai_failed") < names.index("rule_reporting_grant")
     assert names.index("rule_reporting_grant") < names.index("rule_unclassified_scope")
     assert names.index("rule_eeg_advanced_tier") < names.index("rule_eeg_base_tier")
     assert names.index("rule_eeg_base_tier") < names.index("rule_esp_provisional")

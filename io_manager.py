@@ -1058,7 +1058,9 @@ def print_on_paper(lines: list[str], title: str = "REPORT", footer: str = "End o
 def format_pairs(data: Any, width: int = PAPER_WIDTH, indent: str = "") -> list[str]:
     """Turn a dict into aligned 'key : value' lines with a hanging indent."""
     inner = width - 4 - len(indent)
-    key_w = max(len(str(k)) for k in data)
+    if not data:
+        return ["(no data)"]
+    key_w = max((len(str(k)) for k in data), default=0)
     lines = []
     for key, value in data.items():
         label = f"{str(key):<{key_w}} : "

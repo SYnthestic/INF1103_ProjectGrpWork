@@ -3,8 +3,153 @@ folder (DATA_DIR is redirected), so real data is never touched."""
 
 import json
 import os
+import io_manager as logic
 import data_manager as dm
 from tests.helpers import temp_data_dir, raises
+import pytest
+
+
+def test_inspect_save_file_statuses():
+    with temp_data_dir():
+        dm.save_data_to_json([], "here")
+        assert dm.inspect_save_file("here") == ("here.json", "exists")
+        assert dm.inspect_save_file("absent") == ("absent.json", "not_found")
+        assert dm.inspect_save_file("") == ("", "no_name")
+        assert dm.inspect_save_file("a/b") == ("", "invalid_name")
+
+
+def test_is_data_loaded():
+    assert not dm.is_data_loaded([], "")
+    assert dm.is_data_loaded([{"Company Name": "A"}], "")
+    assert dm.is_data_loaded([], "mine.json")
+
+
+def test_failed_save_keeps_the_old_file_and_leaves_no_temp_file():
+    with temp_data_dir() as folder:
+        dm.save_data_to_json([save_load_sample_record()], "mine")
+        assert dm.save_data_to_json([object()], "mine") == (None, "io_error")
+        assert dm.load_data_from_json("mine")[2] == "loaded"
+        assert os.listdir(folder) == ["mine.json"]
+
+
+def test_single_record_file_loads_as_a_one_item_list():
+    with temp_data_dir() as folder:
+        record = save_load_sample_record()
+        with open(os.path.join(folder, "one.json"), "w") as file:
+            json.dump(record, file)
+        loaded, _, status = dm.load_data_from_json("one")
+        assert status == "loaded" and loaded == [record]
+
+
+def test_empty_list_and_empty_file():
+    with temp_data_dir() as folder:
+        dm.save_data_to_json([], "empty")
+        assert dm.load_data_from_json("empty")[:3:2] == ([], "loaded")
+        open(os.path.join(folder, "blank.json"), "w").close()
+        assert dm.load_data_from_json("blank")[2] == "invalid_json"
+
+
+def test_list_with_one_bad_record_is_refused_whole():
+    with temp_data_dir() as folder:
+        with open(os.path.join(folder, "mixed.json"), "w") as file:
+            json.dump([save_load_sample_record(), {"junk": 1}], file)
+        assert dm.load_data_from_json("mixed")[2] == "invalid_format"
+
+
+def test_non_utf8_file_is_treated_as_corrupt():
+    with temp_data_dir() as folder:
+        with open(os.path.join(folder, "bytes.json"), "wb") as file:
+            file.write(b"\xff\xfe\x00bad")
+        assert dm.load_data_from_json("bytes")[2] == "invalid_json"
+
+
+def test_unicode_survives_a_round_trip():
+    with temp_data_dir():
+        record = save_load_sample_record()
+        record["company_profile"]["company_name"] = "Café 緑 ✓"
+        dm.save_data_to_json([record], "uni")
+        assert dm.load_data_from_json("uni")[0] == [record]
+
+
+def test_audit_ids_actually_increase():
+    records = []
+    seen = []
+    for _ in range(3):
+        audit_id = dm.generate_audit_id(records)
+        seen.append(audit_id)
+        records.append(save_load_sample_record(audit_id))
+    assert len(set(seen)) == 3
+    assert seen == sorted(seen)
+
+
+def test_record_validity_rules():
+    assert dm.is_valid_audit_record(save_load_sample_record())
+    assert dm.is_valid_audit_record({"Company Name": "A", "Proposal Narrative": "x"})
+    for bad in (None, 5, "x", [], {}, {"Company Name": "A"}):
+        assert not dm.is_valid_audit_record(bad)
+
+
+def test_add_audit_record_recovers_from_a_bad_list():
+    assert dm.add_audit_record(None, {"a": 1}) == [{"a": 1}]
+    assert dm.add_audit_record([{"b": 2}], {"a": 1}) == [{"b": 2}, {"a": 1}]
+
+
+def test_nested_record_converts_to_display_format():
+    flat = logic.audit_record_to_display_format(save_load_sample_record())
+    assert flat["Company Name"] == "Acme"
+    assert flat["Reporting Advisory Fee"] == 0.0
+
+
+def test_history_refuses_unsafe_usernames():
+    with temp_data_dir() as folder:
+        for bad in ("../x", "a/b", "", None, 5):
+            try:
+                result = dm.append_user_audit(bad, {}, {}, {})
+            except ValueError:
+                continue
+            assert not result
+        assert dm.get_user_audits("../x") == []
+        assert not os.path.exists(os.path.join(os.path.dirname(folder), "x"))
+
+
+def test_logging_out_clears_the_active_user():
+    with temp_data_dir():
+        dm.set_active_user("alice")
+        dm.set_active_user(None)          # logout
+        assert dm.get_active_user() is None
+
+
+def test_delete_and_update_reject_odd_indexes():
+    old = edit_and_delete_records()
+    assert dm.delete_record(old, -1)[1] == "bad_index"
+    assert dm.delete_record(old, True)[1] == "bad_index"
+    assert dm.delete_record("nope", 0)[1] == "bad_index"
+
+
+def test_every_editable_field_can_be_updated():
+    for field in dm.EDITABLE_RECORD_FIELDS:
+        new, status = dm.update_record_field([{"Company Name": "A"}], 0, field, "v")
+        assert status == "updated", field
+        assert new[0][field] == "v"
+
+
+def test_filters_survive_damaged_records():
+    junk = [None, 5, {}, {"evaluation": "x"}, {"company_profile": []}]
+    assert dm.filter_by_decision_status(junk, "MANUAL_REVIEW") == []
+    assert dm.filter_approved_records(junk) == []
+    assert dm.find_records_by_company(junk, "a") == []
+    assert dm.available_decision_statuses(junk) == []
+
+
+def test_pdf_handles_markup_characters_and_unicode():
+    with temp_data_dir():
+        dm.set_active_user("alice")
+        audit = history_audit(2, "R&D <Ltd> Café", "MANUAL_REVIEW")
+        audit["application"]["Proposal Narrative"] = "Swap <b>old</b> & 'new' kit ✓"
+        name, status = dm.export_audit_to_pdf(audit)
+        if status == "missing_dependency":
+            pytest.skip("reportlab is not installed")
+        assert status == "exported"
 
 
 def test_extension_is_added_once():
