@@ -1,0 +1,1364 @@
+commit 89833f21a65fd2b3772e616a115681605a0e31fb
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 16:54:44 2026 +0800
+
+    fix: add pytest to requirements.txt for CI pipeline
+
+commit efff61b63b39138f989faf956a6662db113234ec
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 16:51:32 2026 +0800
+
+    Praying all ruff issues settled. Plz
+
+commit 0497253634076ad9007d98e33e7ee0ce25c97fee
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 16:41:06 2026 +0800
+
+    Thank you ruff for helping to fix. Hopefully
+
+commit fea2e1cef0d6c3a81348bbcaa63e8a316e512811
+Merge: 7a9f208 e5811de
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 16:33:19 2026 +0800
+
+    Merge branch 'main' of https://github.com/SYnthestic/INF1103_ProjectGrpWork
+
+commit 7a9f2088daf38db13ea0bd592d0e1572b10c203f
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 16:32:06 2026 +0800
+
+    Am confident this is more idiot-proofed now
+
+commit e5811de0ee90a8388aa75ae92c9443baf3963884
+Merge: 89e2aea 14d3275
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 09:43:26 2026 +0800
+
+    Merge pull request #3 from SYnthestic/chore/remove-unused-setup-files
+    
+    Chore/remove unused setup files
+
+commit 14d32751a40d62b0b2d3dd3f4c2f4e409d04c7a5
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 09:27:49 2026 +0800
+
+    Remove redundant Project Brief
+
+commit 2c4356a2fa2a2f8e233fa8b448c6fdbd4a206232
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 09:26:05 2026 +0800
+
+    Remove unused setup notebook and version-check script
+
+commit 89e2aea20ed34c337db5c70cbc3b78389e9a3af5
+Author: Timothy-Tan-SIT <2604749@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 09:19:46 2026 +0800
+
+    Delete Draft for Speed Project.docx
+    
+    Deleting unrelated files
+
+commit 26913bd7be0e44d787ecd132b8ba7fc0d791fbb4
+Author: Timothy-Tan-SIT <2604749@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 09:18:26 2026 +0800
+
+    Delete projectspecfiles directory
+    
+    Cleaning up main branch
+
+commit ca3c47d5b15d355cfe4674deab316dbc0623460d
+Author: Timothy-Tan-SIT <2604749@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 09:18:07 2026 +0800
+
+    Delete PDF_Documents directory
+    
+    Cleaning up main branch
+
+commit d5da8102323df68c903b7fae5e88886e9077bc9d
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Oct 14 00:28:57 2026 +0800
+
+    No need docker_com.txt anymore. README docker commands should suffice
+
+commit fba660c99e83a9fc4ffebfb642fe00fb568ab7e0
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 23:42:19 2026 +0800
+
+    Add offline test script for the Logic Manager using hardcoded sample AI responses
+
+commit 4972214205b36d98df3e74ba5e151eda556f600a
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 23:44:35 2026 +0800
+
+    Clean up the bad merge: duplicate retrieve_proposal_type, restore .env.example, drop redundant pip install art
+
+commit cbf61629794b4c5dbbc49a23d04a6a94f07f925f
+Merge: 6d4e5a5 7ad8f2b
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 23:39:47 2026 +0800
+
+    Merge branch 'main' of https://github.com/SYnthestic/INF1103_ProjectGrpWork
+
+commit 6d4e5a57d1d6c4d43ab35249763d932241ea077e
+Merge: b05128b 09cda55
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 23:39:25 2026 +0800
+
+    Merge branch 'feature/logic-manager'
+    And merge properly this time
+
+commit 7ad8f2b62e7962c4b120a6b9f158fc4fc02ac81e
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 23:35:12 2026 +0800
+
+    Add version bounds to requirements and a CD job that publishes the Docker image
+
+commit 249a858ed179801acfde829bd7bc4e64f1042775
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 23:34:53 2026 +0800
+
+    Stop tracking stray test save files in the project root
+
+commit 6102a531cb1f1089081704a77d473ed1218725d5
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 23:34:52 2026 +0800
+
+    Split the 500-line PDF export into small functions (output unchanged)
+
+commit 32d8c86f8c90e697c7500d14caddc90ed5c77cd9
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 23:30:05 2026 +0800
+
+    Add type hints to ai_manager, data_manager, io_manager and main
+
+commit b05128b52e5dc669d984b395c96ebb956463ef9f
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:56:04 2026 +0800
+
+    Stop tracking .env, users.json and per-user record files
+    
+    These are local, per-person files: .env holds the API key, users.json holds
+    password hashes, records/ holds saved audits. They are already in .gitignore
+    but were committed earlier, so git kept tracking them (an empty .env in the
+    repo is how a real key ends up pushed by accident). They are removed from
+    the repository only; the files stay on each person's disk unless git
+    refuses to overwrite a locally changed copy (see the README note).
+    Adds .env.example as the template to copy.
+
+commit a5aba490762cc9ef200ddca0a5860771f22a0248
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:55:44 2026 +0800
+
+    Polish: log AI failures, input length limits, controller no longer imports the screen art, remove dead code
+    
+    - AI failures and unusable answers are logged to DATA_DIR/app.log (the spec
+      asks the AI layer to 'log and continue'); main() turns logging on through
+      the Data Manager. ai_manager stays silent when logging is off
+    - company name, proposal description, 'other' industry and grant name have
+      maximum lengths, so a huge paste can no longer be sent to the AI
+    - main.py asked the screen-art module for the continue button directly; it
+      now goes through io_manager.wait_for_continue()
+    - removed unused io_manager code left over from development (two __main__
+      test blocks, build_user_profile, two unused print helpers)
+    - tests for all of the above
+
+commit 4020500d280d11d9013b43d4c307c230d7d8beaf
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:51:41 2026 +0800
+
+    Audit history: filter, PDF report from the saved audit, count at login
+    
+    - option 9 can filter the list by decision status or company name (Data
+      Manager does the filtering; the first use of the filter/query functions
+      the project spec asks for)
+    - after opening an audit the user can export it as a PDF report. The PDF is
+      built from the saved history entry, so it always shows the final AI
+      analysis and grant decision (the option 2 save files only hold the
+      application inputs). Saved in records/<username>/
+    - export_json_to_pdf now wraps export_records_to_pdf, which takes a list of
+      records, so the old file-based export still works
+    - the number of saved audits is shown after login
+    - main.py no longer calls print(): the Ctrl+C / end-of-input messages moved
+      to io_manager (the spec says all print() calls live in the I/O Manager);
+      test_architecture checks main.py too
+    - tests for all of the above
+
+commit 558b1d0495cf157caa4be2c1f4c0fdcf1ff3461b
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:49:45 2026 +0800
+
+    Tests: plain functions instead of unittest classes
+    
+    The project rule is no class definitions anywhere, and assessors grep for
+    them. The tests were unittest.TestCase classes, so they are now plain
+    test_* functions with plain assert statements, run by tests/run_tests.py
+    (no extra install; pytest can also run them). Shared set-up is two small
+    functions in tests/helpers.py. test_architecture.py now also fails if a
+    class appears anywhere in the code base. Same 155 tests, plus that one.
+
+commit d7d36716b9e88b0568da6ba102785e68a13a6a80
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:36:30 2026 +0800
+
+    Menu options 5 and 6: choose which detail to change; replace a saved file
+    
+    - option 5 lets the user pick a record and then one detail to change, using
+      the same validated prompts as when the record was entered
+    - option 6 deletes a record after a confirmation
+    - saving to an existing file now asks add / replace / cancel, so a
+      deleted record can really be removed from a saved file
+    - the Data Manager does the changes (update_record_field, delete_record)
+      and returns new lists, leaving the originals untouched
+    - replaces the earlier update/delete functions (they could only change the
+      company name and the grant)
+    - fixed the 'No AI audit yet' message to point to option 7
+    - README: layer table, new menu options, rule list
+
+commit dfcd22bedd14b8c3b0b868374d0b02470c68f7f7
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:34:46 2026 +0800
+
+    Separate the layers: AI and I/O no longer import each other or Data
+    
+    - ai_manager no longer imports io_manager; the waiting screen is passed
+      in as a function (get_ai_response(narrative, show_progress))
+    - io_manager no longer imports data_manager; it only prompts and shows
+      results. The save/load/merge steps moved to main.py (the controller)
+    - the welcome text prints when show_welcome_sequence() is called, not
+      when io_manager is imported
+    - main.py is now small functions plus main(), and can be imported by
+      tests without starting the program
+    - options 5 and 6 keep their current behaviour (Tia's functions), now run
+      from update_record_flow / delete_record_flow in main.py
+    - tests/test_architecture.py fails if a layer imports another layer or
+      the logic/data/AI layers call print()/input()
+    - tests for the controller flows and the I/O Manager's pure helpers
+
+commit af138b2402007c3f2538e923e3f53c4281115e5d
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:31:27 2026 +0800
+
+    Remove duplicated display code left by the merge
+    
+    display_grant_decision built its text twice and printed the decision panel
+    twice on every audit. display_applied_grants rebuilt its lines a second time
+    with direct dict indexing, which overwrote the flat_record() version and would
+    raise KeyError for records loaded in the nested layout.
+    
+    README: options 5 and 6 are built, and the container runs as root, so the
+    Linux permission row no longer applies.
+
+commit db53ae24d25b2f762a8ab1597e0ba07cd20b15b2
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:26:44 2026 +0800
+
+    Remove duplicated imports and stray merge fragment from io_manager
+    
+    The merge left a second copy of the platform-setup header, a duplicate import
+    block, and a leftover chunk (an indented 'import tty' plus a second _getb,
+    _pending and _raw_input) that ended up inside _raw_input's finally block.
+    Because 'import tty' was then local to _raw_input, tty.setraw() raised
+    UnboundLocalError on Linux/macOS/Docker. Windows was unaffected.
+
+commit dfa630ed0c67842de8e015dccddadea0ea0c92a7
+Merge: a37687d 3e11975
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:21:12 2026 +0800
+
+    Merge branch 'main' of https://github.com/SYnthestic/INF1103_ProjectGrpWork
+
+commit a37687d9a3d0ec886b5206f5aa69257f6b8ca345
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:20:51 2026 +0800
+
+    Removing duplicate functions and dealing with failure of commit checks
+
+commit 3e11975486b78dab1b6592f6dbda0ba8890f2710
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:18:26 2026 +0800
+
+    Removing duplicate functions and dealing with failure of commit checks
+
+commit 90f19e1ed8926c5906d38df8bbb38cee8cb93a5c
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:06:09 2026 +0800
+
+    Think I managed to fix the bug. TBC, can the rest confirm plz
+
+commit 34580ae61b93ff5f9d2a251fac1b6faedde8beb1
+Merge: 3e3b008 5950f69
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 22:02:48 2026 +0800
+
+    Merge branch 'login_system'
+
+commit 3e3b0080db4dec2407d20d6cf0f65c53c87ac2b9
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 21:53:22 2026 +0800
+
+    Managed to use *args here. Key is used only for loading file. Saving? Not necessary for it
+
+commit ef018c2d2c0bfa33a85027a82dad064124400a2a
+Merge: 8e50681 68adce3
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 21:01:10 2026 +0800
+
+    Merge branch 'update-and-delete'
+
+commit 68adce3f27fe84ea3c55e7c4c795ca94ceab8234
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 20:52:17 2026 +0800
+
+    making the Options 7 and 8 easier to understand
+
+commit 5950f697b5e019c07fff8587868b11a81d487dab
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 14:12:57 2026 +0800
+
+    Split the grant decision into small rules with a priority list
+    
+    evaluate_grant_application was one 570-line function. It is now:
+    - build_case(): cleans the profile and AI audit into one case
+    - rule_* functions: one per decision, each returns a decision or None
+    - DECISION_RULES: the priority order (first match wins)
+    - cap_subsidy_at_retrofit_cost / add_scheme_mismatch_note: adjustments
+    
+    Scheme names, co-funding rates and caps are named constants. Outputs are
+    unchanged (checked against the old version on 60,000 random cases) and
+    public logic functions now have type hints.
+
+commit 568dc5aa40a4224a689f8e32a889f47e33408224
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 14:12:57 2026 +0800
+
+    Add GitHub Actions CI and ruff lint settings
+    
+    Runs lint and the unit tests on Python 3.11-3.13, then builds the Docker
+    image and runs the tests inside it. README documents how to run them.
+
+commit 0120e37447153053209c5ed5d389e036b379f64d
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 14:12:57 2026 +0800
+
+    Add unit tests; fix shared AI fallback defaults; remove unused imports
+    
+    - tests/ covers the grant rules, SME check, subsidy maths, password
+      hashing, AI output cleaning, accounts, history and saved files
+    - AI fallback defaults are now deep-copied so one result's keyword list
+      can no longer leak into the next
+    - main.py imports continue_button explicitly instead of using import *
+
+commit 8e506815dca29e3545cc290071b4b82cb1c0f164
+Merge: 44fed92 4c2e783
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 13:48:23 2026 +0800
+
+    Merge branch 'feature/data-manager'
+
+commit 08d16168e0f8b6043872f72f63d43b5133ab88b6
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 13:46:34 2026 +0800
+
+    Fix SME check: revenue cap only, remove leftover headcount rule
+
+commit 0feb10a53a2243ecd11f83cb9448eb3bc328196d
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 13:45:35 2026 +0800
+
+    Made some changes and improvements
+
+commit d6d58769e9899d9ffce6862c1720ac7c8bf12be9
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 11:15:58 2026 +0800
+
+    README: explain how grant decisions are made
+    
+    Adds the ordered decision rules (SME test, energy-reduction bands,
+    scheme caps, subsidy limited to the retrofit cost) and notes that menu
+    options 5 and 6 are not built yet.
+
+commit 21ab87aefa75edcbcd83de17f9eb74c8d7039d63
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 11:15:50 2026 +0800
+
+    Ignore "none" / "N/A" placeholders in the exclusion keywords
+    
+    Models often write ["None"] or "N/A" instead of an empty list. That
+    counted as a detected exclusion and sent a clean proposal to manual
+    exclusion review. Placeholder words are now dropped by both the AI
+    Manager (when cleaning its output) and the Logic Manager.
+
+commit cf008030eaa08ebae74d2f7b81235034a06a92aa
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 11:15:44 2026 +0800
+
+    Tell the applicant when their chosen scheme differs from the match
+    
+    The grant the applicant picks was collected and saved but never used.
+    When the proposal is approved for different scheme(s) than the EEG
+    Base/Advanced or Sustainability Reporting choice, a recommendation now
+    says what was matched. The decision itself never depends on the choice,
+    and other choices (EDG, Others) are not flagged.
+
+commit 7213a2af2fb96e36ad553684d9d122e2f317e52e
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 11:15:24 2026 +0800
+
+    Cap equipment subsidies at the retrofit cost; review zero-fee reports
+    
+    - A subsidy is now never larger than the retrofit cost the applicant
+      entered (it was 70% of the baseline energy spend, capped at the
+      scheme maximum, so a SGD 5,000 retrofit could be granted SGD 30,000).
+      The decision explains when the cap applied. A retrofit cost of 0
+      (not stated) applies no cap.
+    - An ESG reporting proposal with a fee of 0 used to be "pre-approved"
+      for SGD 0; it now goes to MANUAL_REVIEW asking for the quoted fee.
+
+commit 8902cec01f1ad3edbec66d2a8803a51f3914da7b
+Merge: 9202f0f 35d303d
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 13:30:20 2026 +0800
+
+    Merge branch 'login_system' of https://github.com/SYnthestic/INF1103_ProjectGrpWork into login_system
+
+commit 9202f0f3d08767642df8b276f3fd4df027241283
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 11:15:06 2026 +0800
+
+    Align the SME and energy-reduction rules with the project rule set
+    
+    SME test: a company whose annual revenue is over SGD 100 million is now
+    rejected whatever its headcount (it used to pass with 200 or fewer
+    staff). The rejection reason and recommendation say so.
+    
+    Energy-reduction bands (same for every scope):
+    - 20% or more, Scope-1: fast track (unchanged)
+    - 15% or more: provisional Tier 2 (before: Scope-2/3 at 10%; Scope-1
+      at 10-20% was wrongly rejected)
+    - 10% to under 15%: manual review (new)
+    - under 10%: rejected as low impact. The reason text is now true; it
+      used to say "15% is below the minimum of 10%".
+    
+    The Advanced Tier (over 350 tonnes) also needs at least the 10%
+    minimum reduction, so an AI-claimed tonnes figure with 0% reduction
+    can no longer earn up to SGD 350,000.
+
+commit 35d303dd612fe4ac0641d66fe025823e36281111
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 13 00:07:49 2026 +0800
+
+    Fixing Loophole 4: make sure its under both 00M and 200 pax. And Loophole 9: Making sure just seeing 'fossil fuel modification' in intervention should make it go into the MANUAL_EXCLUSION_REVIEW branch.
+
+commit 6b7c3cf22c3e04dbb8473fea4029b8533d39f04c
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 23:11:27 2026 +0800
+
+    Fix the remaining ways the app could crash
+    
+    - Viewing records loaded from a file (options 3 then 4, 7, 8) raised a
+      KeyError when the file used the nested record layout or was missing
+      a field. Records are now converted to the flat layout and missing
+      values show as N/A.
+    - The AI step (options 1 and 7) and the grant logic (options 1 and 8)
+      run through attempt(): an unexpected error now prints a short
+      message and returns to the menu instead of ending the program.
+      Ctrl+C and end of input still exit cleanly.
+    - parse_ai_audit no longer raises when the model returns something
+      other than text (e.g. a list of content parts).
+    - Login checks the username format, so a hand-edited users.json with
+      an unusable name cannot crash the login.
+
+commit 31eb5fe8bf2d0e6e9d0103e0e67cd28d62b40444
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:16:01 2026 +0800
+
+    Show menu options 9 and 10 inside the boxed menu
+    
+    "9. View My Past Audits" and "10. Logout" were printed as a plain
+    text line under the ASCII-art menu. They are now rows of the menu box
+    itself, and a "Logged in as: <name>" row is added when someone is
+    logged in (gui.boxed_menu(username)). The title is now 'select your
+    choice (0-10)' (it still said 0-6 although options go up to 8).
+    io_manager.print_account_menu() is removed.
+
+commit 22913a39917ee261ccfec13822b32d315b2a2545
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:11:42 2026 +0800
+
+    README: per-user record folders, failed-AI audits, lock files
+    
+    Documents where saved records now go (records/<username>/), that an
+    audit is not added to the history when the AI call fails, the 8-64
+    character password rule, the temporary .lock files, and a
+    troubleshooting row for failed saves.
+
+commit 72fb8325a1288e85e5e8b6c382a7d08d26731c9d
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 22:34:05 2026 +0800
+
+    List all dependencies in requirements.txt; fix a missing label
+
+commit 10a48f235c51c91353765bbcab7cff08f1df7bc0
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:10:08 2026 +0800
+
+    Exit cleanly on Ctrl+C or end of input
+    
+    Pressing Ctrl+C at a prompt, or running the container without -it,
+    ended the program with a long traceback. main.py now prints a short
+    message instead (and a hint about 'docker run -it' for EOF); other
+    errors still show their normal traceback. The AI worker thread is a
+    daemon so Ctrl+C during the AI wait exits at once.
+
+commit 7515d279097ebe66a32a51ffba4ea60666bcd589
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:09:33 2026 +0800
+
+    Lock users.json and audit_history.json while they are updated
+    
+    Both files are read, changed and rewritten as a whole, so two copies
+    of the app sharing one folder (e.g. two containers) could overwrite
+    each other's new account or audit. Updates now take a short-lived
+    .lock file first and wait their turn (up to 5 s); a lock left behind
+    by a crashed run is cleared after 30 s. If the lock cannot be
+    obtained the save reports failure instead of risking a lost update.
+
+commit acec9ead01df670d331c88ff3d3fc391d058f58f
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:09:08 2026 +0800
+
+    Keep saved record files in a separate folder for each user
+    
+    Options 2/3 (and the PDF export) wrote to one shared folder, so any
+    logged-in user could load or overwrite another user's saved files.
+    They now use DATA_DIR/records/<username>/.
+    
+    - Data Manager: set_active_user() chooses the folder; usernames are
+      checked against [a-z0-9_] before being used in a path, so nothing
+      like ".." can escape the records folder.
+    - main.py sets the active user at login and clears it at logout.
+    - records/ and *.lock added to .gitignore and .dockerignore.
+    
+    Files saved earlier directly in the data folder are no longer listed
+    for users; move them into records/<username>/ to keep using them.
+
+commit a47c01e814d074caed1196fa5168a622f545a1ca
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:08:45 2026 +0800
+
+    Do not save failed AI results to the user's audit history
+    
+    If the AI call failed (missing OPENROUTER_API_KEY, timeout, unusable
+    answer) the fallback MANUAL_REVIEW/Unknown result used to be stored as
+    a real audit. It is now shown but not saved, with a message telling the
+    user to check their connection and API key and try again.
+
+commit 7533643b8097aec60543230550d2d998b007bd8c
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:08:38 2026 +0800
+
+    Make the past-audit screens tolerate damaged history entries
+    
+    A null timestamp, a text subsidy, or a non-dictionary entry in
+    audit_history.json used to crash "View my past audits" with a
+    traceback. The list and detail screens now show what is there
+    (N/A / SGD 0.00 for bad values) and the Data Manager drops entries
+    that are not audit records.
+
+commit c71a9545a956933a33fc994138ed322926add959
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:08:18 2026 +0800
+
+    Harden login against damaged account data and over-long passwords
+    
+    - verify_password: a user record with a bad/non-hex salt, a non-integer
+      or zero iteration count, or a non-text hash now simply fails the
+      login instead of raising. Iterations are capped so a hand-edited file
+      cannot hang the app, and over-long passwords are rejected up front.
+    - Data Manager: get_user only returns real records, and user_exists
+      checks the username key, so a damaged entry can never be overwritten
+      by a new account with the same name.
+    - I/O: login rejects passwords longer than the sign-up limit (64).
+
+commit 692215e39f4eb062bccac41d099edb1b958e5cb5
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:07:48 2026 +0800
+
+    Reject nan/inf inputs and bad values in the grant checks
+    
+    - I/O: float() accepts "nan" and "inf", which slip past the <= / >=
+      range checks. All numeric money/percentage prompts now use
+      finite_float() and ask again.
+    - Logic: values from the profile or AI audit are coerced to finite
+      numbers, so a None/text/NaN value can no longer raise a TypeError
+      or silently fall through to "low impact". A lone exclusion string
+      is kept whole instead of being read letter by letter.
+    - Logic: an equipment proposal with no baseline energy spend now goes
+      to MANUAL_REVIEW instead of being "pre-approved" for SGD 0.
+
+commit 7e91233e3b6261b72cb23820c9e1dd63e17d9bbc
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 18:07:10 2026 +0800
+
+    Validate and clean the AI Manager's output
+    
+    The model can return the right keys with the wrong types ("30%" or
+    null for a number, a string or null for the keyword list). These
+    crashed the Logic Manager or were read letter by letter.
+    
+    - parse_ai_audit now cleans every field: numbers are clamped
+      (reduction 0-100, tonnes >= 0, NaN/inf rejected), scope names are
+      normalised ("scope 3" -> "Scope-3"), keywords become a list of
+      strings, text fields become strings.
+    - JSON surrounded by extra prose is now recovered.
+    - New ai_status field ("ok"/"failed") plus ai_call_failed() so other
+      layers can tell a fallback result from a real one.
+    - A missing OPENROUTER_API_KEY now gives a clear message instead of a
+      bare KeyError; the unused api_key variable is now used.
+
+commit 7c593c792af21e58d668725b6a2ee0792f9160cf
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 17:59:57 2026 +0800
+
+    Docker setup: keep JSON files in the data folder, clearer README
+
+commit 3fdf42133ad3b183c33da9ec5a68b8029a0a95ce
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 13:55:28 2026 +0800
+
+    Document the login system in the README
+    
+    - new "Accounts and login" section: login/sign-up rules, how passwords
+      are hashed, what users.json and audit_history.json contain
+    - menu summary updated for options 9 (past audits) and 10 (logout);
+      also corrects "5 and 6" to "7 and 8" for the AI/logic re-run options
+
+commit fa2a67f3520ba32223b34805b04812e31584d0d1
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 13:55:28 2026 +0800
+
+    Add "View my past audits" (menu option 9)
+    
+    Logged-in users can list and reopen their own saved audits. Only the
+    current user's history is ever loaded, so users cannot see each
+    other's audits.
+    
+    - I/O Manager: MENU_AUDIT_HISTORY constant, option shown under the
+      main menu, summary table (#, date, company, decision, subsidy),
+      audit-number picker with validation, full detail view reusing the
+      existing AI audit and grant decision reports
+    - main.py: audit_history_flow(username) using dm.get_user_audits
+
+commit 61298b57252e678547fcf83f9856a0a9d0aa412d
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 13:55:28 2026 +0800
+
+    Link audits to the logged-in user (audit_history.json)
+    
+    Every audit completed via option 1 is now saved automatically under
+    the current user's username, together with the inputs, the AI audit
+    and the grant decision. Each user's audits are numbered from #1.
+    
+    - Data Manager: AUDIT_HISTORY_FILE, load_audit_history,
+      get_user_audits(username), append_user_audit(username, ...)
+      with audit_id (via generate_audit_id) and timestamp
+    - I/O Manager: "Audit #N saved to your history" confirmation
+    - main.py: save to history right after the grant decision
+      (the existing optional "Save to JSON" export is unchanged)
+    - audit_history.json ignored by git and Docker
+
+commit fc0b2df165f989caf83c1c312c354a767f08175b
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 13:55:27 2026 +0800
+
+    Add logout (menu option 10)
+    
+    Option 10 returns to the login screen so another user can sign in
+    without restarting the app. Session state (scheme_grant_records,
+    ai_audit_data, jsonfile_name) is reset on every login, so one user's
+    unsaved records are never visible to the next user.
+    
+    - I/O Manager: MENU_LOGOUT constant, "10. Logout" under the main menu,
+      logged-out message
+    - main.py: menu loop also ends on MENU_LOGOUT; outer loop returns to
+      the login screen
+
+commit 17dab1ee8723cf61f723aea1f297cc52a327d475
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 13:55:27 2026 +0800
+
+    Save user accounts persistently to users.json
+    
+    Accounts now survive restarts. Only the Data Manager changes: the
+    get_user / user_exists / save_new_user interface is the same, so the
+    I/O, Logic and main.py code from the previous commit is untouched.
+    
+    - users.json stores username, salt, hash, iteration count, created_at
+      (plain JSON, not otherwise secured; passwords are never stored)
+    - read_json_file / write_json_file helpers; writes go to a temp file
+      and are swapped in with os.replace so a crash can't half-write it
+    - users.json ignored by git and Docker so hashes are never committed
+    - stored next to the other save files (DATA_DIR); an unreadable file is never overwritten and a corrupt one is set aside as .corrupt, like the record save files
+
+commit 7ab39b605618ae7a8ca6e1024d92cbadb4b95de4
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 13:55:27 2026 +0800
+
+    Add user account creation and login
+    
+    Users must now log in (or create an account) before reaching the main
+    menu. Accounts are held in memory only in this commit, so they last
+    for the current run; the next commit makes them persistent.
+    
+    - I/O Manager: login screen (1 Login / 2 Create account / 0 Exit),
+      username rules (3-20 chars, letters/digits/_ , case-insensitive),
+      password rules (8+ chars, a letter and a digit, no edge spaces),
+      hidden password entry via getpass, typed twice on sign-up,
+      generic "invalid username or password" message on failed login,
+      "Logged in as" line under the main menu
+    - Data Manager: get_user / user_exists / save_new_user
+    - main.py: create_account_flow and login_flow wire
+      I/O -> Logic (hash/verify) -> Data. The existing menu is unchanged
+      but indented one level inside the new login loop.
+
+commit b772f42dcad6e6422ec9ad22e9f1701f6ad4f1aa
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 13:55:27 2026 +0800
+
+    Add salted SHA-256 password hashing (Logic Manager)
+    
+    New, self-contained helpers; nothing calls them yet, so the app
+    behaves exactly as before.
+    
+    - hash_password(): PBKDF2-HMAC-SHA256, random 16-byte salt per user,
+      200,000 iterations
+    - build_new_user_record(): username + salt + hash (never the password)
+    - verify_password(): constant-time compare via hmac.compare_digest;
+      unknown usernames still do a dummy hash so they can't be detected
+      by response time
+
+commit ae3123a251b6da9b15a7268435c94f36e436ee19
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 14:06:33 2026 +0800
+
+    Managed to integrate Tia's delete and update functions. We'll try to do more with them?
+
+commit ece9ceee44ddcd2b8bbbd22b7c05a1522986cf39
+Merge: c813b98 44fed92
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 14:01:17 2026 +0800
+
+    Merge branch 'main' into update-and-delete
+
+commit c813b98eec4c80557c0148e1d2411c18b2f84a87
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 13:52:10 2026 +0800
+
+    Integrating Update and Delete with some bugs
+
+commit 880a83b803577f0b2524bd81cc117981af95c242
+Merge: 2f0e06f 44fed92
+Author: Timothy-Tan-SIT <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 07:08:10 2026 +0800
+
+    Merge pull request #2 from SYnthestic/main
+    
+    New base code for user login
+
+commit 44fed92fa97b9c491cc09d2730690440af6d55aa
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 01:02:21 2026 +0800
+
+    Integrated Ming Yao's Latest Sustainability IO Function with main. Shld've noticed this earlier... my bad
+
+commit 822d6d396a8ce70988ea04da0a62115440b5c29c
+Merge: f8acad7 d2c5f0f
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 12 00:22:45 2026 +0800
+
+    Merge branch 'feature/io-manager'
+
+commit f8acad74b7c0a9e4fb131a14b1a21cb760dfdc79
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 22:48:21 2026 +0800
+
+    Managed to integrate Zhi Bin's Data Manager with overall program. Not sure if, or how many functions are lost tho
+
+commit fd5d4f59d7b7ab8d8c30b060bf54110ba2ce1d8f
+Merge: 6c756a6 78c5423
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 22:18:25 2026 +0800
+
+    Merge branch 'main' of https://github.com/SYnthestic/INF1103_ProjectGrpWork
+
+commit 6c756a6ac6df56459f3b0e53c2c654354a967cf3
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 22:09:23 2026 +0800
+
+    Revert "Transferred AI Manager time bar from GUI to IO Manager"
+    
+    This reverts commit cc92db8655313358a9234b50b188a1b17e9b8ff5.
+
+commit 78c54232a55187f7d0e011b2effe2536c4cf7695
+Merge: 86f4204 588350b
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 21:47:28 2026 +0800
+
+    Fixing merger conflicts.
+
+commit 4c2e783707e16eb3d81c4c1e7c71b14f0aecb548
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 21:40:57 2026 +0800
+
+    Add reportlab in requirements.txt for PDF function
+
+commit 588350ba88f8f2f528e4eece3fb0b27df32ca08b
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 13:57:44 2026 +0800
+
+    Completed: Updated PDF file design with new font, text colors, and spacing
+
+commit 2f0e06f6e73fc065bab16094bd6846fbd1ca85f4
+Merge: 8d930d2 86f4204
+Author: Timothy-Tan-SIT <2604749@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 00:42:28 2026 +0800
+
+    Merge pull request #1 from SYnthestic/main
+    
+    Updating base code for a new login system
+
+commit 86f4204ade13e9deaa8d46276765118118d4696d
+Merge: 8d930d2 459c449
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 00:39:23 2026 +0800
+
+    Yet more merge conflict. Deleted the 2 .pyc files
+
+commit 459c4495af51ecfa3a4b241902875625b95d0ef7
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 00:33:30 2026 +0800
+
+    Just adding options 5 and 6
+
+commit 42de5296b07bbc2ff184faa9ec82b3e48002e89a
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sun Oct 11 00:31:58 2026 +0800
+
+    Adding back the missing 4 options, and updating stuff a little
+
+commit 7d0ce2e0c18a6edb24f831f3f637d6fc01a0ef85
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Sat Oct 10 23:52:32 2026 +0800
+
+    Work in Progress: Added a function whereby each JSON filename is unique to that particular user company name. So if the same user use the tool again with the same company name, the new audit record will be appended to the existing JSON file they have earlier.
+
+commit b5da5050fca2ec40e8a8407c86aea301ff89eeb2
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Sat Oct 10 23:48:31 2026 +0800
+
+    Work in Progress: Added a generate PDF function using saved JSON output after the user used the tool. Still formatting and designing the PDF document to look prettier
+
+commit 8d930d2a625fc2eb3bb818fa7eb09a114f2d7995
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sat Oct 10 19:59:56 2026 +0800
+
+    Just preparing for Tia's Update and Delete Functions. These are options 5 and 6
+
+commit 2449ae019890a07e01e8e005b65bfba9fc22ac2f
+Author: Tia <2603925@sit.singaporetech.edu.sg>
+Date:   Sat Oct 10 03:17:17 2026 +0800
+
+    refactor(ui): encapsulate welcome banner in io_manager and trigger from main
+
+commit 04fdf111cdc987b850ae3598c16350ef83d2743d
+Author: Tia <2603925@sit.singaporetech.edu.sg>
+Date:   Sat Oct 10 02:49:20 2026 +0800
+
+    clean up imports, change the import code in case 4
+
+commit 00fb169d1b059e5f087e1497c0f6e76df950c4e9
+Author: Tia <2603925@sit.singaporetech.edu.sg>
+Date:   Sat Oct 10 02:25:24 2026 +0800
+
+    feat(main): integrate update and delete interactive options into case 4
+
+commit 0fc000c248e6f71f150912454cf9278b5007b8a0
+Author: Tia <2603925@sit.singaporetech.edu.sg>
+Date:   Sat Oct 10 02:25:07 2026 +0800
+
+    feat(data): implement update_record_by_index and delete_record_by_index persistence
+
+commit 4028fdb448a72da7bf06da74f704421c3d1e4460
+Author: Tia <2603925@sit.singaporetech.edu.sg>
+Date:   Sat Oct 10 02:24:52 2026 +0800
+
+    feat(io): add record selection, editing prompts, and input validation
+
+commit 69e77a9db969106edd8aa9ac4210e2e9a9ae0a41
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sat Oct 10 00:45:13 2026 +0800
+
+    Aesthetics went brrrrr.. Time to send this back to main
+
+commit 27be41fae8293ae00c807edff824b73766803cd3
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 17:51:42 2026 +0800
+
+    More aesthetic functions added. Also put a cap of 50 characters on save file name
+
+commit 7b06120a2c127e06b1d7836b77e38cf20b292c17
+Author: Tia <2603925@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 17:17:51 2026 +0800
+
+    add update_record_by_index to overwrite existing records and trigger json save
+
+commit d7004a4d32ab791793eee66e18ad7e03c12729fb
+Author: Tia <2603925@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 17:14:48 2026 +0800
+
+    add retrieve_updated_record to handle user input for editing records
+
+commit f9efdb524681d725e272ac79d4f00b0648234216
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 16:38:57 2026 +0800
+
+    Starting to prepare for Zhi Bin to integrate his changes
+
+commit 36d8310f8584821ca3ee9b574055f11947c7e700
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 16:28:10 2026 +0800
+
+    Finished sending all print() to IO. Data Manager? Integrate with Zhi Bin's work then take care of that afterwards
+
+commit aaa1a4ef96ec32852099f327949f2e641df14e10
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 15:51:53 2026 +0800
+
+    Work in Progress: Improved data manager from previous commits
+
+commit b97096104ee6094cab59e56ffb0b383e9d7d7a0c
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 11:49:24 2026 +0800
+
+    Work in Progress: Updated io_manager with print calls for data manager
+
+commit d9c2479d68849659b1f1dff6588fe7dba30a228b
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 09:43:09 2026 +0800
+
+    Work in Progress: audit_record_to_display_format to show loaded records in menu
+
+commit d1322397bd493b8d4a123d0a5e4c502f54416f42
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 09:39:08 2026 +0800
+
+    Work in Progress: Added filter functions for decision status and company name
+
+commit 104066d03bbf8b3aa122cb5893da9484bbd08c8c
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Fri Oct 9 00:30:30 2026 +0800
+
+    Work in Progress: Removed all print calls previously made in Data Manager
+
+commit da4d7ddcfc8fab3db12e23d113d14fe51c4111a2
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 6 16:59:40 2026 +0800
+
+    made abit more modifications. Now I'm ready to send the clicking input to IO Manager
+
+commit e90a97d95576b0043f6e87053df5b3cbc9c47e79
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 6 14:34:18 2026 +0800
+
+    Added Start AI button: you only see the Start AI button when inputing data. If you choose option 5, it just goes straight to the AI Processor - this is intentional. Cos you alr know it will run. But for Option 1, you won't necessarily know the AI will run, so I added the Start AI Button to let the user know the AI is going to run
+
+commit e8512239ebbb361a53e9e686d7d825ed42f3705d
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Oct 6 12:50:45 2026 +0800
+
+    Git API security rearing its ugly head yet again
+
+commit b032247a1c0b4919681f0d1df72217fe39838fdb
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 17:20:49 2026 +0800
+
+    Neatened the import in main.py. Will now do the painful work of shifting the click function to IO
+
+commit cc92db8655313358a9234b50b188a1b17e9b8ff5
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 16:52:54 2026 +0800
+
+    Transferred AI Manager time bar from GUI to IO Manager
+
+commit bd0c1a3c80d342ef343d10373282fc7ae54df295
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 16:31:17 2026 +0800
+
+    Transferred the goodbye, and wrong option over to IO
+
+commit 4e34d20af85c62b82500943ec38af2ff11fad1a5
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 16:12:55 2026 +0800
+
+    Transferred print for save floppy disc to IO
+
+commit f8b0502300d3dd0c07d2a17b795711ff137fdb82
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 16:03:19 2026 +0800
+
+    First steps in sending the inputs from SME Interface GUI to IO Manager
+
+commit 05dc2d2fddc9bf8ea8f27f6d0434800baae2e412
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 15:17:33 2026 +0800
+
+    Starting to transfer some print() calls from main.py to IO Manager
+
+commit 5908ee801a1a6ef8441d4b8d2f6d773b3dcd0c5c
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 14:36:12 2026 +0800
+
+    Still unsuccessful
+
+commit 02ef620fdd8101c555f77609ede56dfad3c479b4
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 14:34:18 2026 +0800
+
+    Trying to settle the .env problem
+
+commit 09cda5550f19377b0928c87664f06f440773ce1a
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 14:24:03 2026 +0800
+
+    Read through project specs and added PDF to organise PDF docs
+
+commit 20dbd17b62a1be5888da61697fe6c070413ca32e
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Oct 5 13:52:40 2026 +0800
+
+    Added team project specs, timeline, and all relevant files in
+
+commit 7f5922f1a68bd011e56f849bb5da71065a326284
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Sun Oct 4 22:53:55 2026 +0800
+
+    Work in Progress: Slight amendments to audit_id function and pre existing save file function
+
+commit e23e666ee73cbce080417cd6f0ec102692e4610d
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Sat Oct 3 22:45:22 2026 +0800
+
+    Work in Progress: Updated load data from json function to include file naming validation too
+
+commit 8e55653d95a1648a809829d3838abdb45330f551
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Sat Oct 3 22:38:16 2026 +0800
+
+    Work in Progress: Updated save data to json function with filename validation
+
+commit 641e7c1271fe571af82ce8907180c8f301abd458
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Fri Oct 2 16:14:32 2026 +0800
+
+    Added a txt file to store the commands so we can copy and paste and run
+
+commit e8f727d5bdb34d82833339a20e74b887bf3df96a
+Author: Zhi-Bin-SIT <2603206@sit.singaporetech.edu.sg>
+Date:   Fri Oct 2 10:37:18 2026 +0800
+
+    Work in Progress: Adding a function that gives each record generated a unique ID
+
+commit 38b2bd77512232a03cb4dc322054d90c43cb8808
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Thu Oct 1 15:38:50 2026 +0800
+
+    Added a time bar to AI Manager and changed the name of the GUI from art_stuff to sme_interface_gui
+
+commit f5fc654b91d737bc61102401cc246d00d71f4416
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Thu Oct 1 14:59:10 2026 +0800
+
+    Added another button, and added the function to click on them to proceed on. Time to rename art_stuff tbh
+
+commit 7d7286efb5dd7bc8d7fb5455d4ffcc5b7a87aa08
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Thu Oct 1 13:28:20 2026 +0800
+
+    Artified the startup page :)
+
+commit 0b46d88f1094a0d581d5b18eb2a72f302e524df0
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Thu Oct 1 01:31:52 2026 +0800
+
+    Added more art stuff
+
+commit 7f829941c08c2dfe6d59d764b2ba4114894113c7
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Thu Oct 1 01:02:28 2026 +0800
+
+    Added a little art to work
+
+commit 54c819126d1ec9c9c76e24f63e81697792bd67aa
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 30 21:53:26 2026 +0800
+
+    Added abit of logos
+
+commit 97a091a5a41a5425f1c14490da93aa2070ba7b49
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 30 21:12:49 2026 +0800
+
+    Updated io abit
+
+commit 9cf16cd1d24f13f97c00f8c1ded32c56580a819f
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 30 21:04:05 2026 +0800
+
+    Prepping the branch for merger
+
+commit a746be5fc703dc8a3009801ae9daf39f49251ad6
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 30 20:55:35 2026 +0800
+
+    Increased Timeout to 60s, tested AI for rejection scenario
+
+commit d57b19b301159d27280e4b7b512bd0eb46c5bab9
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Sep 28 15:52:32 2026 +0800
+
+    Minor changes to Readme.md
+
+commit d3428e42e6c6d48c954a975856e93b195525732f
+Author: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date:   Mon Sep 28 15:45:12 2026 +0800
+
+    I/O, AI and Logic Layer Working
+    
+    Step 1: Insert your OpenRouter API key into the .env
+    Step 2:   docker build -t sme-grant-auditor .
+    Step 3:   docker run -it --name sme-auditor --env-file .env -v "C:\SME_Grant_Data:/app/data" sme-grant-auditor
+    Step 4: Next time on start: docker start -ai sme-auditor
+    Step 5: Read the README.md for queries
+
+commit d2c5f0f58a8dfa857c585245ea5172eeaa9bcae1
+Author: minggy10 <tohmingyaooo@gmail.com>
+Date:   Sat Sep 26 00:19:31 2026 +0800
+
+    Inserted types of grants
+
+commit ec210667eed16bccca2d02c731ba848fc5bde185
+Merge: 6a6a9b3 56423ff
+Author: Kaiwen <2604750@sit.singaporetech.edu.sg>
+Date:   Fri Sep 25 17:00:49 2026 +0800
+
+    Merge branch 'main' of https://github.com/SYnthestic/INF1103_ProjectGrpWork
+
+commit 6a6a9b3eb9413762df452a51f61ab26d3e8e0f7f
+Author: Kaiwen <2604750@sit.singaporetech.edu.sg>
+Date:   Fri Sep 25 16:58:13 2026 +0800
+
+    Add .env file for easier setup of AI API
+
+commit 6e807bd6b453a158be241c5cc79573cbf5505c31
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Fri Sep 25 11:08:38 2026 +0800
+
+    Setting up print to intro Logic Manager. Now construction can start
+
+commit 56423ff5c092e19a2bf05401ed52db6a9141805b
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Thu Sep 24 17:10:39 2026 +0800
+
+    Added python setup folder so we can check our Python versions, and maybe try using .ipynb folder to pip install mods
+
+commit c85282e95ee89caf86e192dd5c697e833239d537
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 23 18:43:18 2026 +0800
+
+    Integrating AI Manager function to main.py, but it is not working so well
+
+commit 2fd67bbac6117645072e20413066e920220d0705
+Author: Kaiwen <2604750@sit.singaporetech.edu.sg>
+Date:   Wed Sep 23 18:12:02 2026 +0800
+
+    Add OpenRouter AI client and response function with a test prompt
+
+commit a56bbf9daf33b2c1bf92de016cb63465805d3d60
+Author: Kaiwen <2604750@sit.singaporetech.edu.sg>
+Date:   Wed Sep 23 15:53:49 2026 +0800
+
+    Add Dockerfile and requirements.txt
+
+commit 1779192ed6bcf48a9add032dcce665ec41a4e11d
+Merge: 0958f06 e699b2f
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 23 12:16:04 2026 +0800
+
+    Conflict #4 solved. Expect this to be the norm when settling merges. 我们的程序一起 growing...
+
+commit e699b2fdd2b5160488ea5b5eed0d7bb6efb36900
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 23 12:09:08 2026 +0800
+
+    Added a function to allow user to check which schemes they already applied for. Data Manager, 你们可以 plz edit and delete function 주세요git add .!
+
+commit 0958f065944396315115e014a10c2d642c0ceee4
+Merge: c36868f 8fd1953
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 23 11:55:26 2026 +0800
+
+    Handling yet another conflict. Should try teaching the whole team how to handle it
+
+commit 8fd1953a3c14511ecc94aee14925b43bbf7e8b12
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 23 11:54:11 2026 +0800
+
+    Added the Loading Part to Data Manager.
+
+commit c36868fb0cd7466e053f022ecfca0e6fa710bbf7
+Merge: e7eb0d0 2be2e24
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 23 11:40:44 2026 +0800
+
+    Resolved conflict #2
+
+commit 2be2e24bd07db7424cd6a90cba4843575913639e
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 23 11:38:49 2026 +0800
+
+    Integrated newer IO functions to main.py
+
+commit 2c8bfd17dc860babce9f3f8341c91f0b0d3b72bf
+Merge: 7631ceb 41c4018
+Author: minggy10 <tohmingyaooo@gmail.com>
+Date:   Wed Sep 23 00:38:54 2026 +0800
+
+    Merge branch 'feature/io-manager' of https://github.com/SYnthestic/INF1103_ProjectGrpWork into feature/io-manager
+
+commit 7631ceb00d7e3e198f36f7be7ea81330833b4a1b
+Author: minggy10 <tohmingyaooo@gmail.com>
+Date:   Wed Sep 23 00:36:10 2026 +0800
+
+    Added input for No. of employees, Equity, Annual Energy Expenditure, & Estimated Retrofit Cost
+
+commit 8eaf87cd6e09db78d261ac248620276c687c5348
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Sep 22 17:24:08 2026 +0800
+
+    Got the kinks settled out. Time to consider adding load functions
+
+commit d6c829c66a922b013eba9e8680ea10c03b4f343d
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Sep 22 17:00:48 2026 +0800
+
+    Added the save to JSON function. Not without flaws however
+
+commit e7eb0d0f525995a978f2466680a3d3e491cbb2b4
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Sep 22 16:39:25 2026 +0800
+
+    Prepped data manager file for development. Current stage: Embryonic Stage. Kai Wen can make the AI Manager branch now
+
+commit 87b0dab8f2625087682f8cc02f74ac81ccefa9f1
+Merge: 6585e5d 41c4018
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Sep 22 16:10:06 2026 +0800
+
+    Conflict resolution handled
+
+commit 41c4018cb497fdda29b992f7f010fe560cce9494
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Sep 22 14:21:58 2026 +0800
+
+    Added Logic Manager for 6, _ branch on Main. Also prepped JSON branches, 2 and 3, for embryonic data manager development
+
+commit bbfba144cfa17e147e7221e7cb5da0287f2eb19e
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Sep 22 13:56:59 2026 +0800
+
+    Tested I/O functions. Looks good. For now, I'm just going to integrate IO with main
+
+commit 6585e5d3ac3b61787c7b49b871dfd9026ea5d483
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Sep 22 10:53:39 2026 +0800
+
+    Started preliminary work on main.py, embryonic phase of io_manager.py underway
+
+commit d6f4abc268663227e997fd8fc56120bbfe32b1ff
+Author: minggy10 <tohmingyaooo@gmail.com>
+Date:   Sat Sep 19 18:31:51 2026 +0800
+
+    Added Company's name, industry sector & total revenue
+
+commit 405f279589868f75e7f2e1510347285204c6f7a6
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sat Sep 19 13:17:24 2026 +0800
+
+    Added folder and moved all spec files there
+
+commit 74824f66094812f07a4837f4504b391feadce082
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sat Sep 19 13:15:06 2026 +0800
+
+    Renamed manager files for proper understanding
+
+commit e36da0db21839c15aa502b76279198564c3a7fd3
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sat Sep 19 12:57:41 2026 +0800
+
+    Added core files for main and each of the 4 managers
+
+commit 74415db8f574725a4d6921cb0c8ad1fbbe346c57
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Sat Sep 19 12:38:14 2026 +0800
+
+    Added Final Project Guidelines
+
+commit cbb4fe69b88a33823392b3f00f05535001cbeb64
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Thu Sep 17 18:23:33 2026 +0800
+
+    Added initial proposal submission
+
+commit a29b5466b1dbd1ae82ef26f3e899ecc713f1e146
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 16 12:28:57 2026 +0800
+
+     Added requirements, I think
+
+commit f2aee5df9126034363a96e47b772ee2411cfded2
+Author: Samuel Yam <2603176@sit.singaporetech.edu.sg>
+Date:   Wed Sep 16 12:22:32 2026 +0800
+
+    Adding a potential draft
+
+commit 16ab2b6a11f1c4dd24be2e83fe8caaa60be2d887
+Author: SY <2603176@sit.singaporetech.edu.sg>
+Date:   Tue Sep 8 19:02:18 2026 +0800
+
+    Just adding Grading Criteria file here
+
+commit 9ed55949d5e678257b10028081efcdafcc219c14
+Author: SY <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Sep 7 16:18:08 2026 +0800
+
+    Added initial project details
+
+commit c1c7344ba4cec6d357cd49c48ddbaf3b9d658a7a
+Merge: 6ae443f d486497
+Author: SY <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Sep 7 14:23:54 2026 +0800
+
+    Merge branch 'main' of https://github.com/SYnthestic/INF1103_ProjectGrpWork
+
+commit d486497ce695c6326110a9b8f3bd9d3d8e07a569
+Author: SYnthestic <119954383+SYnthestic@users.noreply.github.com>
+Date:   Mon Sep 7 14:14:32 2026 +0800
+
+    Initial commit
+
+commit 6ae443fe6a75207174bc6c8ff89a12740fc2478f
+Author: SY <2603176@sit.singaporetech.edu.sg>
+Date:   Mon Sep 7 14:10:16 2026 +0800
+
+    Initial Project setup
