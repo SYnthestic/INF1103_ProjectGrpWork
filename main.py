@@ -1,457 +1,516 @@
-from typing import Any
+"""Controller: passes data between the four managers. It has no print()
+or input(); everything the user sees goes through the I/O Manager."""
+
+import sys
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from types import TracebackType
-import sys
+from typing import Any
 
-
-# Load OPENROUTER_API_KEY from a local .env file when running outside
-# Docker. Inside Docker the variable is injected via --env-file instead.
 try:
     from dotenv import load_dotenv
-
     load_dotenv(override=True)
 except ImportError:
     pass
 
+import ai_manager
+import data_manager
+import io_manager
+import logic_manager
 
-import io_manager as in_and_out
-import data_manager as dm
-import ai_manager as ai
-import logic_manager as logic
-
-# Type aliases (plain dicts/lists - the project uses no classes)
 Record = dict[str, Any]
 Records = list[Record]
 AiAudit = dict[str, Any]
-Session = dict[str, Any]
 
 
 # ========================================================
-# Clean exit on Ctrl+C / end of input
+# Shared objects
 # ========================================================
-# Without this, pressing Ctrl+C at any prompt (or running Docker without
-# -it, so there is no keyboard input) ends the program with a long
-# traceback. Every other error still shows its normal traceback.
-def _handle_uncaught(
-    exc_type: type[BaseException], exc: BaseException, tb: TracebackType | None
-) -> None:
+class Services:
+    """The four managers, handed to every controller class instead of being
+    imported as globals. Tests can pass mocks, and the modules can later be
+    replaced by manager classes without touching the controllers (association)."""
+
+    def __init__(self, io=io_manager, data=data_manager, ai=ai_manager, logic=logic_manager):
+        self.io = io
+        self.dm = data
+        self.ai = ai
+        self.logic = logic
+
+
+class Session:
+    """State of one logged-in user. The username cannot be changed."""
+
+    def __init__(self, username: str):
+        self._username = username
+        self.records: Records = []
+        self.ai_audit: AiAudit = {}
+        self.jsonfile_name: str = ""
+        self.ending: str | None = None  # None, "exit" or "logout"
+
+    @property
+    def username(self) -> str:
+        return self._username
+
+
+# ========================================================
+# Services used by several actions
+# ========================================================
+class AuditService:
+    """AI Manager -> Logic Manager for one record."""
+
+    def __init__(self, services: Services):
+        self._s = services
+
+    def attempt(self, step: Callable[..., Any], *args: Any) -> tuple[bool, Any]:
+        """Runs one risky step. Returns (True, result), or (False, None) after
+        showing a message. Ctrl+C and end of input still exit cleanly."""
+        try:
+            return True, step(*args)
+        except (KeyboardInterrupt, EOFError):
+            raise
+        except Exception as error:
+            self._s.io.show_unexpected_error(error)
+            return False, None
+
+    def ask_ai(self, narrative: str) -> AiAudit:
+        # The waiting screen belongs to the I/O Manager, so it is handed over
+        # as a function and the AI Manager never prints.
+        return self._s.ai.get_ai_response(narrative, self._s.io.run_ai_analysis_bar)
+
+    def run_audit(self, record: Record) -> tuple[AiAudit, dict[str, Any] | None]:
+        io = self._s.io
+        narrative = io.flat_record(record).get("Proposal Narrative", "")
+        ok, ai_audit = self.attempt(self.ask_ai, narrative)
+        if not ok:
+            return {}, None
+        io.display_ai_audit(ai_audit)
+
+        ok, result = self.attempt(
+            self._s.logic.evaluate_grant_application,
+            io.convert_record_to_profile(record),
+            ai_audit,
+        )
+        if not ok:
+            return ai_audit, None
+        io.display_grant_decision(result)
+        return ai_audit, result
+
+
+class RecordStorage:
+    """Saving and loading record files: I/O asks -> Data stores -> I/O reports."""
+
+    def __init__(self, services: Services):
+        self._s = services
+
+    def save(self, records: Records, jsonfile_name: str) -> str:
+        io, dm = self._s.io, self._s.dm
+        if not jsonfile_name:
+            jsonfile_name = io.retrieve_json_filename(dm.INVALID_FILENAME_CHARS)
+
+        clean_name, status = dm.inspect_save_file(jsonfile_name)
+        if status in ("no_name", "invalid_name"):
+            io.display_save_result(status, jsonfile_name)
+            return ""
+
+        to_save = records
+        if status == "exists":
+            action = io.ask_existing_file_action(clean_name)
+            if action == "cancel":
+                return clean_name
+            if action == "add":
+                existing, _, load_status = dm.load_data_from_json(clean_name)
+                if load_status != "loaded":
+                    io.display_load_result(load_status, clean_name)
+                    return clean_name
+                to_save = dm.merge_records(existing, records)
+
+        saved_name, save_status = dm.save_data_to_json(to_save, clean_name)
+        io.display_save_result(save_status, clean_name)
+        return saved_name or clean_name
+
+    def load(self, records: Records, jsonfile_name: str) -> tuple[Records, str]:
+        io, dm = self._s.io, self._s.dm
+        if dm.is_data_loaded(records, jsonfile_name) and not io.confirm_overwrite_records():
+            return records, jsonfile_name
+
+        name = io.retrieve_json_filename(dm.INVALID_FILENAME_CHARS, 3)  # 3 = 'load' disk
+        loaded, clean_name, status = dm.load_data_from_json(name)
+        io.display_load_result(status, clean_name or name)
+        return (loaded, clean_name) if status == "loaded" else (records, jsonfile_name)
+
+
+# ========================================================
+# Menu actions: one class per menu option
+# ========================================================
+class Action(ABC):
+    """Abstract base for every menu option."""
+
+    def __init__(self, services: Services, key: int):
+        self._s = services
+        self._key = key
+
+    @abstractmethod
+    def run(self, session: Session) -> None: ...
+
+
+class NewApplicationAction(Action):
+    """Collect an application, audit it, keep it in history, offer to save."""
+
+    def __init__(self, services, key, audits: AuditService, storage: RecordStorage):
+        super().__init__(services, key)
+        self._audits = audits
+        self._storage = storage
+
+    def _collect(self) -> Record:
+        io = self._s.io
+        company_name = io.retrieve_company_name()
+        company_industry = io.retrieve_company_industry()
+        total_revenue = io.retrieve_total_revenue()
+        total_employees = io.retrieve_total_employees()
+        local_equity = io.retrieve_local_equity()
+        proposal_type = io.retrieve_proposal_type()
+        sustainability_grant = io.retrieve_sustainability_grant()
+        proposal_narrative = io.retrieve_proposal_narrative()
+
+        if proposal_type == "Equipment / Energy Upgrade":
+            baseline = io.retrieve_baseline_energy_expenditure()
+            retrofit = io.retrieve_estimated_retrofit_cost()
+            fee = 0.0
+        else:
+            baseline = retrofit = 0.0
+            fee = io.retrieve_reporting_advisory_fee()
+
+        io.display_company_profile(
+            company_name, company_industry, total_revenue, total_employees,
+            local_equity, proposal_type, sustainability_grant, proposal_narrative,
+            baseline, retrofit, fee,
+        )
+        return {
+            "Company Name": company_name,
+            "Company Industry": company_industry,
+            "Company Total Revenue": total_revenue,
+            "Total Employees": total_employees,
+            "Local Equity": local_equity,
+            "Proposal Type": proposal_type,
+            "Sustainability Grant": sustainability_grant,
+            "Proposal Narrative": proposal_narrative,
+            "Baseline Energy Expenditure": baseline,
+            "Estimated Retrofit Cost": retrofit,
+            "Reporting Advisory Fee": fee,
+        }
+
+    def run(self, session: Session) -> None:
+        io, dm = self._s.io, self._s.dm
+        session.records.append(self._collect())
+        io.display_applied_grants(session.records, self._key)
+
+        session.ai_audit, result = self._audits.run_audit(session.records[-1])
+
+        if result is None:
+            pass  # a step raised; the error was already shown
+        elif self._s.ai.ai_call_failed(session.ai_audit):
+            io.show_audit_not_saved_ai_failed()
+        else:
+            saved = dm.append_user_audit(
+                session.username, session.records[-1], session.ai_audit, result
+            )
+            io.show_audit_saved_to_history(saved)
+
+        if io.confirm_save_to_json():
+            session.jsonfile_name = self._storage.save(session.records, session.jsonfile_name)
+
+
+class SaveAction(Action):
+    def __init__(self, services, key, storage: RecordStorage):
+        super().__init__(services, key)
+        self._storage = storage
+
+    def run(self, session: Session) -> None:
+        session.jsonfile_name = self._storage.save(session.records, session.jsonfile_name)
+
+
+class LoadAction(Action):
+    def __init__(self, services, key, storage: RecordStorage):
+        super().__init__(services, key)
+        self._storage = storage
+
+    def run(self, session: Session) -> None:
+        session.records, session.jsonfile_name = self._storage.load(
+            session.records, session.jsonfile_name
+        )
+
+
+class DisplayAction(Action):
+    def run(self, session: Session) -> None:
+        self._s.io.display_applied_grants(session.records, self._key)
+
+
+class UpdateAction(Action):
+    def run(self, session: Session) -> None:
+        io, dm = self._s.io, self._s.dm
+        records = session.records
+        if not records:
+            io.display_no_records_message()
+            return
+
+        index = io.select_record_index(records, "update")
+        field = None if index is None else io.select_field_to_edit(records[index])
+        if field is None:
+            return
+
+        records[index] = io.flat_record(records[index])
+        value = io.retrieve_field_value(field)
+        session.records, status = dm.update_record_field(records, index, field, value)
+
+        if status == "updated":
+            io.show_record_updated(session.records[index].get("Company Name") or "N/A", field)
+        else:
+            io.show_record_not_changed()
+
+
+class DeleteAction(Action):
+    def run(self, session: Session) -> None:
+        io, dm = self._s.io, self._s.dm
+        records = session.records
+        if not records:
+            io.display_no_records_message()
+            return
+
+        index = io.select_record_index(records, "delete")
+        if index is None:
+            return
+
+        name = io.flat_record(records[index]).get("Company Name") or "N/A"
+        if not io.confirm_delete_record(name):
+            io.show_record_not_changed()
+            return
+
+        session.records, status = dm.delete_record(records, index)
+        if status == "deleted":
+            io.show_record_deleted(name)
+        else:
+            io.show_record_not_changed()
+
+
+class RerunAiAction(Action):
+    def __init__(self, services, key, audits: AuditService):
+        super().__init__(services, key)
+        self._audits = audits
+
+    def run(self, session: Session) -> None:
+        io = self._s.io
+        if not session.records:
+            io.display_no_records_message()
+            return
+        narrative = io.flat_record(session.records[-1]).get("Proposal Narrative", "")
+        ok, new_audit = self._audits.attempt(self._audits.ask_ai, narrative)
+        if ok:
+            session.ai_audit = new_audit
+            io.display_ai_audit(new_audit)
+
+
+class RerunLogicAction(Action):
+    def __init__(self, services, key, audits: AuditService):
+        super().__init__(services, key)
+        self._audits = audits
+
+    def run(self, session: Session) -> None:
+        io = self._s.io
+        if not session.records:
+            io.display_no_records_message()
+        elif not session.ai_audit:
+            io.display_no_ai_audit()
+        else:
+            profile = io.convert_record_to_profile(session.records[-1])
+            ok, result = self._audits.attempt(
+                self._s.logic.evaluate_grant_application, profile, session.ai_audit
+            )
+            if ok:
+                io.display_grant_decision(result)
+
+
+class HistoryAction(Action):
+    """Past audits of the logged-in user, with filtering and PDF export."""
+
+    def _apply_filter(self, audits: list[Record]) -> list[Record] | None:
+        io, dm = self._s.io, self._s.dm
+        chosen = io.retrieve_history_filter(dm.available_audit_statuses(audits))
+        if chosen is None:
+            return None
+        kind, value = chosen
+        if kind == "status":
+            matches = dm.filter_audits_by_status(audits, value)
+        else:
+            matches = dm.search_audits_by_company(audits, value)
+        if not matches:
+            io.show_no_matching_audits()
+            return None
+        return matches
+
+    def _export(self, audit: Record) -> None:
+        io, dm = self._s.io, self._s.dm
+        if io.confirm_export_pdf():
+            file_name, status = dm.export_audit_to_pdf(audit)
+            io.show_pdf_result(status, file_name, dm.get_records_folder())
+
+    def run(self, session: Session) -> None:
+        io = self._s.io
+        audits = self._s.dm.get_user_audits(session.username)
+        shown = audits
+        while True:
+            if not io.display_audit_history(shown, session.username, filtered=shown is not audits):
+                return
+            action, index = io.choose_history_action(shown)
+            if action == "back":
+                return
+            if action == "filter":
+                shown = self._apply_filter(audits) or audits
+                continue
+            io.display_audit_detail(shown[index])
+            self._export(shown[index])
+            io.wait_for_return()
+            return
+
+
+class LogoutAction(Action):
+    def run(self, session: Session) -> None:
+        self._s.io.show_logged_out(session.username)
+        self._s.dm.set_active_user(None)
+        session.ending = "logout"
+
+
+class ExitAction(Action):
+    def run(self, session: Session) -> None:
+        self._s.io.show_goodbye()
+        session.ending = "exit"
+
+
+# ========================================================
+# Login screen
+# ========================================================
+class AuthController:
+    """I/O collects -> Logic hashes/verifies -> Data stores."""
+
+    def __init__(self, services: Services):
+        self._s = services
+
+    def create_account(self) -> None:
+        io, dm = self._s.io, self._s.dm
+        username = io.retrieve_new_username()
+        while dm.user_exists(username):
+            io.show_username_taken(username)
+            username = io.retrieve_new_username()
+
+        password = io.retrieve_new_password()
+        record = self._s.logic.build_new_user_record(username, password)
+        if dm.save_new_user(record):
+            io.show_account_created(username)
+        else:
+            io.show_account_save_failed()
+
+    def login(self) -> str | None:
+        io = self._s.io
+        username = io.retrieve_username()
+        password = io.retrieve_password()
+        stored = self._s.dm.get_user(username)
+        # The format check also guards against a hand-edited users.json
+        # holding a name that cannot be used for the user's folder.
+        if io.is_valid_username(username) and self._s.logic.verify_password(password, stored):
+            io.show_login_success(username)
+            return username
+        io.show_login_failed()
+        return None
+
+    def login_screen(self) -> str | None:
+        """Returns the username, or None if the user chose to exit."""
+        io = self._s.io
+        while True:
+            match io.get_auth_choice():
+                case 0:
+                    io.show_goodbye()
+                    return None
+                case 1:
+                    username = self.login()
+                    if username is not None:
+                        return username
+                case 2:
+                    self.create_account()
+                case _:
+                    io.show_wrong_option_error()
+
+
+# ========================================================
+# The application
+# ========================================================
+class Application:
+    """Owns the services and the menu, and runs the program."""
+
+    def __init__(self, services: Services | None = None):
+        self._s = services or Services()
+        self._auth = AuthController(self._s)
+        self._menu = self._build_menu()
+
+    def _build_menu(self) -> dict[int, Action]:
+        s, io = self._s, self._s.io
+        audits = AuditService(s)
+        storage = RecordStorage(s)
+        actions = [
+            ExitAction(s, 0),
+            NewApplicationAction(s, 1, audits, storage),
+            SaveAction(s, 2, storage),
+            LoadAction(s, 3, storage),
+            DisplayAction(s, 4),
+            UpdateAction(s, 5),
+            DeleteAction(s, 6),
+            RerunAiAction(s, 7, audits),
+            RerunLogicAction(s, 8, audits),
+            HistoryAction(s, io.MENU_AUDIT_HISTORY),
+            LogoutAction(s, io.MENU_LOGOUT),
+        ]
+        return {action._key: action for action in actions}
+
+    def run_session(self, username: str) -> bool:
+        """True = back to the login screen, False = leave the program."""
+        io, dm = self._s.io, self._s.dm
+        dm.set_active_user(username)
+        io.show_audit_count(len(dm.get_user_audits(username)))
+        session = Session(username)
+
+        while session.ending is None:
+            action = self._menu.get(io.get_menu_choice(username))
+            if action is None:
+                io.show_wrong_option_error()
+            else:
+                action.run(session)  # polymorphism: no branching on the type
+        return session.ending == "logout"
+
+    def run(self) -> None:
+        io = self._s.io
+        self._s.dm.setup_logging()
+        io.show_welcome_sequence()
+        io.wait_for_continue()
+
+        while True:
+            username = self._auth.login_screen()
+            if username is None or not self.run_session(username):
+                break
+
+
+def _handle_uncaught(exc_type: type[BaseException], exc: BaseException,
+                     tb: TracebackType | None) -> None:
+    """Clean exit on Ctrl+C or end of input; other errors keep their traceback."""
     if issubclass(exc_type, KeyboardInterrupt):
-        in_and_out.show_interrupted()
+        io_manager.show_interrupted()
     elif issubclass(exc_type, EOFError):
-        in_and_out.show_input_ended()
+        io_manager.show_input_ended()
     else:
         sys.__excepthook__(exc_type, exc, tb)
 
 
-# ========================================================
-# Account flows: I/O collects -> Logic hashes/verifies -> Data stores
-# ========================================================
-def create_account_flow() -> None:
-    username = in_and_out.retrieve_new_username()
-    while dm.user_exists(username):
-        in_and_out.show_username_taken(username)
-        username = in_and_out.retrieve_new_username()
-
-    password = in_and_out.retrieve_new_password()
-    user_record = logic.build_new_user_record(username, password)
-
-    if dm.save_new_user(user_record):
-        in_and_out.show_account_created(username)
-    else:
-        in_and_out.show_account_save_failed()
-
-
-def login_flow() -> str | None:
-    """Returns the logged-in username, or None if login failed."""
-    username = in_and_out.retrieve_username()
-    password = in_and_out.retrieve_password()
-
-    stored_user = dm.get_user(username)
-    # The format check also guards against a hand-edited users.json holding
-    # a name that cannot be used for the user's folder.
-    if in_and_out.is_valid_username(username) and logic.verify_password(
-        password, stored_user
-    ):
-        in_and_out.show_login_success(username)
-        return username
-
-    in_and_out.show_login_failed()
-    return None
-
-
-def attempt(step: Callable[..., Any], *args: Any) -> tuple[bool, Any]:
-    """Runs one risky step (AI call, grant logic). Returns (True, result), or
-    (False, None) after showing a short message if it raised, so one
-    unexpected error can no longer end the whole program. Ctrl+C and end of
-    input are passed through so they still exit cleanly."""
-    try:
-        return True, step(*args)
-    except (KeyboardInterrupt, EOFError):
-        raise
-    except Exception as error:
-        in_and_out.show_unexpected_error(error)
-        return False, None
-
-
-def ask_ai(narrative: str) -> AiAudit:
-    """AI Manager call. The waiting screen belongs to the I/O Manager, so it
-    is handed over as a function and the AI Manager never prints."""
-    return ai.get_ai_response(narrative, in_and_out.run_ai_analysis_bar)
-
-
-def run_audit(record: Record) -> tuple[AiAudit, dict[str, Any] | None]:
-    """AI Manager -> Logic Manager for one record, displaying both results.
-    Returns (ai_audit, result); result is None if a step failed."""
-    narrative = in_and_out.flat_record(record).get("Proposal Narrative", "")
-    ok, ai_audit = attempt(ask_ai, narrative)
-    if not ok:
-        return {}, None
-    in_and_out.display_ai_audit(ai_audit)
-
-    ok, result = attempt(
-        logic.evaluate_grant_application,
-        in_and_out.convert_record_to_profile(record),
-        ai_audit,
-    )
-    if not ok:
-        return ai_audit, None
-    in_and_out.display_grant_decision(result)
-    return ai_audit, result
-
-
-def apply_history_filter(audits: list[Record]) -> list[Record] | None:
-    """Asks the user for a filter; the Data Manager does the filtering.
-    Returns the matching audits, or None if cancelled / nothing matched."""
-    statuses = dm.available_audit_statuses(audits)
-    chosen = in_and_out.retrieve_history_filter(statuses)
-    if chosen is None:
-        return None
-    kind, value = chosen
-    if kind == "status":
-        matches = dm.filter_audits_by_status(audits, value)
-    else:
-        matches = dm.search_audits_by_company(audits, value)
-    if not matches:
-        in_and_out.show_no_matching_audits()
-        return None
-    return matches
-
-
-def export_audit_flow(audit: Record) -> None:
-    """Offers a PDF report for one audit, built from the saved history entry."""
-    if in_and_out.confirm_export_pdf():
-        file_name, status = dm.export_audit_to_pdf(audit)
-        in_and_out.show_pdf_result(status, file_name, dm.get_records_folder())
-
-
-def audit_history_flow(username: str) -> None:
-    audits = dm.get_user_audits(username)
-    shown = audits
-    while True:
-        if not in_and_out.display_audit_history(
-            shown, username, filtered=shown is not audits
-        ):
-            return
-        action, index = in_and_out.choose_history_action(shown)
-        if action == "back":
-            return
-        if action == "filter":
-            shown = apply_history_filter(audits) or audits
-            continue
-        in_and_out.display_audit_detail(shown[index])
-        export_audit_flow(shown[index])
-        in_and_out.wait_for_return()
-        return
-
-
-# ========================================================
-# Saving and loading records: I/O asks -> Data stores/reads -> I/O reports
-# ========================================================
-def save_records_flow(records: Records, jsonfile_name: str) -> str:
-    """Asks for a file name if needed, merges with an existing file if the
-    user agrees, saves, and returns the (possibly updated) jsonfile_name."""
-    if not jsonfile_name:
-        jsonfile_name = in_and_out.retrieve_json_filename(dm.INVALID_FILENAME_CHARS)
-
-    clean_name, status = dm.inspect_save_file(jsonfile_name)
-    if status in ("no_name", "invalid_name"):
-        in_and_out.display_save_result(status, jsonfile_name)
-        return ""
-
-    to_save = records
-    if status == "exists":
-        action = in_and_out.ask_existing_file_action(clean_name)
-        if action == "cancel":
-            return clean_name
-        if action == "add":
-            existing, _, load_status = dm.load_data_from_json(clean_name)
-            if load_status != "loaded":
-                in_and_out.display_load_result(load_status, clean_name)
-                return clean_name
-            to_save = dm.merge_records(existing, records)
-        # "replace": the file will hold exactly the records in memory
-
-    saved_name, save_status = dm.save_data_to_json(to_save, clean_name)
-    in_and_out.display_save_result(save_status, clean_name)
-    return saved_name or clean_name
-
-
-def load_records_flow(records: Records, jsonfile_name: str) -> tuple[Records, str]:
-    """Confirms before replacing records in memory, loads, shows the result,
-    and returns (records, jsonfile_name). On failure both are unchanged."""
-    if (
-        dm.is_data_loaded(records, jsonfile_name)
-        and not in_and_out.confirm_overwrite_records()
-    ):
-        return records, jsonfile_name
-
-    name = in_and_out.retrieve_json_filename(
-        dm.INVALID_FILENAME_CHARS, 3
-    )  # 3 = show the 'load' disk
-    loaded, clean_name, status = dm.load_data_from_json(name)
-    in_and_out.display_load_result(status, clean_name or name)
-
-    if status == "loaded":
-        return loaded, clean_name
-    return records, jsonfile_name
-
-
-# ========================================================
-# Menu option 1: collect a new application and audit it
-# ========================================================
-def collect_application() -> Record:
-    """Asks the I/O Manager for every field and returns one record."""
-    company_name = in_and_out.retrieve_company_name()
-    company_industry = in_and_out.retrieve_company_industry()
-    total_revenue = in_and_out.retrieve_total_revenue()
-    total_employees = in_and_out.retrieve_total_employees()
-    local_equity = in_and_out.retrieve_local_equity()
-    proposal_type = in_and_out.retrieve_proposal_type()
-    sustainability_grant = in_and_out.retrieve_sustainability_grant()
-    proposal_narrative = in_and_out.retrieve_proposal_narrative()
-
-    if proposal_type == "Equipment / Energy Upgrade":
-        baseline_energy_expenditure = in_and_out.retrieve_baseline_energy_expenditure()
-        retrofit_cost = in_and_out.retrieve_estimated_retrofit_cost()
-        reporting_advisory_fee = 0.0
-    else:
-        baseline_energy_expenditure = 0.0
-        retrofit_cost = 0.0
-        reporting_advisory_fee = in_and_out.retrieve_reporting_advisory_fee()
-
-    in_and_out.display_company_profile(
-        company_name,
-        company_industry,
-        total_revenue,
-        total_employees,
-        local_equity,
-        proposal_type,
-        sustainability_grant,
-        proposal_narrative,
-        baseline_energy_expenditure,
-        retrofit_cost,
-        reporting_advisory_fee,
-    )
-    return {
-        "Company Name": company_name,
-        "Company Industry": company_industry,
-        "Company Total Revenue": total_revenue,
-        "Total Employees": total_employees,
-        "Local Equity": local_equity,
-        "Proposal Type": proposal_type,
-        "Sustainability Grant": sustainability_grant,
-        "Proposal Narrative": proposal_narrative,
-        "Baseline Energy Expenditure": baseline_energy_expenditure,
-        "Estimated Retrofit Cost": retrofit_cost,
-        "Reporting Advisory Fee": reporting_advisory_fee,
-    }
-
-
-def new_application_flow(session: Session, key: int) -> None:
-    """Menu option 1: collect, audit with AI + Logic, keep in history, and
-    offer to save the record to a JSON file."""
-    session["records"].append(collect_application())
-    in_and_out.display_applied_grants(session["records"], key)
-
-    # The AI Manager and Logic Manager run automatically on the record just
-    # collected (menu options 7 and 8 re-run them by hand).
-    session["ai_audit"], result = run_audit(session["records"][-1])
-
-    # Every completed audit is kept in the user's history, unless the AI call
-    # itself failed (missing API key, timeout, unusable answer) - that result
-    # is only a placeholder, not a real audit.
-    if result is None:
-        pass  # a step raised; the error was already shown
-    elif ai.ai_call_failed(session["ai_audit"]):
-        in_and_out.show_audit_not_saved_ai_failed()
-    else:
-        saved_audit = dm.append_user_audit(
-            session["username"], session["records"][-1], session["ai_audit"], result
-        )
-        in_and_out.show_audit_saved_to_history(saved_audit)
-
-    if in_and_out.confirm_save_to_json():
-        session["jsonfile_name"] = save_records_flow(
-            session["records"], session["jsonfile_name"]
-        )
-
-
-def update_record_flow(session: Session) -> None:
-    """Menu option 5: change one detail of one record in memory."""
-    records = session["records"]
-    if not records:
-        in_and_out.display_no_records_message()
-        return
-
-    index = in_and_out.select_record_index(records, "update")
-    field = None if index is None else in_and_out.select_field_to_edit(records[index])
-    if field is None:
-        return
-
-    # Records loaded from a file may use the nested layout; the editor works
-    # on the flat layout the screens use.
-    records[index] = in_and_out.flat_record(records[index])
-    value = in_and_out.retrieve_field_value(field)
-    session["records"], status = dm.update_record_field(records, index, field, value)
-
-    if status == "updated":
-        in_and_out.show_record_updated(
-            session["records"][index].get("Company Name") or "N/A", field
-        )
-    else:
-        in_and_out.show_record_not_changed()
-
-
-def delete_record_flow(session: Session) -> None:
-    """Menu option 6: remove one record from memory."""
-    records = session["records"]
-    if not records:
-        in_and_out.display_no_records_message()
-        return
-
-    index = in_and_out.select_record_index(records, "delete")
-    if index is None:
-        return
-
-    name = in_and_out.flat_record(records[index]).get("Company Name") or "N/A"
-    if not in_and_out.confirm_delete_record(name):
-        in_and_out.show_record_not_changed()
-        return
-
-    session["records"], status = dm.delete_record(records, index)
-    if status == "deleted":
-        in_and_out.show_record_deleted(name)
-    else:
-        in_and_out.show_record_not_changed()
-
-
-def rerun_ai_flow(session: Session) -> None:
-    """Menu option 7: run the AI Manager again on the latest record."""
-    if not session["records"]:
-        in_and_out.display_no_records_message()
-        return
-    narrative = in_and_out.flat_record(session["records"][-1]).get(
-        "Proposal Narrative", ""
-    )
-    ok, new_audit = attempt(ask_ai, narrative)
-    if ok:
-        session["ai_audit"] = new_audit
-        in_and_out.display_ai_audit(new_audit)
-
-
-def rerun_logic_flow(session: Session) -> None:
-    """Menu option 8: run the Logic Manager again on the latest record."""
-    if not session["records"]:
-        in_and_out.display_no_records_message()
-    elif not session["ai_audit"]:
-        in_and_out.display_no_ai_audit()
-    else:
-        user_profile = in_and_out.convert_record_to_profile(session["records"][-1])
-        ok, result = attempt(
-            logic.evaluate_grant_application, user_profile, session["ai_audit"]
-        )
-        if ok:
-            in_and_out.display_grant_decision(result)
-
-
-# ========================================================
-# One logged-in session
-# ========================================================
-def run_session(username: str) -> bool:
-    """Shows the main menu until the user logs out (returns True, so the
-    login screen comes back) or exits the program (returns False)."""
-    # Saved record files (options 2/3) live in this user's own folder.
-    dm.set_active_user(username)
-    in_and_out.show_audit_count(len(dm.get_user_audits(username)))
-    session = {"username": username, "records": [], "ai_audit": {}, "jsonfile_name": ""}
-
-    while True:
-        key = in_and_out.get_menu_choice(username)
-
-        match key:
-            case 0:
-                in_and_out.show_goodbye()
-                return False
-            case 1:
-                new_application_flow(session, key)
-            case 2:  # Save to JSON
-                session["jsonfile_name"] = save_records_flow(
-                    session["records"], session["jsonfile_name"]
-                )
-            case 3:  # Pull from JSON
-                session["records"], session["jsonfile_name"] = load_records_flow(
-                    session["records"], session["jsonfile_name"]
-                )
-            case 4:  # Display the current records
-                in_and_out.display_applied_grants(session["records"], key)
-            case 5:  # Update a record
-                update_record_flow(session)
-            case 6:  # Delete a record
-                delete_record_flow(session)
-            case 7:
-                rerun_ai_flow(session)
-            case 8:
-                rerun_logic_flow(session)
-            case in_and_out.MENU_AUDIT_HISTORY:  # 9: Past audits of the logged-in user
-                audit_history_flow(username)
-            case in_and_out.MENU_LOGOUT:  # 10: Back to the login screen
-                in_and_out.show_logged_out(username)
-                dm.set_active_user(None)
-                return True
-            case _:
-                in_and_out.show_wrong_option_error()
-
-
-def login_screen() -> str | None:
-    """Shows the login screen until someone logs in. Returns the username,
-    or None if the user chose to exit."""
-    while True:
-        match in_and_out.get_auth_choice():
-            case 0:
-                in_and_out.show_goodbye()
-                return None
-            case 1:
-                username = login_flow()
-                if username is not None:
-                    return username
-            case 2:
-                create_account_flow()
-            case _:
-                in_and_out.show_wrong_option_error()
-
-
 def main() -> None:
     sys.excepthook = _handle_uncaught
-    dm.setup_logging()
-    in_and_out.show_welcome_sequence()
-    in_and_out.wait_for_continue()
-
-    while True:
-        username = login_screen()
-        if username is None:
-            break
-        if not run_session(username):
-            break
+    Application().run()
 
 
 if __name__ == "__main__":
