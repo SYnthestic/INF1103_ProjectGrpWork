@@ -2,6 +2,7 @@ import threading
 from typing import Any
 from collections.abc import Iterator
 from sme_interface_stores import sme_interface_gui as gui
+from sme_interface_stores.sme_interface_gui import Palette, Button, ContinueButton, ReturnButton, AiButton, YesNoDialog, DiskPrompt, SaveDiskPrompt, LoadDiskPrompt, TileFramer, Renderer, AnsiRenderer, PlainRenderer
 import sys
 import os
 import time
@@ -214,8 +215,8 @@ def read_limited(max_len: int, blocked: str = "") -> str:
     return "".join(buf)
 
 
-# Shows welcome sequence with ASCII art and sustainability banner
-def show_welcome_sequence() -> None:
+# 1. This method MUST be indented inside the class block
+def show_welcome_sequence(self) -> None:
     print("Welcome to SME Sustainability Grant Eligibility & Scope Compliance Auditor!")
     print(
         "This tool will help you determine if your company is eligible for the SME Sustainability Grant and assess your compliance with the scope of the grant."
@@ -225,8 +226,14 @@ def show_welcome_sequence() -> None:
         "Please provide the following information about your company to proceed with the assessment. Thankyou!"
     )
     print()
-    print(gui.hello())
-    print(gui.framed_sustainability_banner())
+        
+        # 2. To fix the PREVIOUS error, you need to instantiate Renderer 
+        # or use an instance of it. Do NOT pass 'self' or leave it empty on the class name.
+    renderer_instance = Renderer() 
+    print(renderer_instance.hello())
+    print(Renderer.framed_sustainability_banner())
+
+
 
 
 # Verifies that the input is a valid integer key for the menu options.
