@@ -1,180 +1,45 @@
-"""Visual design for the terminal interface.
+"""Screen art for the terminal: menus, banners, floppy-disk prompts and buttons.
 
-Every class here only BUILDS text. Nothing prints or reads input; the
-I/O Manager does that."""
+    InterfaceArt   builds art as plain strings (it never prints or reads keys)
+    ButtonPanel    shows the clickable buttons by handing their art to a
+                   terminal object it is given (association; the old circular
+                   import of io_manager is gone)
+
+The I/O Manager is the only caller; it owns the printing.
+"""
 
 import re
 import textwrap
-from abc import ABC, abstractmethod
 
-from art import art as ascii_art
+from art import art as art_lookup
 from art import text2art
 
 ANSI = re.compile(r"\033\[[0-9;]*m")
 
-
-# ========================================================
-# Palette: one place for every colour code
-# ========================================================
-class Palette:
-    RESET = "\033[0m"
-    BLUE = "\033[34m"
-    GREEN = "\033[92m"
-    RED = "\033[91m"
-    GOLD = "\033[93m"
-    CYAN = "\033[96m"
-    GREY = "\033[90m"
-    WHITE = "\033[97m"
-    LABEL = "\033[30;107m"  # black text on a bright white label
+BLUE = "\033[34m"
+LABEL = "\033[30;107m"  # black text on a bright white label
+RESET = "\033[0m"
+BUTTON_BOUNDS = (5, 35)
 
 
-# ========================================================
-# Buttons: abstract base + three specialisations
-# ========================================================
-class Button(ABC):
-    """A clickable box. Subclasses only say WHAT it shows and its colour."""
+class InterfaceArt:
+    """Every picture and layout the app can show, as strings."""
 
-    WIDTH = 26
-    BOUNDS = (5, 35)  # clickable columns
+    BLUE = BLUE
+    LABEL = LABEL
+    RESET = RESET
 
-    @property
-    @abstractmethod
-    def label(self) -> str: ...
-
-    @property
-    @abstractmethod
-    def colour(self) -> str: ...
-
-    @property
-    def bounds(self) -> tuple[int, int]:
-        return self.BOUNDS
-
-    def render(self) -> str:
-        c, s, r = self.colour, Palette.GREY, Palette.RESET
-        return f"""
-     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-    █  {c}┌──────────────────────────┐{r}  █
-    █  {c}│{self.label:<{self.WIDTH}}│{r}  █▀▄
-    █  {c}└──────────────────────────┘{r}  █ █
-    ▀████████████████████████████████▀  █
-      {s}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{r}
-    """
-
-
-class ContinueButton(Button):
-    label = "⮞ PRESS ENTER TO CONTINUE"
-    colour = Palette.GOLD
-
-
-class ReturnButton(Button):
-    label = " ⮪  CLICK OR ENTER RETURN"
-    colour = Palette.CYAN
-
-
-class AiButton(Button):
-    label = "⮞ START AI ANALYSIS"
-    colour = Palette.GREEN
-
-
-class YesNoDialog:
-    """Boxed yes/no prompt. render() returns (art, regions), where regions
-    maps True/False to the (min_x, max_x) columns of each button."""
-
-    def __init__(self, question: str, btn_w: int = 12, gap: int = 4, indent: int = 4):
-        self._question = question
-        self._btn_w = btn_w
-        self._gap = gap
-        self._indent = indent
-
-    def render(self):
-        g, rd, grey, r = Palette.GREEN, Palette.RED, Palette.GREY, Palette.RESET
-        w, gap, indent = self._btn_w, self._gap, self._indent
-        hint = "[Y] Yes    [N] No    or click a button"
-        total = 2 * w + gap
-        inner = max(len(self._question), len(hint), total) + 6
-
-        def row(plain="", styled=None):
-            pad = inner - len(plain)
-            left = pad // 2
-            return " " * indent + "│" + " " * left + (styled or plain) + " " * (pad - left) + "│"
-
-        def part(label, kind):
-            return {
-                "top": "┌" + "─" * (w - 2) + "┐",
-                "mid": "│" + label.center(w - 2) + "│",
-                "bot": "└" + "─" * (w - 2) + "┘",
-            }[kind]
-
-        lines = [" " * indent + "┌" + "─" * inner + "┐", row(), row(self._question), row()]
-        for kind in ("top", "mid", "bot"):
-            yes, no = part("YES", kind), part("NO", kind)
-            lines.append(row(yes + " " * gap + no, f"{g}{yes}{r}" + " " * gap + f"{rd}{no}{r}"))
-        lines += [row(), row(hint, f"{grey}{hint}{r}"), row(), " " * indent + "└" + "─" * inner + "┘"]
-
-        yes_start = indent + 1 + (inner - total) // 2 + 1
-        no_start = yes_start + w + gap
-        regions = {True: (yes_start, yes_start + w - 1), False: (no_start, no_start + w - 1)}
-        return "\n" + "\n".join(lines) + "\n", regions
-
-
-# ========================================================
-# Floppy-disk prompts: one template, two titles
-# ========================================================
-class DiskPrompt(ABC):
-    """Floppy disk with an input slot sized for max_len characters."""
-
-    def __init__(self, prompt: str = " Name: ", max_len: int = 50):
-        self._prompt = prompt
-        self._max_len = max_len
-
-    @property
-    @abstractmethod
-    def title(self) -> str: ...
-
-    def render(self):
-        """Returns (art, rows_up, col) so the I/O Manager can place the cursor."""
-        b, r, label = Palette.BLUE, Palette.RESET, Palette.LABEL
-        w = len(self._prompt) + self._max_len
-        inner = w + 4
-        body = inner + 4
-
-        def label_row(text=""):
-            return f"  {b}██{r}  {label}{text:<{w}}{r}  {b}██ █{r}"
-
-        lines = [
-            f"  {b}{'█' * body}▀▄{r}",
-            f"  {b}{'█' * body} █{r}",
-            f"  {b}██{r}  {'▀' * w}  {b}██ █{r}",
-            f"  {b}██{r}  {'█' * w}  {b}██ █{r}",
-            f"  {b}██{r}  {'█' * w}  {b}██ █{r}",
-            f"  {b}██{' ' * inner}██ █{r}",
-            label_row(f"{self.title} (max {self._max_len} chars)".center(w)),
-            label_row(self._prompt),  # input row (index 7)
-            label_row(),
-            f"  {b}{'█' * body}▀{r}",
-            f"   {b}{'▀' * (body + 1)}{r}",
-        ]
-        return "\n".join(lines), len(lines) - 7, 7 + len(self._prompt)
-
-
-class SaveDiskPrompt(DiskPrompt):
-    title = "SAVE TO DISK"
-
-
-class LoadDiskPrompt(DiskPrompt):
-    title = "LOAD FROM DISK"
-
-
-# ========================================================
-# Helper: draws a border of tiles around a block of text
-# ========================================================
-class TileFramer:
     @staticmethod
-    def wrap(content: str, tile: str, gap: str = " ") -> str:
-        lines = [l for l in textwrap.dedent(content).strip("\n").splitlines() if l.strip()]
+    def tile_frame(content: str, tile: str, gap: str = " ") -> str:
+        """Surround `content` (multi-line string) with a border made of `tile`."""
+        lines = textwrap.dedent(content).strip("\n").splitlines()
+        lines = [line for line in lines if line.strip()]
+
+        # Width of the box, measured from its plain top border (no colours/emoji)
         box_w = len(ANSI.sub("", lines[0]))
         tw, gw = len(tile), len(gap)
 
+        # Smallest tile count whose inner area fits the box
         cols = 2
         while cols * tw + (cols - 1) * gw - 2 * (tw + gw) < box_w:
             cols += 1
@@ -184,116 +49,157 @@ class TileFramer:
         pad_l = (inner - box_w) // 2
         pad_r = inner - box_w - pad_l
 
-        edge = gap.join([tile] * cols)
-        blank = f"{tile}{gap}{' ' * inner}{gap}{tile}"
+        edge = gap.join([tile] * cols)  # top / bottom row
+        blank = f"{tile}{gap}{' ' * inner}{gap}{tile}"  # breathing room
+
         out = [edge, blank]
-        out += [f"{tile}{gap}{' ' * pad_l}{l}{' ' * pad_r}{gap}{tile}" for l in lines]
+        for line in lines:
+            out.append(f"{tile}{gap}{' ' * pad_l}{line}{' ' * pad_r}{gap}{tile}")
         out += [blank, edge]
         return "\n".join(out)
 
+    @staticmethod
+    def yes_no_buttons(question: str, btn_w: int = 12, gap: int = 4, indent: int = 4):
+        """Boxed yes/no prompt. Returns (art, regions).
+        regions maps True/False to the (min_x, max_x) columns of each button."""
+        green, red, grey, reset = "\033[92m", "\033[91m", "\033[90m", "\033[0m"
+        hint = "[Y] Yes    [N] No    or click a button"
+        total = 2 * btn_w + gap
+        inner = max(len(question), len(hint), total) + 6
 
-# ========================================================
-# Renderer: the interface the I/O Manager talks to
-# ========================================================
-class Renderer(ABC):
-    """Contract for every look the program can have. Each method RETURNS text."""
+        def row(plain="", styled=None):
+            pad = inner - len(plain)
+            left = pad // 2
+            return (
+                " " * indent
+                + "│"
+                + " " * left
+                + (styled or plain)
+                + " " * (pad - left)
+                + "│"
+            )
 
-    @abstractmethod
-    def hello(self) -> str: ...
+        def button(label, part):
+            parts = {
+                "top": "┌" + "─" * (btn_w - 2) + "┐",
+                "mid": "│" + label.center(btn_w - 2) + "│",
+                "bot": "└" + "─" * (btn_w - 2) + "┘",
+            }
+            return parts[part]
 
-    @abstractmethod
-    def goodbye(self) -> str: ...
+        lines = [" " * indent + "┌" + "─" * inner + "┐", row(), row(question), row()]
+        for part in ("top", "mid", "bot"):
+            yes, no = button("YES", part), button("NO", part)
+            plain = yes + " " * gap + no
+            styled = f"{green}{yes}{reset}" + " " * gap + f"{red}{no}{reset}"
+            lines.append(row(plain, styled))
+        lines += [
+            row(),
+            row(hint, f"{grey}{hint}{reset}"),
+            row(),
+            " " * indent + "└" + "─" * inner + "┘",
+        ]
 
-    @abstractmethod
-    def welcome_banner(self) -> str: ...
+        # Button columns (1-based, matching the terminal's mouse reports)
+        pad_l = (inner - total) // 2
+        yes_start = indent + 1 + pad_l + 1
+        no_start = yes_start + btn_w + gap
+        regions = {
+            True: (yes_start, yes_start + btn_w - 1),
+            False: (no_start, no_start + btn_w - 1),
+        }
+        return "\n" + "\n".join(lines) + "\n", regions
 
-    @abstractmethod
-    def menu(self, username: str | None = None) -> str: ...
+    @staticmethod
+    def wrong_sign_red() -> str:
+        red_start = "\033[91m"
+        color_reset = "\033[0m"
 
-    @abstractmethod
-    def wrong_option_error(self) -> str: ...
+        x_art = r"""
+      ____    ____
+      \   \  /   /
+       \   \/   /
+        \      /
+        /      \
+       /   /\   \
+      /___/  \___\
+    """
 
-    @abstractmethod
-    def saved_icon(self) -> str: ...
+        return red_start + x_art + color_reset + "Error! Unrecognised number option"
 
-    @abstractmethod
-    def button_art(self, button: Button) -> str: ...
+    @staticmethod
+    def face_paintscheme() -> str:
+        return art_lookup("woman")  # a single tile, e.g. ▓⚗_⚗▓
 
-    @abstractmethod
-    def disk_prompt(self, mode: str, max_len: int = 50): ...
-
-    @abstractmethod
-    def yes_no(self, question: str): ...
-
-
-class AnsiRenderer(Renderer):
-    """Full colour and art. Plain terminals extend it (see below)."""
-
-    def __init__(self):
-        # Composition: the renderer owns its buttons for its whole life.
-        self._continue = ContinueButton()
-        self._return = ReturnButton()
-        self._ai = AiButton()
-
-    # -- hook that subclasses override --------------------------------
-    def _finish(self, text: str) -> str:
-        return text
-
-    # -- buttons ------------------------------------------------------
-    @property
-    def continue_button(self) -> Button:
-        return self._continue
-
-    @property
-    def return_button(self) -> Button:
-        return self._return
-
-    @property
-    def ai_button(self) -> Button:
-        return self._ai
-
-    def button_art(self, button: Button) -> str:
-        return self._finish(button.render())
-
-    # -- styles the I/O Manager needs when typing on a disk label -----
-    @property
-    def label_style(self) -> str:
-        return self._finish(Palette.LABEL)
-
-    @property
-    def reset_style(self) -> str:
-        return self._finish(Palette.RESET)
-
-    # -- screens ------------------------------------------------------
-    def hello(self) -> str:
+    @staticmethod
+    def hello() -> str:
         return text2art("Hello", font="block", chr_ignore=True)
 
-    def goodbye(self) -> str:
+    @staticmethod
+    def goodbye_art() -> str:
         return text2art("Goodbye", font="rnd-xlarge")
 
-    def welcome_banner(self) -> str:
-        g, rd, r = Palette.GREEN, Palette.RED, Palette.RESET
-        return self._finish(f"""
-    ┌──────────────────────────────────────────────────┐
-    │                                                  │
-    │                   {g}Welcome to:                    {r}│
-    │                                                  │
-    │{g}🌱 SME Green Sustainability Eligibility Scheme 🌱{r} │
-    ├──────────────────────────────────────────────────┤
-    │                                                  │
-    │   For the purposes of determining eligibility    │
-    │  to the SME Green Grant and assessing compliance.│
-    │                                                  │
-    │   {rd}⚠️ WARNING: This application is experimental.   {r}│
-    │                                                  │
-    └──────────────────────────────────────────────────┘
-    """)
+    @staticmethod
+    def _disk_prompt_art(title: str, prompt: str, max_len: int):
+        """Floppy disk with an input slot sized to fit max_len characters."""
+        w = len(prompt) + max_len  # label/shutter width
+        inner = w + 4
+        body = inner + 4
 
-    def framed_welcome_banner(self) -> str:
-        tile = ascii_art("woman").strip()
-        return TileFramer.wrap(self.welcome_banner(), tile)
+        def label_row(text=""):
+            return f"  {BLUE}██{RESET}  {LABEL}{text:<{w}}{RESET}  {BLUE}██ █{RESET}"
 
-    def menu(self, username: str | None = None) -> str:
+        lines = [
+            f"  {BLUE}{'█' * body}▀▄{RESET}",
+            f"  {BLUE}{'█' * body} █{RESET}",
+            f"  {BLUE}██{RESET}  {'▀' * w}  {BLUE}██ █{RESET}",
+            f"  {BLUE}██{RESET}  {'█' * w}  {BLUE}██ █{RESET}",
+            f"  {BLUE}██{RESET}  {'█' * w}  {BLUE}██ █{RESET}",
+            f"  {BLUE}██{' ' * inner}██ █{RESET}",
+            label_row(title.center(w)),
+            label_row(prompt),  # <- input row (index 7)
+            label_row(),
+            f"  {BLUE}{'█' * body}▀{RESET}",
+            f"   {BLUE}{'▀' * (body + 1)}{RESET}",
+        ]
+
+        input_row = 7
+        rows_up = len(lines) - input_row
+        col = 7 + len(prompt)
+        return "\n".join(lines), rows_up, col
+
+    @classmethod
+    def save_disk_prompt_art(cls, prompt: str = " Name: ", max_len: int = 50):
+        return cls._disk_prompt_art(f"SAVE TO DISK (max {max_len} chars)", prompt, max_len)
+
+    @classmethod
+    def load_disk_prompt_art(cls, prompt: str = " Name: ", max_len: int = 50):
+        return cls._disk_prompt_art(
+            f"LOAD FROM DISC (max {max_len} chars)", prompt, max_len
+        )
+
+    @staticmethod
+    def save_disk_block_deep_blue() -> str:
+        blue = "\033[34m"  # Deep classic blue
+        white = "\033[97m"  # Crisp white for contrast
+        reset = "\033[0m"  # Reset formatting
+
+        disk_art = f"""
+  {blue}█████████████████████████▀▄{reset}
+  {blue}█████████████████████████ █{reset}
+  {blue}██{reset}  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀ {blue}██ █{reset}
+  {blue}██{reset}  █████████████████  {blue}██ █{reset}
+  {blue}██{reset}  █████████████████  {blue}██ █{reset}
+  {blue}██                     ██ █{reset}
+  {blue}██       {white}███████{blue}       ██ █{reset}
+  {blue}██       {white}██   ██{blue}       ██ █{reset}
+  {blue}█████████████████████████▀{reset} 
+   {blue}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}  
+"""
+        return disk_art
+
+    @staticmethod
+    def boxed_menu(username: str | None = None) -> str:
         border = "▓⚗_⚗▓ " * 10
         blank = "▓" + " " * 57 + "▓"
 
@@ -301,7 +207,8 @@ class AnsiRenderer(Renderer):
             return "▓" + text.ljust(57) + "▓"
 
         lines = [
-            border, blank,
+            border,
+            blank,
             row("    Please select your choice (0-10)"),
             blank,
             row("    0. Exit"),
@@ -318,56 +225,98 @@ class AnsiRenderer(Renderer):
             blank,
         ]
         if username:
-            lines += [row(f"    Logged in as: {username}"), blank]
+            lines.append(row(f"    Logged in as: {username}"))
+            lines.append(blank)
         lines.append(border)
         return "\n".join(lines)
 
-    def wrong_option_error(self) -> str:
-        x_art = r"""
-      ____    ____
-      \   \  /   /
-       \   \/   /
-        \      /
-        /      \
-       /   /\   \
-      /___/  \___\
+    @staticmethod
+    def sustainability_banner() -> str:
+        # Terminal Colors: \033[92m = Eco Green, \033[91m = Warning Red, \033[0m = Reset
+        green = "\033[92m"
+        red = "\033[91m"
+        reset = "\033[0m"
+
+        banner = f"""
+    ┌──────────────────────────────────────────────────┐
+    │                                                  │
+    │                   {green}Welcome to:                    {reset}│
+    │                                                  │
+    │{green}🌱 SME Green Sustainability Eligibility Scheme 🌱{reset} │
+    ├──────────────────────────────────────────────────┤
+    │                                                  │
+    │   For the purposes of determining eligibility    │
+    │  to the SME Green Grant and assessing compliance.│
+    │                                                  │
+    │   {red}⚠️ WARNING: This application is experimental.   {reset}│
+    │                                                  │
+    └──────────────────────────────────────────────────┘
     """
-        return self._finish(Palette.RED + x_art + Palette.RESET + "Error! Unrecognised number option")
+        return banner
 
-    def saved_icon(self) -> str:
-        b, w, r = Palette.BLUE, Palette.WHITE, Palette.RESET
-        return self._finish(f"""
-  {b}█████████████████████████▀▄{r}
-  {b}█████████████████████████ █{r}
-  {b}██{r}  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀ {b}██ █{r}
-  {b}██{r}  █████████████████  {b}██ █{r}
-  {b}██{r}  █████████████████  {b}██ █{r}
-  {b}██                     ██ █{r}
-  {b}██       {w}███████{b}       ██ █{r}
-  {b}██       {w}██   ██{b}       ██ █{r}
-  {b}█████████████████████████▀{r}
-   {b}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{r}
-""")
-
-    # -- prompts ------------------------------------------------------
-    def disk_prompt(self, mode: str, max_len: int = 50):
-        prompt = LoadDiskPrompt(max_len=max_len) if mode == "load" else SaveDiskPrompt(max_len=max_len)
-        art_text, rows_up, col = prompt.render()
-        return self._finish(art_text), rows_up, col
-
-    def yes_no(self, question: str):
-        art_text, regions = YesNoDialog(question).render()
-        return self._finish(art_text), regions
+    @classmethod
+    def framed_sustainability_banner(cls) -> str:
+        tile = cls.face_paintscheme().strip()
+        return cls.tile_frame(cls.sustainability_banner(), tile)
 
 
-class PlainRenderer(AnsiRenderer):
-    """Same screens with the colour codes removed, for Docker logs, CI or
-    terminals without ANSI support. Only one method is overridden."""
+class ButtonPanel:
+    """The clickable buttons. Each one builds its art and hands it to the
+    terminal, which shows it and waits for Enter or a click."""
 
-    def _finish(self, text: str) -> str:
-        return ANSI.sub("", text)
+    def __init__(self, terminal) -> None:
+        self._terminal = terminal
 
+    def _show(self, art: str) -> None:
+        self._terminal.execute_button_interaction(
+            art, min_x=BUTTON_BOUNDS[0], max_x=BUTTON_BOUNDS[1]
+        )
 
-def create_renderer(plain: bool = False) -> Renderer:
-    """Factory used by main.py / io_manager.py."""
-    return PlainRenderer() if plain else AnsiRenderer()
+    def continue_button(self) -> None:
+        gold = "\033[93m"
+        shadow = "\033[90m"
+        reset = "\033[0m"
+
+        art = f"""
+     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+    █  {gold}┌──────────────────────────┐{reset}  █
+    █  {gold}│⮞ PRESS ENTER TO CONTINUE │{reset}  █▀▄
+    █  {gold}└──────────────────────────┘{reset}  █ █
+    ▀████████████████████████████████▀  █
+      {shadow}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}
+    """
+        self._show(art)
+
+    def return_button(self) -> None:
+        cyan = "\033[96m"
+        shadow = "\033[90m"
+        reset = "\033[0m"
+
+        art = f"""
+     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+    █  {cyan}┌──────────────────────────┐{reset}  █
+    █  {cyan}│ ⮪  CLICK OR ENTER RETURN │{reset}  █▀▄
+    █  {cyan}└──────────────────────────┘{reset}  █ █
+    ▀████████████████████████████████▀  █
+      {shadow}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}
+    """
+        self._show(art)
+
+    def ai_button(self) -> None:
+        """The button that starts the AI analysis (menu option 1), so users
+        know the AI Manager is about to run."""
+        green = "\033[92m"
+        shadow = "\033[90m"
+        reset = "\033[0m"
+
+        label = "⮞ START AI ANALYSIS"
+
+        art = f"""
+     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+    █  {green}┌──────────────────────────┐{reset}  █
+    █  {green}│{label:<26}│{reset}  █▀▄
+    █  {green}└──────────────────────────┘{reset}  █ █
+    ▀████████████████████████████████▀  █
+      {shadow}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀{reset}
+    """
+        self._show(art)
