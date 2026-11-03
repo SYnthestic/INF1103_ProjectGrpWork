@@ -1,9 +1,25 @@
 """Tests for the Logic Manager: grant decisions, SME check, subsidy maths
 and password hashing. No network, files or AI are involved."""
 
-import logic_manager as logic
+from logic_manager import (
+    BorderlineImpactRule,
+    EegBaseTierRule,
+    EligibilityRule,
+    ExclusionKeywordsRule,
+    FossilFuelModificationRule,
+    LogicManager,
+    LowImpactRule,
+    NotAnSmeRule,
+    PasswordHasher,
+    ReportingGrantRule,
+    RetrofitCostCap,
+    UnclassifiedScopeRule,
+)
+from tests.helpers import calculate_subsidy
 
 import math
+
+logic = LogicManager()
 
 VALID_STATUSES = {
     "REJECT_NON_SME",
@@ -49,9 +65,9 @@ def test_sme_exactly_at_both_limits_passes():
 
 
 def test_subsidy_with_zero_cost_rate_or_cap_is_zero():
-    assert logic.calculate_subsidy(0, 0.5, 20000) == 0.0
-    assert logic.calculate_subsidy(10000, 0.0, 20000) == 0.0
-    assert logic.calculate_subsidy(10000, 0.5, 0) == 0.0
+    assert calculate_subsidy(0, 0.5, 20000) == 0.0
+    assert calculate_subsidy(10000, 0.0, 20000) == 0.0
+    assert calculate_subsidy(10000, 0.5, 0) == 0.0
 
 
 def test_srg_fee_where_30_percent_equals_the_cap():
@@ -284,7 +300,7 @@ def test_unicode_password_round_trips():
 
 
 def test_password_at_the_limit_works_and_beyond_is_refused():
-    limit = logic.MAX_PASSWORD_CHARS_CHECKED
+    limit = PasswordHasher.MAX_PASSWORD_CHARS_CHECKED
     ok = "x" * limit
     record = logic.build_new_user_record("alice", ok)
     assert logic.verify_password(ok, record)
@@ -387,15 +403,15 @@ def test_no_fail_reasons_for_an_sme():
 
 
 def test_rate_applied():
-    assert logic.calculate_subsidy(10000, 0.5, 20000) == 5000.0
+    assert calculate_subsidy(10000, 0.5, 20000) == 5000.0
 
 
 def test_cap_applied():
-    assert logic.calculate_subsidy(1000000, 0.7, 30000) == 30000.0
+    assert calculate_subsidy(1000000, 0.7, 30000) == 30000.0
 
 
 def test_rounded_to_cents():
-    assert logic.calculate_subsidy(333.333, 0.5, 1000) == 166.67
+    assert calculate_subsidy(333.333, 0.5, 1000) == 166.67
 
 
 def test_scope1_fast_track_is_base_tier():
@@ -622,29 +638,33 @@ def rule_engine_case(profile=None, audit=None):
 
 
 def test_rules_run_in_priority_order():
-    names = [rule.__name__ for rule in logic.DECISION_RULES]
-    assert names[0] == "rule_exclusion_keywords"
-    assert names.index("rule_fossil_fuel_modification") < names.index("rule_not_an_sme")
-    assert names.index("rule_not_an_sme") < names.index("rule_ai_failed")
-    assert names.index("rule_ai_failed") < names.index("rule_reporting_grant")
-    assert names.index("rule_reporting_grant") < names.index("rule_unclassified_scope")
-    assert names.index("rule_eeg_advanced_tier") < names.index("rule_eeg_base_tier")
-    assert names.index("rule_eeg_base_tier") < names.index("rule_esp_provisional")
-    assert names[-1] == "rule_low_impact"
+    names = [type(rule).__name__ for rule in logic.engine.rules]
+    assert names[0] == "ExclusionKeywordsRule"
+    assert names.index("FossilFuelModificationRule") < names.index("NotAnSmeRule")
+    assert names.index("NotAnSmeRule") < names.index("AiFailedRule")
+    assert names.index("AiFailedRule") < names.index("ReportingGrantRule")
+    assert names.index("ReportingGrantRule") < names.index("UnclassifiedScopeRule")
+    assert names.index("EegAdvancedTierRule") < names.index("EegBaseTierRule")
+    assert names.index("EegBaseTierRule") < names.index("EspProvisionalRule")
+    assert names[-1] == "LowImpactRule"
+
+
+def test_every_rule_is_an_eligibility_rule():
+    assert all(isinstance(rule, EligibilityRule) for rule in logic.engine.rules)
 
 
 def test_last_rule_always_gives_a_decision():
-    assert logic.rule_low_impact(rule_engine_case()) is not None
+    assert LowImpactRule().evaluate(rule_engine_case()) is not None
 
 
 def test_a_rule_that_does_not_apply_returns_none():
     clean = rule_engine_case()
-    assert logic.rule_exclusion_keywords(clean) is None
-    assert logic.rule_fossil_fuel_modification(clean) is None
-    assert logic.rule_not_an_sme(clean) is None
-    assert logic.rule_reporting_grant(clean) is None
-    assert logic.rule_unclassified_scope(clean) is None
-    assert logic.rule_borderline_impact(clean) is None
+    assert ExclusionKeywordsRule().evaluate(clean) is None
+    assert FossilFuelModificationRule().evaluate(clean) is None
+    assert NotAnSmeRule().evaluate(clean) is None
+    assert ReportingGrantRule().evaluate(clean) is None
+    assert UnclassifiedScopeRule().evaluate(clean) is None
+    assert BorderlineImpactRule().evaluate(clean) is None
 
 
 def test_each_rule_returns_a_complete_decision():
@@ -655,7 +675,7 @@ def test_each_rule_returns_a_complete_decision():
         "matched_schemes",
         "approved_subsidy_sgd",
     }
-    decision = logic.rule_eeg_base_tier(rule_engine_case())
+    decision = EegBaseTierRule().evaluate(rule_engine_case())
     assert set(decision) == keys
 
 
@@ -664,14 +684,15 @@ def test_build_case_cleans_bad_values():
         {"annual_revenue_sgd": "lots", "group_employment_size": 12.7},
         {"detected_exclusion_keywords": "None"},
     )
-    assert case["annual_revenue"] == 0.0
-    assert case["headcount"] == 12
-    assert case["exclusions"] == []
+    assert case.annual_revenue == 0.0
+    assert case.headcount == 12
+    assert case.exclusions == []
 
 
 def test_retrofit_cap_ignores_non_subsidy_decisions():
-    decision = logic._decision("MANUAL_REVIEW", subsidy=500.0)
-    logic.cap_subsidy_at_retrofit_cost(decision, {"retrofit_cost": 10.0})
+    decision = EligibilityRule.make_decision("MANUAL_REVIEW", subsidy=500.0)
+    case = logic.build_case({"estimated_retrofit_cost_sgd": 10.0}, {})
+    RetrofitCostCap().adjust(decision, case)
     assert decision["approved_subsidy_sgd"] == 500.0
 
 
