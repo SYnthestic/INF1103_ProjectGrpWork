@@ -52,7 +52,50 @@ FOSSIL_FUEL_LABEL = "Fossil Fuel Modification"
 EFS_GREEN_NAME = "Enterprise Financing Scheme – Green (EFS-Green)"
 
 
-##PLACE FOR PASSWORD##
+# =========================================================
+# Password hashing (SHA-256 PBKDF2)
+# =========================================================
+class PasswordHasher:
+    """Passwords are never stored. Instead we store a random 16-byte salt per
+    user plus the PBKDF2-HMAC-SHA256 hash of salt + password, repeated
+    `iterations` times so brute-forcing is slow. Comparison is constant time
+    (hmac.compare_digest) so timing does not leak the hash."""
+
+    ALGORITHM = "pbkdf2_sha256"
+    DEFAULT_ITERATIONS = 200_000
+    SALT_BYTES = 16
+    # Upper limits used when checking a login, so a hand-edited or damaged
+    # users.json (or an absurdly long password) cannot hang or crash the app.
+    MAX_PASSWORD_CHARS_CHECKED = 256
+    MAX_STORED_ITERATIONS = 5_000_000
+
+    def __init__(self, iterations: int = DEFAULT_ITERATIONS) -> None:
+        self._iterations = iterations
+
+    def hash_password(
+        self,
+        password: str,
+        salt_hex: str | None = None,
+        iterations: int | None = None,
+    ) -> dict[str, Any]:
+        """Hashes a password. A fresh random salt is made for a new account;
+        a stored salt is reused when checking a login.
+
+        Returns: algorithm, iterations, salt (hex), password_hash (hex)."""
+        if salt_hex is None:
+            salt_hex = secrets.token_hex(self.SALT_BYTES)
+        if iterations is None:
+            iterations = self._iterations
+
+        digest = hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), iterations
+        )
+        return {
+            "algorithm": self.ALGORITHM,
+            "iterations": iterations,
+            "salt": salt_hex,
+            "password_hash": digest.hex(),
+        }
 
 
 # =========================================================
