@@ -1,14 +1,19 @@
-"""Tests for the I/O Manager's pure helpers (validation and record
-conversion). Screens and prompts are covered by the end-to-end check in
+"""Tests for the I/O Manager's pure helpers (validation) and for the
+record conversion it relies on (ApplicationRecord). Screens and prompts are covered by the end-to-end check in
 the README, since they need a real terminal."""
 
+import ast
 import contextlib
 import io
-from unittest import mock
-import io_manager as io_mgr
-from tests.helpers import raises
-import ast
 import pathlib
+from unittest import mock
+
+from data_manager import DataManager
+from io_manager import IOManager
+from models import ApplicationRecord
+from tests.helpers import raises
+
+io_mgr = IOManager()
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -149,6 +154,18 @@ def test_nan_and_infinity_are_refused():
             io_mgr.finite_float(text)
 
 
+def flat_record(record):
+    return ApplicationRecord(record).flat
+
+
+def convert_record_to_profile(record):
+    return ApplicationRecord(record).to_profile()
+
+
+def fields_for(record):
+    return ApplicationRecord(record).proposal.editable_fields
+
+
 RECORD_CONVERSION_NESTED = {
     "audit_id": 1,
     "company_profile": {
@@ -164,7 +181,7 @@ RECORD_CONVERSION_NESTED = {
 
 
 def test_nested_record_becomes_the_display_layout():
-    flat = io_mgr.flat_record(RECORD_CONVERSION_NESTED)
+    flat = flat_record(RECORD_CONVERSION_NESTED)
     assert flat["Company Name"] == "Acme"
     assert flat["Proposal Narrative"] == "Our plan"
     assert flat["Reporting Advisory Fee"] == 1000.0
@@ -172,16 +189,16 @@ def test_nested_record_becomes_the_display_layout():
 
 def test_flat_record_is_left_alone():
     record = {"Company Name": "Beta"}
-    assert io_mgr.flat_record(record) is record
+    assert flat_record(record) is record
 
 
 def test_garbage_gives_an_empty_record():
     for value in (None, 5, "x", []):
-        assert io_mgr.flat_record(value) == {}
+        assert flat_record(value) == {}
 
 
 def test_conversion_to_the_logic_profile():
-    profile = io_mgr.convert_record_to_profile(
+    profile = convert_record_to_profile(
         {
             "Company Name": "Beta",
             "Company Total Revenue": 10.0,
@@ -197,14 +214,14 @@ def test_conversion_to_the_logic_profile():
 
 
 def test_missing_fields_do_not_crash():
-    profile = io_mgr.convert_record_to_profile({})
+    profile = convert_record_to_profile({})
     assert profile["annual_revenue_sgd"] == 0.0
 
 
 def test_displaying_damaged_records_does_not_crash():
     with (
         contextlib.redirect_stdout(io.StringIO()),
-        mock.patch.object(io_mgr.gui, "return_button"),
+        mock.patch.object(io_mgr.buttons, "return_button"),
     ):
         io_mgr.display_applied_grants([{}, {"Company Name": None}, 5], 4)
 
@@ -254,8 +271,8 @@ def test_bad_answers_are_asked_again():
 
 
 def test_fields_depend_on_the_proposal_type():
-    equipment = io_mgr.fields_for(RECORD_PICKER_RECORDS[0])
-    reporting = io_mgr.fields_for(RECORD_PICKER_RECORDS[1])
+    equipment = fields_for(RECORD_PICKER_RECORDS[0])
+    reporting = fields_for(RECORD_PICKER_RECORDS[1])
     assert "Baseline Energy Expenditure" in equipment
     assert "Reporting Advisory Fee" not in equipment
     assert "Reporting Advisory Fee" in reporting
@@ -263,9 +280,7 @@ def test_fields_depend_on_the_proposal_type():
 
 
 def test_every_editable_field_has_a_prompt():
-    import data_manager
-
-    assert set(io_mgr.FIELD_PROMPTS) == set(data_manager.EDITABLE_RECORD_FIELDS)
+    assert set(io_mgr.field_prompts) == set(DataManager.EDITABLE_RECORD_FIELDS)
 
 
 def test_choosing_a_field():
