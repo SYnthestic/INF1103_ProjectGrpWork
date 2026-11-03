@@ -216,7 +216,7 @@ class DataManager:
     USERS_FILE = "users.json"
     AUDIT_HISTORY_FILE = "audit_history.json"
     RECORDS_DIR_NAME = "records"
-    _USERNAME_FOR_PATH = re.compile(r"[a-z0-9_]{1,64}")
+    RESERVED_FILES = ("users.json", "audit_history.json")
     EDITABLE_RECORD_FIELDS = (
         "Company Name",
         "Company Industry",
@@ -280,6 +280,9 @@ class DataManager:
         return os.path.join(
             self._store.data_dir, self.RECORDS_DIR_NAME, self._active_user
         )
+    def _is_reserved(self, name: str) -> bool:
+        """Stops a record file from replacing the shared account/history files."""
+        return self._active_user is None and name.lower() in self.RESERVED_FILES
 
     def _record_path(self, jsonfile_name: str) -> str:
         return os.path.join(self._records_dir(), jsonfile_name)
@@ -381,7 +384,7 @@ class DataManager:
         name = FilenameRules.normalise(jsonfile_name)
         if not name:
             return "", "no_name"
-        if not FilenameRules.is_valid(name):
+        if not FilenameRules.is_valid(name) or self._is_reserved(name):
             return "", "invalid_name"
         if os.path.isfile(self._record_path(name)):
             return name, "exists"
@@ -403,9 +406,9 @@ class DataManager:
         name = FilenameRules.normalise(jsonfile_name)
         if not name:
             return [], "", "no_name"
-        if not FilenameRules.is_valid(name):
+        if not FilenameRules.is_valid(name) or self._is_reserved(name):
             return [], "", "invalid_name"
-
+        
         path = self._record_path(name)
         if not os.path.isfile(path):
             return [], name, "not_found"
@@ -451,7 +454,7 @@ class DataManager:
         name = FilenameRules.normalise(jsonfile_name)
         if not name:
             return None, "no_name"
-        if not FilenameRules.is_valid(name):
+        if not FilenameRules.is_valid(name) or self._is_reserved(name):
             return None, "invalid_name"
 
         if JsonStore.write_path(self._record_path(name), data):
