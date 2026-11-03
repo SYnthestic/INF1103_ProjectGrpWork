@@ -4,18 +4,21 @@ A terminal app that takes an SME's details and a free-text upgrade proposal, use
 
 ## How it is organised
 
-| File | Role |
-|---|---|
-| `main.py` | The controller: runs the login screen and menu, and passes data between the layers. The only file that knows about all four layers |
-| `io_manager.py` | **I/O layer.** All user input, validation and screen output |
-| `ai_manager.py` | **AI layer.** Sends the proposal to the AI API and returns a validated JSON result |
-| `logic_manager.py` | **Logic layer.** Eligibility rules, grant matching, subsidy maths and password hashing (no AI) |
-| `data_manager.py` | **Data layer.** Saving and loading records, user accounts and audit history as JSON |
-| `tests/` | Automated tests, including one that fails if a layer imports another layer |
+The program is object-oriented. The four managers from Part 1 are still the four main classes, and `main.py` wires them together.
 
-The layers never import each other and only `io_manager.py` prints or asks for input. Data flows one way: the I/O layer collects and checks the input, the AI layer turns the narrative into a JSON audit, the logic layer decides, then the result goes to the data layer to be stored and back to the I/O layer to be shown.
+| File | Main classes | Role |
+|---|---|---|
+| `main.py` | `Application`, `Session` | The controller: runs the login screen and menu and passes data between the managers. The only file that knows about all four. Managers are handed to it, so tests can pass in doubles |
+| `io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
+| `ai_manager.py` | `AIManager`, `AIClient` (abstract), `OpenRouterClient`, `AuditResponseParser` | **AI manager.** Sends the proposal to the AI API and returns a validated JSON result. Depends on the `AIClient` interface, so another provider (or a test fake) can be plugged in |
+| `logic_manager.py` | `LogicManager`, `DecisionEngine`, `EligibilityRule` (abstract, 13 rules), `GrantScheme` (abstract, 4 schemes), `DecisionAdjuster`, `PasswordHasher` | **Logic manager.** Eligibility rules, grant matching, subsidy maths and password hashing (no AI). A new rule or scheme is a new subclass; the engine does not change |
+| `data_manager.py` | `DataManager`, `JsonStore`, `FilenameRules` | **Data manager.** Saving and loading records, user accounts and audit history as JSON |
+| `report_exporter.py` | `ReportExporter` (abstract), `PdfReportExporter`, `ReportTheme`, `ReportContent` | PDF report drawing, kept separate from storage. The Data Manager only knows the `ReportExporter` interface |
+| `models.py` | `Proposal` (abstract), `EquipmentProposal`, `ReportingProposal`, `ApplicationRecord`, `RecordSections`, `PlaceholderKeywords` | Small shared domain classes with no I/O. Any manager may import them |
+| `sme_interface_stores/sme_interface_gui.py` | `InterfaceArt`, `ButtonPanel` | Screen art and the clickable buttons. Used only by the I/O manager |
+| `tests/` | | Automated tests, including ones that fail if a manager imports another manager or procedural code reappears |
 
-The project uses plain functions only (no classes).
+The managers never import each other and only `io_manager.py` prints or asks for input. Data flows one way: the I/O manager collects and checks the input, the AI manager turns the narrative into a JSON audit, the logic manager decides, then the result goes to the data manager to be stored and back to the I/O manager to be shown.
 
 ---
 
@@ -219,27 +222,27 @@ Files saved by an older version directly in the folder are not shown to any user
 
 ## Tests and continuous integration
 
-The project has an automated test suite (plain test functions with plain `assert` statements, run by `tests/run_tests.py`, so there are no test classes and nothing extra to install) that covers the grant rules, the AI output cleaning, accounts and saved files. It never calls the AI or touches your real data.
+The project has an automated [pytest](https://docs.pytest.org/) suite (`pytest` is in `requirements.txt`) that covers the grant rules, the AI output cleaning, accounts, saved files and the class design itself. It never calls the AI or touches your real data.
 
 ```
-python tests/run_tests.py -v
+python -m pytest -v
 ```
 
 To check the code style as well, install [ruff](https://docs.astral.sh/ruff/) (`pip install ruff`) and run `ruff check .`.
 
-Every push and pull request on GitHub runs the same checks automatically (`.github/workflows/ci.yml`): lint, the tests on Python 3.11, 3.12 and 3.13, then a Docker build whose image runs the tests again. A red cross on a commit means a check failed; click it to see which one. When everything passes on `main`, a final job publishes the Docker image to the GitHub Container Registry as `ghcr.io/<owner>/<repo>` (tags `latest` and the commit id); pull requests never publish. `requirements.txt` gives each package a version range (a lower and an upper bound) so a future major release cannot break a fresh install.
+Every push and pull request on GitHub runs the same checks automatically (`.github/workflows/ci.yml`): lint, the tests (`python -m pytest`) on Python 3.11, 3.12 and 3.13, then a Docker build whose image runs the tests again. A red cross on a commit means a check failed; click it to see which one. When everything passes on `main`, a final job publishes the Docker image to the GitHub Container Registry as `ghcr.io/<owner>/<repo>` (tags `latest` and the commit id); pull requests never publish. `requirements.txt` gives each package a version range (a lower and an upper bound) so a future major release cannot break a fresh install.
 
-`tests/test_logic_sample_ai_responses.py` is the stand-alone check of the Logic Manager: it feeds hardcoded sample AI responses (raw JSON text) to `logic_manager`, needs no API key or internet (a guard fails the test if a network connection is attempted), and can be run on its own with `python tests/test_logic_sample_ai_responses.py`.
+`tests/test_logic_sample_ai_responses.py` is the stand-alone check of the Logic Manager: it feeds hardcoded sample AI responses (raw JSON text) to `logic_manager`, needs no API key or internet (a guard fails the test if a network connection is attempted), and can be run on its own with `python -m pytest tests/test_logic_sample_ai_responses.py`.
 
 You can also run the tests inside the Docker image. Build it first, then run either the stand-alone Logic Manager script or all the tests:
 
 ```
 docker build -t sme-grant-auditor .
-docker run --rm sme-grant-auditor python tests/test_logic_sample_ai_responses.py
-docker run --rm sme-grant-auditor python tests/run_tests.py
+docker run --rm sme-grant-auditor python -m pytest tests/test_logic_sample_ai_responses.py
+docker run --rm sme-grant-auditor python -m pytest
 ```
 
-The tests live in `tests/`, one file per layer (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py`) plus `test_architecture.py`, which fails if a layer imports another layer, a non-I/O layer calls `print()`/`input()`, or any `class` appears. When you change a rule, change or add the matching test in the same commit.
+The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py`) plus `test_architecture.py`, which fails if a manager imports another manager, a non-I/O module calls `print()`/`input()`, a module-level function (procedural code) appears, or a design abstraction stops being abstract. `test_oop_design.py` checks polymorphism, substitution (every rule and scheme works through its base class), extension without modification, and how the parts are wired. When you change a rule, change or add the matching test in the same commit.
 
 ---
 
