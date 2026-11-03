@@ -216,7 +216,7 @@ class DataManager:
     USERS_FILE = "users.json"
     AUDIT_HISTORY_FILE = "audit_history.json"
     RECORDS_DIR_NAME = "records"
-    RESERVED_FILES = ("users.json", "audit_history.json")
+    RESERVED_FILES = (USERS_FILE.lower(), AUDIT_HISTORY_FILE.lower())
     EDITABLE_RECORD_FIELDS = (
         "Company Name",
         "Company Industry",
