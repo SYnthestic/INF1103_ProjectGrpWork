@@ -30,7 +30,7 @@ jobs:
         run: ruff check .
 
       - name: Unit tests
-        run: python tests/run_tests.py -v
+        run: python -m pytest -v
 
   docker:
     runs-on: ubuntu-latest
@@ -42,7 +42,7 @@ jobs:
         run: docker build -t sme-grant-auditor .
 
       - name: Run the unit tests inside the image
-        run: docker run --rm sme-grant-auditor python tests/run_tests.py
+        run: docker run --rm sme-grant-auditor python -m pytest
 
   # Continuous delivery: when the checks pass on main, publish the Docker image
   # to the GitHub Container Registry (ghcr.io). Pull requests and other
