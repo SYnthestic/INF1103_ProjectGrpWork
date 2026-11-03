@@ -243,7 +243,6 @@ class DataManager:
         self._exporter = exporter or PdfReportExporter()
         self._active_user: str | None = None
 
-
     # Folders and the active user
     @property
     def data_dir(self) -> str:
@@ -280,6 +279,7 @@ class DataManager:
         return os.path.join(
             self._store.data_dir, self.RECORDS_DIR_NAME, self._active_user
         )
+    
     def _is_reserved(self, name: str) -> bool:
         """Stops a record file from replacing the shared account/history files."""
         return self._active_user is None and name.lower() in self.RESERVED_FILES
@@ -672,7 +672,7 @@ class DataManager:
             in str(RecordSections.get(audit, "application").get("Company Name", "")).lower()
         ]
     
-    # PDF export function(delegates the drawing to the ReportExporter)
+    # PDF export function (delegates the drawing to the ReportExporter)
     @staticmethod
     def audit_to_report_record(audit: Record) -> Record:
         """Turns one audit-history entry into the flat record layout the PDF
