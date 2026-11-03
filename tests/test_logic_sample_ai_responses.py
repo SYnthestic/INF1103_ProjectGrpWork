@@ -6,11 +6,10 @@ logic_manager exactly as the real pipeline would, so the Logic Manager's
 decisions can be checked without any API key, network or AI Manager.
 
 Run from the project folder, any of:
-    python tests/test_logic_sample_ai_responses.py
-    python tests/run_tests.py
-    docker run --rm sme-grant-auditor python tests/test_logic_sample_ai_responses.py
+    python -m pytest tests/test_logic_sample_ai_responses.py
+    docker run --rm sme-grant-auditor python -m pytest
 
-Plain functions and asserts only (no classes). Every evaluation runs inside
+Plain test functions and asserts. Every evaluation runs inside
 a guard that raises if anything tries to open a network connection.
 """
 
@@ -19,9 +18,12 @@ import os
 import socket
 import subprocess
 import sys
-import logic_manager as logic  # noqa: E402
+from logic_manager import LogicManager
+from tests.helpers import calculate_subsidy
 from contextlib import contextmanager
 import math
+
+logic = LogicManager()
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -487,8 +489,8 @@ def test_sme_check_and_subsidy_maths_on_sample_figures():
     assert logic.check_sme_status(100.0, 5000000.0, 50) is True
     assert logic.check_sme_status(29.9, 5000000.0, 50) is False
     assert logic.get_sme_fail_reasons(100.0, 5000000.0, 50) == []
-    assert logic.calculate_subsidy(100000.0, 0.30, 350000.0) == 30000.0
-    assert logic.calculate_subsidy(10000000.0, 0.30, 350000.0) == 350000.0
+    assert calculate_subsidy(100000.0, 0.30, 350000.0) == 30000.0
+    assert calculate_subsidy(10000000.0, 0.30, 350000.0) == 350000.0
 
 
 def test_passwords_hash_and_verify_without_any_network():
