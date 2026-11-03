@@ -3,14 +3,18 @@ folder (DATA_DIR is redirected), so real data is never touched."""
 
 import json
 import os
-import io_manager as logic
-import data_manager as dm
-from tests.helpers import temp_data_dir, raises
 import pytest
+
+from data_manager import DataManager, FilenameRules, JsonStore
+from models import ApplicationRecord
+from report_exporter import ReportContent
+from tests.helpers import temp_data_dir, raises
+
+dm = DataManager()  # for the helpers that need no folder
 
 
 def test_inspect_save_file_statuses():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         dm.save_data_to_json([], "here")
         assert dm.inspect_save_file("here") == ("here.json", "exists")
         assert dm.inspect_save_file("absent") == ("absent.json", "not_found")
@@ -25,7 +29,7 @@ def test_is_data_loaded():
 
 
 def test_failed_save_keeps_the_old_file_and_leaves_no_temp_file():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         dm.save_data_to_json([save_load_sample_record()], "mine")
         assert dm.save_data_to_json([object()], "mine") == (None, "io_error")
         assert dm.load_data_from_json("mine")[2] == "loaded"
@@ -33,7 +37,7 @@ def test_failed_save_keeps_the_old_file_and_leaves_no_temp_file():
 
 
 def test_single_record_file_loads_as_a_one_item_list():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         record = save_load_sample_record()
         with open(os.path.join(folder, "one.json"), "w") as file:
             json.dump(record, file)
@@ -42,7 +46,7 @@ def test_single_record_file_loads_as_a_one_item_list():
 
 
 def test_empty_list_and_empty_file():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         dm.save_data_to_json([], "empty")
         assert dm.load_data_from_json("empty")[:3:2] == ([], "loaded")
         open(os.path.join(folder, "blank.json"), "w").close()
@@ -50,21 +54,21 @@ def test_empty_list_and_empty_file():
 
 
 def test_list_with_one_bad_record_is_refused_whole():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         with open(os.path.join(folder, "mixed.json"), "w") as file:
             json.dump([save_load_sample_record(), {"junk": 1}], file)
         assert dm.load_data_from_json("mixed")[2] == "invalid_format"
 
 
 def test_non_utf8_file_is_treated_as_corrupt():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         with open(os.path.join(folder, "bytes.json"), "wb") as file:
             file.write(b"\xff\xfe\x00bad")
         assert dm.load_data_from_json("bytes")[2] == "invalid_json"
 
 
 def test_unicode_survives_a_round_trip():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         record = save_load_sample_record()
         record["company_profile"]["company_name"] = "Café 緑 ✓"
         dm.save_data_to_json([record], "uni")
@@ -95,13 +99,13 @@ def test_add_audit_record_recovers_from_a_bad_list():
 
 
 def test_nested_record_converts_to_display_format():
-    flat = logic.audit_record_to_display_format(save_load_sample_record())
+    flat = ApplicationRecord.nested_to_flat(save_load_sample_record())
     assert flat["Company Name"] == "Acme"
     assert flat["Reporting Advisory Fee"] == 0.0
 
 
 def test_history_refuses_unsafe_usernames():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         for bad in ("../x", "a/b", "", None, 5):
             try:
                 result = dm.append_user_audit(bad, {}, {}, {})
@@ -113,10 +117,10 @@ def test_history_refuses_unsafe_usernames():
 
 
 def test_logging_out_clears_the_active_user():
-    with temp_data_dir():
-        dm.set_active_user("alice")
-        dm.set_active_user(None)  # logout
-        assert dm.get_active_user() is None
+    with temp_data_dir() as (dm, _):
+        dm.active_user = "alice"
+        dm.active_user = None  # logout
+        assert dm.active_user is None
 
 
 def test_delete_and_update_reject_odd_indexes():
@@ -142,8 +146,8 @@ def test_filters_survive_damaged_records():
 
 
 def test_pdf_handles_markup_characters_and_unicode():
-    with temp_data_dir():
-        dm.set_active_user("alice")
+    with temp_data_dir() as (dm, _):
+        dm.active_user = "alice"
         audit = history_audit(2, "R&D <Ltd> Café", "MANUAL_REVIEW")
         audit["application"]["Proposal Narrative"] = "Swap <b>old</b> & 'new' kit ✓"
         name, status = dm.export_audit_to_pdf(audit)
@@ -153,19 +157,19 @@ def test_pdf_handles_markup_characters_and_unicode():
 
 
 def test_extension_is_added_once():
-    assert dm.normalise_filename("grants") == "grants.json"
-    assert dm.normalise_filename(" grants.JSON ") == "grants.JSON"
+    assert FilenameRules.normalise("grants") == "grants.json"
+    assert FilenameRules.normalise(" grants.JSON ") == "grants.JSON"
 
 
 def test_valid_and_invalid_names():
-    assert dm.is_valid_filename("grants.json")
+    assert FilenameRules.is_valid("grants.json")
     for bad in ("a/b.json", "..\\x.json", ".json", " .json", "a\x00b.json", 'q"x.json'):
-        assert not dm.is_valid_filename(bad)
+        assert not FilenameRules.is_valid(bad)
 
 
 def test_generated_company_filename_is_safe():
-    name = dm.generate_company_save_filename("Acme / Pte. Ltd: <test>")
-    assert dm.is_valid_filename(name)
+    name = FilenameRules.company_save_filename("Acme / Pte. Ltd: <test>")
+    assert FilenameRules.is_valid(name)
     assert name.endswith(".json")
 
 
@@ -181,7 +185,7 @@ def save_load_sample_record(audit_id="AUD-0001"):
 
 
 def test_round_trip():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         records = [save_load_sample_record()]
         assert dm.save_data_to_json(records, "mine") == ("mine.json", "saved")
         loaded, name, status = dm.load_data_from_json("mine")
@@ -190,24 +194,24 @@ def test_round_trip():
 
 
 def test_no_temp_file_is_left_behind():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         dm.save_data_to_json([], "mine")
         assert os.listdir(folder) == ["mine.json"]
 
 
 def test_bad_names_are_refused():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         assert dm.save_data_to_json([], "")[1] == "no_name"
         assert dm.save_data_to_json([], "../x")[1] == "invalid_name"
 
 
 def test_missing_file_reports_not_found():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         assert dm.load_data_from_json("nothing")[2] == "not_found"
 
 
 def test_corrupt_file_is_set_aside():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         path = os.path.join(folder, "broken.json")
         with open(path, "w") as file:
             file.write("{not json")
@@ -222,7 +226,7 @@ def test_corrupt_file_is_set_aside():
 
 
 def test_valid_json_of_the_wrong_shape_is_refused():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         path = os.path.join(folder, "wrong.json")
         with open(path, "w") as file:
             json.dump({"a": 1}, file)
@@ -230,14 +234,14 @@ def test_valid_json_of_the_wrong_shape_is_refused():
 
 
 def test_audit_ids_increase():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         first = save_load_sample_record(dm.generate_audit_id([]))
         second_id = dm.generate_audit_id([first])
         assert first["audit_id"] != second_id
 
 
 def test_merge_does_not_duplicate_ids():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         existing = [save_load_sample_record("AUD-0001")]
         duplicate = dict(existing[0])
         fresh = save_load_sample_record("AUD-0002")
@@ -246,30 +250,30 @@ def test_merge_does_not_duplicate_ids():
 
 
 def test_records_go_into_the_active_users_folder():
-    with temp_data_dir() as folder:
-        dm.set_active_user("alice")
+    with temp_data_dir() as (dm, folder):
+        dm.active_user = "alice"
         dm.save_data_to_json([], "mine")
         assert os.path.exists(os.path.join(folder, "records", "alice", "mine.json"))
 
 
 def test_one_user_cannot_see_anothers_files():
-    with temp_data_dir():
-        dm.set_active_user("alice")
+    with temp_data_dir() as (dm, _):
+        dm.active_user = "alice"
         dm.save_data_to_json([], "mine")
-        dm.set_active_user("bob")
+        dm.active_user = "bob"
         assert dm.load_data_from_json("mine")[2] == "not_found"
 
 
 def test_unsafe_usernames_are_refused():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         for bad in ("..", "a/b", "Alice", "", "x" * 65, 5):
             with raises(ValueError):
-                dm.set_active_user(bad)
-        assert dm.get_active_user() is None
+                dm.active_user = bad
+        assert dm.active_user is None
 
 
 def test_new_user_is_stored_and_found():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         assert not dm.user_exists("alice")
         assert dm.save_new_user({"username": "alice", "password_hash": "x"})
         assert dm.user_exists("alice")
@@ -278,18 +282,18 @@ def test_new_user_is_stored_and_found():
 
 
 def test_duplicate_username_is_refused():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         dm.save_new_user({"username": "alice"})
         assert not dm.save_new_user({"username": "alice"})
 
 
 def test_unknown_user_is_none():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         assert dm.get_user("nobody") is None
 
 
 def test_damaged_users_file_is_kept_as_a_backup():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         path = os.path.join(folder, "users.json")
         with open(path, "w") as file:
             file.write("{broken")
@@ -301,7 +305,7 @@ def test_damaged_users_file_is_kept_as_a_backup():
 
 
 def test_damaged_user_record_still_blocks_the_name():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         with open(os.path.join(folder, "users.json"), "w") as file:
             json.dump({"alice": "garbage"}, file)
         assert dm.user_exists("alice")
@@ -309,7 +313,7 @@ def test_damaged_user_record_still_blocks_the_name():
 
 
 def test_history_is_kept_per_user():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         dm.append_user_audit(
             "alice",
             {"Company Name": "A"},
@@ -333,7 +337,7 @@ def test_history_is_kept_per_user():
 
 
 def test_audit_ids_are_unique():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         for _ in range(3):
             dm.append_user_audit("alice", {}, {}, {})
         ids = [audit["audit_id"] for audit in dm.get_user_audits("alice")]
@@ -341,14 +345,14 @@ def test_audit_ids_are_unique():
 
 
 def test_damaged_history_entries_are_skipped():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         with open(os.path.join(folder, "audit_history.json"), "w") as file:
             json.dump({"alice": [1, "x", {"audit_id": "A1"}]}, file)
         assert dm.get_user_audits("alice") == [{"audit_id": "A1"}]
 
 
 def test_damaged_history_is_kept_as_a_backup():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         path = os.path.join(folder, "audit_history.json")
         with open(path, "w") as file:
             file.write("{broken")
@@ -358,8 +362,8 @@ def test_damaged_history_is_kept_as_a_backup():
 
 
 def test_lock_file_is_removed_afterwards():
-    with temp_data_dir() as folder:
-        with dm._file_lock("users.json") as locked:
+    with temp_data_dir() as (dm, folder):
+        with JsonStore(folder).lock("users.json") as locked:
             assert locked
         assert not any((name.endswith(".lock") for name in os.listdir(folder)))
 
@@ -515,13 +519,13 @@ def test_pdf_file_name_is_safe():
     audit = history_audit(7, 'A/B: "Co"', "MANUAL_REVIEW")
     name = dm.audit_pdf_filename(audit)
     assert name == "audit_7_A_B_ _Co_.pdf"
-    assert dm.is_valid_filename(name)
+    assert FilenameRules.is_valid(name)
     assert dm.audit_pdf_filename({"audit_id": 1}) == "audit_1_Company.pdf"
 
 
 def test_export_audit_to_pdf_writes_a_pdf_with_the_decision():
-    with temp_data_dir() as folder:
-        dm.set_active_user("alice")
+    with temp_data_dir() as (dm, folder):
+        dm.active_user = "alice"
         name, status = dm.export_audit_to_pdf(
             history_audit(1, "Apex", "PRE_APPROVED_TIER_1")
         )
@@ -535,7 +539,7 @@ def test_export_audit_to_pdf_writes_a_pdf_with_the_decision():
 
 
 def test_export_of_nothing_fails_cleanly():
-    with temp_data_dir():
+    with temp_data_dir() as (dm, _):
         assert dm.export_audit_to_pdf({}) == (None, "pdf_error")
         assert dm.export_audit_to_pdf(None) == (None, "pdf_error")
 
@@ -543,7 +547,7 @@ def test_export_of_nothing_fails_cleanly():
 def test_logging_goes_to_the_data_folder_and_is_set_up_once():
     import logging
 
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         assert dm.setup_logging() is True
         assert dm.setup_logging() is True
         root = logging.getLogger()
@@ -565,11 +569,11 @@ def test_logging_goes_to_the_data_folder_and_is_set_up_once():
 
 
 def test_logging_setup_fails_quietly_when_the_folder_cannot_be_used():
-    with temp_data_dir() as folder:
+    with temp_data_dir() as (dm, folder):
         blocker = os.path.join(folder, "blocker")
         with open(blocker, "w", encoding="utf-8") as file:
             file.write("a file where a folder is needed")
-        dm.DATA_DIR = os.path.join(blocker, "inside")
+        dm.data_dir = os.path.join(blocker, "inside")
         assert dm.setup_logging() is False
 
 
@@ -577,47 +581,47 @@ def test_logging_setup_fails_quietly_when_the_folder_cannot_be_used():
 
 
 def test_pdf_name_defaults_to_the_source_name():
-    assert dm._resolve_pdf_name("audits.json", None) == "audits.pdf"
-    assert dm._resolve_pdf_name("audits.json", "report") == "report.pdf"
+    assert FilenameRules.resolve_pdf_name("audits.json", None) == "audits.pdf"
+    assert FilenameRules.resolve_pdf_name("audits.json", "report") == "report.pdf"
 
 
 def test_pdf_name_rejects_unsafe_names():
     for bad in ("../x.pdf", "a/b.pdf", "bad*.pdf", "tab\t.pdf"):
-        assert dm._resolve_pdf_name("audits.json", bad) is None
+        assert FilenameRules.resolve_pdf_name("audits.json", bad) is None
 
 
 def test_outcome_wording_follows_the_decision_status():
-    assert dm._outcome_for({"decision_status": "MANUAL_REVIEW"})[1] == "amber"
-    assert dm._outcome_for({"decision_status": "REJECT_NON_SME"})[1] == "red"
-    assert dm._outcome_for({"audit_passed": True})[1] == "teal"
-    assert dm._outcome_for({})[1] == "amber"
+    assert ReportContent.outcome_for({"decision_status": "MANUAL_REVIEW"})[1] == "amber"
+    assert ReportContent.outcome_for({"decision_status": "REJECT_NON_SME"})[1] == "red"
+    assert ReportContent.outcome_for({"audit_passed": True})[1] == "teal"
+    assert ReportContent.outcome_for({})[1] == "amber"
 
 
 def test_screening_result_for_unknown_status_goes_to_review():
-    assert dm._screening_result_for({}) == "Not recorded"
+    assert ReportContent.screening_result_for({}) == "Not recorded"
     assert (
-        dm._screening_result_for({"decision_status": "ODD"})
+        ReportContent.screening_result_for({"decision_status": "ODD"})
         == "Further review required"
     )
     assert (
-        dm._screening_result_for({"decision_status": "X", "audit_passed": True})
+        ReportContent.screening_result_for({"decision_status": "X", "audit_passed": True})
         == "Passed"
     )
 
 
 def test_report_values_are_written_as_prose():
-    assert dm._readable_value(1234.5, "annual_revenue_sgd") == "SGD 1,234.50"
-    assert dm._readable_value(True) == "Yes"
-    assert dm._readable_value([], "x") == "None recorded"
-    assert dm._readable_value("REJECT_NON_SME", "decision_status").startswith(
+    assert ReportContent.readable_value(1234.5, "annual_revenue_sgd") == "SGD 1,234.50"
+    assert ReportContent.readable_value(True) == "Yes"
+    assert ReportContent.readable_value([], "x") == "None recorded"
+    assert ReportContent.readable_value("REJECT_NON_SME", "decision_status").startswith(
         "Did not qualify"
     )
 
 
 def test_report_sections_handle_both_record_layouts():
     flat = {"Company Name": "Flat Co", "Audit ID": 7}
-    profile, proposal, ai_audit, evaluation, record_id, _ = dm._report_sections(flat, 0)
+    profile, proposal, ai_audit, evaluation, record_id, _ = ReportContent.report_sections(flat, 0)
     assert profile["company_name"] == "Flat Co" and record_id == 7
     assert ai_audit == {} and evaluation == {}
-    assert dm._report_company_name([flat]) == "Flat Co"
-    assert dm._report_company_name([]) == "the named company"
+    assert ReportContent.company_name([flat]) == "Flat Co"
+    assert ReportContent.company_name([]) == "the named company"
