@@ -1,8 +1,13 @@
 .env
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 venv/
+log.txt
+
+# Docker image exports (e.g. from "docker save"); build the image instead
+*.tar
 
 # Local user accounts (contain password hashes) and audit history
 users.json
