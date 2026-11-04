@@ -20,21 +20,7 @@ from data_manager import DataManager
 from io_manager import IOManager
 from logic_manager import LogicManager
 from models import ApplicationRecord, Proposal
-
-Record = dict[str, Any]
-Records = list[Record]
-AiAudit = dict[str, Any]
-
-
-class Session:
-    """What one logged-in user is working on. The Session owns its record
-    list and lives only until logout (composition)."""
-
-    def __init__(self, username: str) -> None:
-        self.username = username
-        self.records: Records = []
-        self.ai_audit: AiAudit = {}
-        self.jsonfile_name = ""
+from session import AiAudit, Record, Records, Session
 
 
 class Application:
