@@ -22,7 +22,8 @@ from contextlib import contextmanager
 from typing import Any
 
 from models import ApplicationRecord
-from sme_interface_stores.sme_interface_gui import ButtonPanel, InterfaceArt
+from sme_interface_stores.sme_interface_gui import InterfaceArt
+from sme_interface_stores.buttons import ButtonPanel
 
 Record = dict[str, Any]
 Records = list[Record]

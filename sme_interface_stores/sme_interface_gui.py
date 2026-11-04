@@ -1,9 +1,7 @@
-"""Screen art for the terminal: menus, banners, floppy-disk prompts and buttons.
+"""Screen art for the terminal: menus, banners and floppy-disk prompts.
 
     InterfaceArt   builds art as plain strings (it never prints or reads keys)
-    ButtonPanel    shows the clickable buttons by handing their art to a
-                   terminal object it is given (association; the old circular
-                   import of io_manager is gone)
+
 
 The I/O Manager is the only caller; it owns the printing.
 """
