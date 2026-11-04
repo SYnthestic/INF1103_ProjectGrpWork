@@ -41,7 +41,7 @@ ALLOWED = {
     "ai_manager": SUPPORT_MODULES,
     "logic_manager": SUPPORT_MODULES,
     "data_manager": SUPPORT_MODULES,
-    "main": MANAGERS | {"models"},
+    "main": MANAGERS | {"models", "sessions"},
 }
 
 
