@@ -8,11 +8,6 @@ The I/O Manager is the only caller; it owns the printing.
 """
 
 import re
-import textwrap
-
-from art import art as art_lookup
-from art import text2art
-
 ANSI = re.compile(r"\033\[[0-9;]*m")
 
 BLUE = "\033[34m"
