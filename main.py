@@ -216,40 +216,48 @@ class Application:
     # ========================================================
     def save_records_flow(
     self, records: Records, jsonfile_name: str
-) -> tuple[str, bool]:
-        """Asks for a file name if needed, merges with an existing file if the
-        user agrees, saves, and returns (jsonfile_name, saved).
-        On cancel or failure the original name is returned with saved=False."""
+    ) -> tuple[str, bool]:
+        """Ask for a filename if needed, then save the records.
+
+        Returns (filename, saved). An empty or invalid filename is forgotten.
+        """
         target = jsonfile_name
+
         if not target:
+            # Keep this as a one-argument call: the I/O method defaults to save mode.
             target = self._io.retrieve_json_filename(
-                self._data.INVALID_FILENAME_CHARS, for_loading=False
+                self._data.INVALID_FILENAME_CHARS
             )
-            if target is None:                       # blank entry = cancel
+            if target is None:
                 self._io.display_save_result("no_name", "")
-                return jsonfile_name, False
+                return "", False
 
         clean_name, status = self._data.inspect_save_file(target)
+
         if status in ("no_name", "invalid_name"):
             self._io.display_save_result(status, target)
-            return jsonfile_name, False
+            return "", False
 
         to_save = records
         if status == "exists":
             action = self._io.ask_existing_file_action(clean_name)
+
             if action == "cancel":
                 return jsonfile_name, False
+
             if action == "add":
                 existing, _, load_status = self._data.load_data_from_json(clean_name)
                 if load_status != "loaded":
                     self._io.display_load_result(load_status, clean_name)
                     return jsonfile_name, False
                 to_save = self._data.merge_records(existing, records)
-            # "replace": the file will hold exactly the records in memory
 
         saved_name, save_status = self._data.save_data_to_json(to_save, clean_name)
         self._io.display_save_result(save_status, clean_name)
-        return (saved_name or clean_name), save_status == "saved"
+
+        if save_status == "saved":
+            return saved_name or clean_name, True
+        return jsonfile_name, False
 
     def offer_save_before_leaving(self, session: Session) -> bool:
         """Returns True if it is OK to leave (nothing unsaved, saved, or the
@@ -268,23 +276,19 @@ class Application:
         return False                               # cancelled or failed: stay
     
     def load_records_flow(
-    self, records: Records, jsonfile_name: str
-) -> tuple[Records, str]:
-        """Prompts for a file name, confirms before replacing records in memory,
-        loads, shows the result, and returns (records, jsonfile_name).
-        On cancel or failure both are unchanged."""
-        new_name = self._io.retrieve_json_filename(
-            self._data.INVALID_FILENAME_CHARS, for_loading=True
-        )
-        if new_name is None:                      # blank entry = cancel, no prompt
-            self._io.display_load_result("no_name", "")
-            return records, jsonfile_name
-
-
+        self, records: Records, jsonfile_name: str
+    ) -> tuple[Records, str]:
         if self._data.is_data_loaded(records, jsonfile_name) and (
             not self._io.confirm_overwrite_records()
         ):
-            return records, jsonfile_name         # user answered "n"
+            return records, jsonfile_name
+
+        new_name = self._io.retrieve_json_filename(
+            self._data.INVALID_FILENAME_CHARS, for_loading=True
+        )
+        if new_name is None:
+            self._io.display_load_result("no_name", "")
+            return records, jsonfile_name
 
         loaded, clean_name, status = self._data.load_data_from_json(new_name)
         self._io.display_load_result(status, clean_name or new_name)

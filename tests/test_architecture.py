@@ -23,30 +23,47 @@ import models
 import report_exporter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MANAGERS = {"io_manager", "ai_manager", "logic_manager", "data_manager"}
+MANAGERS = {
+    "managers.io_manager",
+    "managers.ai_manager",
+    "managers.logic_manager",
+    "managers.data_manager",
+}
+MODULE_PATHS = {
+    "main": "main.py",
+    "models": "models.py",
+    "session": "session.py",
+    "report_exporter": "report_exporter.py",
+    "managers.io_manager": "managers/io_manager.py",
+    "managers.ai_manager": "managers/ai_manager.py",
+    "managers.logic_manager": "managers/logic_manager.py",
+    "managers.data_manager": "managers/data_manager.py",
+    "sme_interface_stores.sme_interface_gui":
+    "sme_interface_stores/sme_interface_gui.py",
+}
 APPLICATION_MODULES = (
     "main",
     "models",
-    "io_manager",
-    "ai_manager",
-    "logic_manager",
-    "data_manager",
+    "managers.io_manager",
+    "managers.ai_manager",
+    "managers.logic_manager",
+    "managers.data_manager",
     "report_exporter",
-    os.path.join("sme_interface_stores", "sme_interface_gui"),
+    "sme_interface_stores.sme_interface_gui",
 )
+
 # Shared support modules every manager may use. They hold no manager logic.
 SUPPORT_MODULES = {"models", "report_exporter", "sme_interface_stores"}
 ALLOWED = {
-    "io_manager": SUPPORT_MODULES,
-    "ai_manager": SUPPORT_MODULES,
-    "logic_manager": SUPPORT_MODULES,
-    "data_manager": SUPPORT_MODULES,
+    "managers.io_manager": SUPPORT_MODULES,
+    "managers.ai_manager": SUPPORT_MODULES,
+    "managers.logic_manager": SUPPORT_MODULES,
+    "managers.data_manager": SUPPORT_MODULES,
     "main": MANAGERS | {"models", "session"},
 }
 
-
 def parse(module_name):
-    path = os.path.join(ROOT, module_name + ".py")
+    path = os.path.join(ROOT, MODULE_PATHS[module_name])
     with open(path, encoding="utf-8") as file:
         return ast.parse(file.read())
 
@@ -77,7 +94,7 @@ def test_managers_do_not_import_each_other():
 
 def test_only_the_io_manager_touches_the_terminal():
     for module_name in APPLICATION_MODULES:
-        if module_name == "io_manager":
+        if module_name.rsplit(".", 1)[-1] == "io_manager":
             continue
         calls = [
             node.func.id
@@ -93,8 +110,9 @@ def test_importing_a_manager_prints_nothing():
     """Imported in a fresh interpreter (reloading modules in this process would
     create second copies of every class and break isinstance checks)."""
     code = (
-        "import models, logic_manager, report_exporter, data_manager, "
-        "ai_manager, io_manager, main"
+    "import models, report_exporter, main; "
+    "import managers.logic_manager, managers.data_manager, "
+    "managers.ai_manager, managers.io_manager"
     )
     done = subprocess.run(
         [sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True

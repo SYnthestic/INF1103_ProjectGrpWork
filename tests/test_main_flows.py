@@ -38,12 +38,13 @@ def test_save_asks_for_a_name_and_saves():
             ) as ask,
             mock.patch.object(app.io, "display_save_result") as shown,
         ):
-            name = app.save_records_flow(records, "")
+            name, saved = app.save_records_flow(records, "")
+
         ask.assert_called_once_with(dm.INVALID_FILENAME_CHARS)
         shown.assert_called_once_with("saved", "mine.json")
         assert name == "mine.json"
+        assert saved is True
         assert dm.load_data_from_json("mine")[0] == records
-
 
 def test_save_reuses_the_name_from_earlier():
     with temp_data_dir() as (dm, _):
@@ -105,8 +106,10 @@ def test_invalid_name_is_reported_and_forgotten():
     with temp_data_dir() as (dm, _):
         app = Application(data=dm)
         with mock.patch.object(app.io, "display_save_result") as shown:
-            name = app.save_records_flow([], "bad/name")
+            name, saved = app.save_records_flow([], "bad/name")
+
         assert name == ""
+        assert saved is False
         assert shown.call_args.args[0] == "invalid_name"
 
 

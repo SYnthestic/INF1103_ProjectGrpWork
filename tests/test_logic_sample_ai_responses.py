@@ -503,9 +503,9 @@ def test_passwords_hash_and_verify_without_any_network():
 def test_logic_manager_loads_without_the_ai_library():
     """Importing logic_manager must not pull in openai or the AI Manager."""
     code = (
-        "import sys, logic_manager; "
-        "bad = [m for m in ('openai', 'ai_manager') if m in sys.modules]; "
-        "sys.exit(1 if bad else 0)"
+    "import sys, managers.logic_manager; "
+    "bad = [m for m in ('openai', 'managers.ai_manager') if m in sys.modules]; "
+    "sys.exit(1 if bad else 0)"
     )
     env = dict(os.environ)
     env.pop("OPENROUTER_API_KEY", None)
