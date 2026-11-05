@@ -16,3 +16,4 @@ class Session:
         self.records: Records = []
         self.ai_audit: AiAudit = {}
         self.jsonfile_name = ""
+        self.dirty = False

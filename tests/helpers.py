@@ -4,8 +4,8 @@ import tempfile
 from contextlib import contextmanager
 from types import SimpleNamespace
 
-from data_manager import DataManager
-from logic_manager import GrantScheme
+from managers.data_manager import DataManager
+from managers.logic_manager import GrantScheme
 
 
 @contextmanager

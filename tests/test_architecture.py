@@ -15,10 +15,10 @@ import subprocess
 import sys
 from abc import ABC
 
-import ai_manager
-import data_manager
-import io_manager
-import logic_manager
+import managers.ai_manager as ai_manager
+import managers.data_manager as data_manager
+import managers.io_manager as io_manager
+import managers.logic_manager as logic_manager
 import models
 import report_exporter
 

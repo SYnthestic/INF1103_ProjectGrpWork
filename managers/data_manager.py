@@ -33,7 +33,10 @@ class FilenameRules:
         jsonfile_name = str(jsonfile_name).strip()
         if jsonfile_name and not jsonfile_name.lower().endswith(".json"):
             jsonfile_name += ".json"
-        return jsonfile_name
+        elif jsonfile_name is None:
+            return ""
+        return jsonfile_name.strip()
+
 
     @classmethod
     def is_valid(cls, jsonfile_name: str) -> bool:
@@ -372,15 +375,17 @@ class DataManager:
         return records
 
     # Loading and saving record files
-    def inspect_save_file(self, jsonfile_name: str) -> tuple[str, str]:
+    def inspect_save_file(self, jsonfile_name: str | None) -> tuple[str, str]:
         """Checks a filename WITHOUT reading the file.
 
         Returns (clean_name, status) where status is one of:
-            "no_name"       nothing was given          (clean_name is "")
-            "invalid_name"  has illegal characters     (clean_name is "")
+            "no_name"       nothing was given / user cancelled (clean_name is "")
+            "invalid_name"  has illegal characters              (clean_name is "")
             "exists"        a save file is already there
-            "not_found"     no such file yet           (clean_name is still usable)
+            "not_found"     no such file yet                    (clean_name is still usable)
         """
+        if jsonfile_name is None:
+            return "", "no_name"
         name = FilenameRules.normalise(jsonfile_name)
         if not name:
             return "", "no_name"
@@ -396,7 +401,7 @@ class DataManager:
         Returns (data, clean_name, status). data is ALWAYS a list.
         status is one of:
             "loaded"          success
-            "no_name"         nothing was given
+            "no_name"         nothing was given. Thus return to main menu
             "invalid_name"    illegal characters in the name
             "not_found"       file does not exist
             "invalid_json"    file is corrupt/unreadable (set aside as .corrupt)
@@ -438,10 +443,10 @@ class DataManager:
         return data, name, "loaded"
 
     @staticmethod
-    def is_data_loaded(data: Records, jsonfile_name: str) -> bool:
+    def is_data_loaded(data: Records, jsonfile_name: str | None) -> bool:
         """True if there is already data/filename in memory (the controller
         should then ask the user before overwriting it)."""
-        return not (data == [] and jsonfile_name == "")
+        return bool(data) or bool(jsonfile_name)
 
     def save_data_to_json(
         self, data: Records, jsonfile_name: str

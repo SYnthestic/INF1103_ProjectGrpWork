@@ -18,7 +18,7 @@ import os
 import socket
 import subprocess
 import sys
-from logic_manager import LogicManager
+from managers.logic_manager import LogicManager
 from tests.helpers import calculate_subsidy
 from contextlib import contextmanager
 import math

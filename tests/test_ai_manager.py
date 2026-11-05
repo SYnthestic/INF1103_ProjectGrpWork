@@ -5,8 +5,8 @@ import json
 import os
 from unittest import mock
 
-import ai_manager as ai
-from ai_manager import AIClient, AIManager, AuditResponseParser, OpenRouterClient
+import managers.ai_manager as ai
+from managers.ai_manager import AIClient, AIManager, AuditResponseParser, OpenRouterClient
 from tests.helpers import raises
 
 parser = AuditResponseParser()

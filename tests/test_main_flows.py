@@ -6,8 +6,8 @@ import tempfile
 from unittest import mock
 
 import main
-from data_manager import DataManager
-from io_manager import IOManager
+from managers.data_manager import DataManager
+from managers.io_manager import IOManager
 from main import Application, Session
 from tests.helpers import temp_data_dir, raises
 
