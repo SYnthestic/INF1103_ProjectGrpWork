@@ -10,7 +10,6 @@ The Application is the only class that knows all four. It is handed them
 manager's internals. Run with:  python main.py
 """
 
-from os import name
 import sys
 from collections.abc import Callable
 from types import TracebackType
