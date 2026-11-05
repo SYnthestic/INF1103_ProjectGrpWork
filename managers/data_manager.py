@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -218,8 +219,17 @@ class DataManager:
     DEFAULT_SAVE_FILE = "audit_records.json"
     USERS_FILE = "users.json"
     AUDIT_HISTORY_FILE = "audit_history.json"
+    RULES_CONFIG_FILE = "rules_config.json"
     RECORDS_DIR_NAME = "records"
-    RESERVED_FILES = (USERS_FILE.lower(), AUDIT_HISTORY_FILE.lower())
+    ARCHIVE_DIR_NAME = "archive"
+    RESERVED_FILES = (
+        USERS_FILE.lower(),
+        AUDIT_HISTORY_FILE.lower(),
+        RULES_CONFIG_FILE.lower(),
+    )
+    # Password fields of a user record. They are replaced on a password reset
+    # and never copied into the archive.
+    PASSWORD_FIELDS = ("algorithm", "iterations", "salt", "password_hash")
     EDITABLE_RECORD_FIELDS = (
         "Company Name",
         "Company Industry",
@@ -534,9 +544,12 @@ class DataManager:
         application: Record,
         ai_audit: AiAudit,
         result: dict[str, Any] | None,
+        rules_used: dict[str, Any] | None = None,
     ) -> Record | None:
         """Saves one completed audit (inputs + AI output + decision) under the
-        logged-in user. Returns the saved record, or None on failure."""
+        logged-in user. `rules_used` records the thresholds the decision was
+        made with, so it can still be explained after they change. Returns the
+        saved record, or None on failure."""
         if not self.is_safe_username(username):
             raise ValueError("unsafe username")
         with self._store.lock(self.AUDIT_HISTORY_FILE) as locked:
@@ -557,11 +570,177 @@ class DataManager:
                 "ai_audit": ai_audit,
                 "result": result,
             }
+            if rules_used is not None:
+                audit_record["rules_used"] = rules_used
             user_audits.append(audit_record)
 
             if self._store.write_json_file(self.AUDIT_HISTORY_FILE, history):
                 return audit_record
             return None
+
+    # Administrator: managing accounts
+    def list_users(self) -> list[Record] | None:
+        """One summary per account, sorted by name: username, stored role,
+        created_at and number of saved audits. Password fields are left out,
+        so nothing secret can reach the screen. None if users.json is
+        unreadable."""
+        users = self.load_users()
+        if users is None:
+            return None
+        history = self.load_audit_history() or {}
+        summaries = []
+        for username in sorted(users):
+            record = users[username] if isinstance(users[username], dict) else {}
+            audits = history.get(username)
+            summaries.append(
+                {
+                    "username": username,
+                    "role": record.get("role", "user"),
+                    "created_at": record.get("created_at", ""),
+                    "audit_count": len(audits) if isinstance(audits, list) else 0,
+                }
+            )
+        return summaries
+
+    def _update_user(self, username: str, changes: dict[str, Any]) -> bool:
+        """Merges `changes` into one stored user record. False if the user
+        does not exist (or has a damaged record) or the write failed."""
+        with self._store.lock(self.USERS_FILE) as locked:
+            if not locked:
+                return False
+            users = self.load_users()
+            if users is None or not isinstance(users.get(username), dict):
+                return False
+            users[username] = {**users[username], **changes}
+            return self._store.write_json_file(self.USERS_FILE, users)
+
+    def set_user_role(self, username: str, role: str) -> bool:
+        return self._update_user(username, {"role": role})
+
+    def set_user_password(self, username: str, password_fields: dict[str, Any]) -> bool:
+        """Replaces the stored password hash with one built by the Logic
+        Manager. Only the password fields are taken from `password_fields`."""
+        changes = {key: password_fields[key] for key in self.PASSWORD_FIELDS}
+        changes["password_changed_at"] = datetime.now().isoformat(timespec="seconds")
+        return self._update_user(username, changes)
+
+    def _new_archive_dir(self, username: str) -> str:
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        base = os.path.join(
+            self._store.data_dir, self.ARCHIVE_DIR_NAME, f"{username}_{stamp}"
+        )
+        path, counter = base, 1
+        while os.path.exists(path):
+            counter += 1
+            path = f"{base}_{counter}"
+        return path
+
+    def archive_user(self, username: str, deleted_by: str) -> tuple[str | None, str]:
+        """Deletes an account but keeps its data. Everything belonging to the
+        user is moved to DATA_DIR/archive/<username>_<date-time>/:
+
+            account.json         the account details (never the password hash)
+            audit_history.json   the user's saved audits
+            records/             the user's saved record files and PDFs
+
+        Then the user is removed from users.json and audit_history.json, so
+        they can no longer log in. Returns (archive_folder, status), status one
+        of "archived", "not_found", "unsafe_name", "busy" or "io_error". On any
+        failure the account is left as it was."""
+        if not self.is_safe_username(username):
+            return None, "unsafe_name"
+        with (
+            self._store.lock(self.USERS_FILE) as users_locked,
+            self._store.lock(self.AUDIT_HISTORY_FILE) as history_locked,
+        ):
+            if not (users_locked and history_locked):
+                return None, "busy"
+            users = self.load_users()
+            history = self.load_audit_history()
+            if users is None or history is None:
+                return None, "io_error"
+            if username not in users:
+                return None, "not_found"
+
+            account = users[username] if isinstance(users[username], dict) else {}
+            account = {
+                key: value
+                for key, value in account.items()
+                if key not in self.PASSWORD_FIELDS
+            }
+            account.update(
+                username=username,
+                deleted_at=datetime.now().isoformat(timespec="seconds"),
+                deleted_by=deleted_by,
+            )
+            audits = history.get(username, [])
+
+            archive_dir = self._new_archive_dir(username)
+            records_dir = os.path.join(
+                self._store.data_dir, self.RECORDS_DIR_NAME, username
+            )
+            archived_records = os.path.join(archive_dir, self.RECORDS_DIR_NAME)
+            moved = False
+            try:
+                if not (
+                    JsonStore.write_path(os.path.join(archive_dir, "account.json"), account)
+                    and JsonStore.write_path(
+                        os.path.join(archive_dir, self.AUDIT_HISTORY_FILE), audits
+                    )
+                ):
+                    raise OSError("could not write the archive files")
+                if os.path.isdir(records_dir):
+                    shutil.move(records_dir, archived_records)
+                    moved = True
+
+                history.pop(username, None)
+                remaining_users = {k: v for k, v in users.items() if k != username}
+                if not self._store.write_json_file(self.AUDIT_HISTORY_FILE, history):
+                    raise OSError("could not update audit_history.json")
+                if not self._store.write_json_file(self.USERS_FILE, remaining_users):
+                    # Put the history back so the account stays complete.
+                    history[username] = audits
+                    self._store.write_json_file(self.AUDIT_HISTORY_FILE, history)
+                    raise OSError("could not update users.json")
+            except OSError as err:
+                logger.error("Could not archive user %s: %s", username, err)
+                if moved:
+                    try:
+                        shutil.move(archived_records, records_dir)
+                    except OSError as undo_err:
+                        logger.error("Could not move records back: %s", undo_err)
+                return None, "io_error"
+            return os.path.abspath(archive_dir), "archived"
+
+    # Administrator: rule thresholds
+    def load_rule_config(self) -> tuple[dict[str, Any] | None, str]:
+        """The saved rule settings. Returns (values, status), status one of:
+            "loaded"      values read from rules_config.json
+            "missing"     no settings saved yet (use the defaults)
+            "corrupt"     the file was unreadable JSON and was set aside
+            "io_error"    the file exists but could not be read
+        The values are not checked here; the Logic Manager decides whether
+        they make sense."""
+        if not os.path.isfile(self._store.full_path(self.RULES_CONFIG_FILE)):
+            return None, "missing"
+        stored = self._store.read_json_file(self.RULES_CONFIG_FILE, {})
+        if stored is None:
+            return None, "io_error"
+        if not stored:
+            return None, "corrupt"
+        return stored.get("thresholds"), "loaded"
+
+    def save_rule_config(self, values: dict[str, Any], changed_by: str) -> bool:
+        """Saves rule settings already checked by the Logic Manager."""
+        stored = {
+            "thresholds": dict(values),
+            "changed_by": changed_by,
+            "changed_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        with self._store.lock(self.RULES_CONFIG_FILE) as locked:
+            if not locked:
+                return False
+            return self._store.write_json_file(self.RULES_CONFIG_FILE, stored)
 
     # Filtering / querying
     @staticmethod
