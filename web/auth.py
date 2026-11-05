@@ -1,11 +1,16 @@
 from flask import Blueprint, current_app, jsonify, request
 from flask import session as flask_session
 
+from web import service
+
+
 bp = Blueprint("auth", __name__, url_prefix="/api")
 
 
 @bp.post("/register")
 def register():
+    if "username" in flask_session:
+        return jsonify(error="already logged in; log out first"), 409
     body = request.get_json(silent=True) or {}
     username, password = body.get("username", ""), body.get("password", "")
     data, logic = current_app.extensions["data"], current_app.extensions["logic"]
@@ -22,11 +27,13 @@ def register():
 
 @bp.post("/login")
 def login():
+    if "username" in flask_session:
+        return jsonify(error="already logged in; log out first"), 409
     body = request.get_json(silent=True) or {}
     username, password = body.get("username", ""), body.get("password", "")
     data, logic = current_app.extensions["data"], current_app.extensions["logic"]
     if logic.verify_password(password, data.get_user(username)):
-        flask_session["username"] = username
+        service.start_session(username)
         return jsonify(username=username)
     return jsonify(error="invalid credentials"), 401
 

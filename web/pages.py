@@ -107,6 +107,9 @@ def home():
 
 @bp.route("/register", methods=["GET", "POST"])
 def register():
+    if "username" in flask_session:
+        flash("You are already logged in. Log out first to switch accounts.")
+        return redirect(url_for("pages.history"))
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
@@ -128,14 +131,16 @@ def register():
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
+    if "username" in flask_session:
+        flash("You are already logged in. Log out first to switch accounts.")
+        return redirect(url_for("pages.history"))
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         data = current_app.extensions["data"]
         logic = current_app.extensions["logic"]
         if logic.verify_password(password, data.get_user(username)):
-            flask_session.clear()               # fresh session on login
-            flask_session["username"] = username
+            service.start_session(username)
             return redirect(url_for("pages.history"))
         flash("Invalid username or password.")
     return render_template("login.html")

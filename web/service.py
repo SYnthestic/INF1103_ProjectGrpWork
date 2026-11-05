@@ -1,9 +1,17 @@
 from flask import current_app
+from flask import session as flask_session
 
 from models import ApplicationRecord
 
 REQUIRED_TEXT = ("Company Name", "Company Industry", "Proposal Narrative")
 REQUIRED_NUMBERS = ("Company Total Revenue", "Total Employees", "Local Equity")
+
+
+
+def start_session(username: str) -> None:
+    flask_session.clear()
+    flask_session["username"] = username
+    flask_session["boot"] = current_app.config["BOOT_ID"]
 
 
 def validate_application(record) -> str | None:
