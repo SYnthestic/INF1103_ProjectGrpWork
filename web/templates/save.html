@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Save to JSON</h1>
+<form method="post">
+  <label>File name (leave blank to cancel)
+    <input name="filename" maxlength="50" value="{{ filename }}"></label>
+  <p><button>Save</button> <a href="{{ url_for('pages.records_page') }}">Cancel</a></p>
+</form>
+{% endblock %}

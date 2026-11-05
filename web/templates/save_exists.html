@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>File already exists</h1>
+<p>{{ clean }} already exists. What should happen?</p>
+<form method="post">
+  <input type="hidden" name="filename" value="{{ clean }}">
+  <button name="mode" value="add">Add to the file (merge)</button>
+  <button name="mode" value="replace">Replace the file</button>
+  <button name="mode" value="cancel">Cancel</button>
+</form>
+{% endblock %}

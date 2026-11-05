@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Records in memory</h1>
+<p>File: {{ ws.jsonfile_name or '(not saved yet)' }}
+  {% if ws.dirty %}<strong>(unsaved changes)</strong>{% endif %}</p>
+<p>
+  <a href="{{ url_for('pages.save_records') }}">Save to JSON</a> |
+  <a href="{{ url_for('pages.load_records') }}">Pull from JSON</a>
+</p>
+{% if not rows %}
+  <p>No records in memory. <a href="{{ url_for('pages.new_audit') }}">Create one</a> or pull from a file.</p>
+{% else %}
+<table>
+  <tr><th>#</th><th>Company</th><th>Industry</th><th>Grant</th><th></th></tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ r.get('Company Name', 'N/A') }}</td>
+    <td>{{ r.get('Company Industry', '') }}</td>
+    <td>{{ r.get('Sustainability Grant', '') }}</td>
+    <td>
+      <a href="{{ url_for('pages.edit_record', index=loop.index0) }}">Edit</a>
+      <form class="inline" method="post" action="{{ url_for('pages.delete_record', index=loop.index0) }}"
+            onsubmit="return confirm('Delete this record?')"><button>Delete</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<p>The AI and Logic buttons work on the latest record (the last row).</p>
+<form class="inline" method="post" action="{{ url_for('pages.run_ai') }}"><button>Run AI Manager (only)</button></form>
+<form class="inline" method="post" action="{{ url_for('pages.run_logic') }}"><button>Run Logic Manager (only)</button></form>
+{% endif %}
+{% endblock %}

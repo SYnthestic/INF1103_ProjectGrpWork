@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p>Latest record: {{ company }}</p>
+<pre>{{ data | tojson(indent=2) }}</pre>
+<a href="{{ url_for('pages.records_page') }}">Back to records</a>
+{% endblock %}

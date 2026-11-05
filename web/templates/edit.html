@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Update record #{{ index + 1 }}</h1>
+<form method="post">
+  {% for key in text_fields %}
+  <label>{{ key }}
+    {% if key == 'Proposal Narrative' %}
+      <textarea name="{{ key }}" rows="6" required>{{ values.get(key, '') }}</textarea>
+    {% else %}
+      <input name="{{ key }}" value="{{ values.get(key, '') }}" required>
+    {% endif %}
+  </label>
+  {% endfor %}
+  {% for key in number_fields %}
+  <label>{{ key }}
+    <input name="{{ key }}" type="number" step="any" min="0" value="{{ values.get(key, '') }}" required></label>
+  {% endfor %}
+  <p><button>Update</button> <a href="{{ url_for('pages.records_page') }}">Cancel</a></p>
+</form>
+{% endblock %}

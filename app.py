@@ -22,7 +22,9 @@ def create_app(config: dict | None = None) -> Flask:
     from web.auth import bp as auth_bp
     from web.audits import bp as audits_bp
     from web.pages import bp as pages_bp
-
+    from web.workspace import Workspaces
+    
+    app.extensions["workspaces"] = Workspaces()
     app.register_blueprint(auth_bp)
     app.register_blueprint(audits_bp)
     app.register_blueprint(pages_bp)

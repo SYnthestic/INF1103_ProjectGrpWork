@@ -12,6 +12,9 @@
     .flash { background: #fff3cd; padding: .6rem; margin: 1rem 0; border-radius: 4px; }
     nav a, nav button { margin-right: 1rem; }
     pre { background: #f4f4f4; padding: .8rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; }
+td, th { border-bottom: 1px solid #ddd; padding: .4rem; text-align: left; }
+form.inline { display: inline; }
     
   </style>
 </head>
@@ -19,6 +22,7 @@
   <nav>
     {% if session.username %}
       <a href="{{ url_for('pages.new_audit') }}">New audit</a>
+      <a href="{{ url_for('pages.records_page') }}">Records</a>
       <a href="{{ url_for('pages.history') }}">History</a>
       <form action="{{ url_for('pages.logout') }}" method="post" style="display:inline">
         <button>Log out ({{ session.username }})</button>

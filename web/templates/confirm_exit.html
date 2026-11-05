@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>You have unsaved records</h1>
+<p>Save them before leaving?</p>
+<p><a href="{{ url_for('pages.save_records') }}">Save records</a></p>
+<form method="post" action="{{ url_for('pages.logout') }}">
+  <input type="hidden" name="force" value="1">
+  <button>Leave without saving</button>
+</form>
+<p><a href="{{ url_for('pages.records_page') }}">Stay</a></p>
+{% endblock %}
