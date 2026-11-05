@@ -196,7 +196,7 @@ class InterfaceArt:
         return disk_art
 
     @staticmethod
-    def boxed_menu(username: str | None = None) -> str:
+    def boxed_menu(username: str | None = None, is_admin: bool = False) -> str:
         border = "▓⚗_⚗▓ " * 10
         blank = "▓" + " " * 57 + "▓"
 
@@ -206,7 +206,7 @@ class InterfaceArt:
         lines = [
             border,
             blank,
-            row("    Please select your choice (0-10)"),
+            row(f"    Please select your choice (0-{11 if is_admin else 10})"),
             blank,
             row("    0. Exit"),
             row("    1. Start"),
@@ -219,6 +219,10 @@ class InterfaceArt:
             row("    8. Run Logic Manager (only)"),
             row("    9. View My Past Audits"),
             row("   10. Logout"),
+        ]
+        if is_admin:
+            lines.append(row("   11. Admin Console"))
+        lines += [
             blank,
         ]
         if username:
