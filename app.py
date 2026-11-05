@@ -1,13 +1,37 @@
+import os
 from flask import Flask
-from web.routes import bp
+from managers.ai_manager import AIManager
+from managers.data_manager import DataManager
+from managers.logic_manager import LogicManager
 
-def create_app():
+
+def create_app(config: dict | None = None) -> Flask:
     app = Flask(__name__)
-    app.config.from_prefixed_env()   # reads FLASK_* from .env
-    app.register_blueprint(bp)
+    app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
+    if config:
+        app.config.update(config)
+
+    app.extensions["ai"] = AIManager()
+    app.extensions["logic"] = LogicManager()
+    app.extensions["data"] = DataManager()
+
+    from web.auth import bp as auth_bp
+    from web.audits import bp as audits_bp
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(audits_bp)
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    @app.get("/")
+    def index():
+        return {"message": "Grant Audit API", "health": "/health"}
+
     return app
 
-app = create_app()
+
+
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    create_app().run(debug=True)
