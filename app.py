@@ -13,12 +13,19 @@ def create_app(config: dict | None = None) -> Flask:
 
     app.extensions["ai"] = AIManager()
     app.extensions["logic"] = LogicManager()
-    app.extensions["data"] = DataManager()
+    app.extensions["data"] = DataManager(data_dir=app.config.get("DATA_DIR"))
+    app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")   # blocks most cross-site form posts
+
+    
+    
 
     from web.auth import bp as auth_bp
     from web.audits import bp as audits_bp
+    from web.pages import bp as pages_bp
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(audits_bp)
+    app.register_blueprint(pages_bp)
 
     @app.get("/health")
     def health():

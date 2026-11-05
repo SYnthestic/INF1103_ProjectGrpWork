@@ -11,6 +11,8 @@ def register():
     data, logic = current_app.extensions["data"], current_app.extensions["logic"]
     if not username or not password:
         return jsonify(error="username and password required"), 400
+    if not data.is_safe_username(username):
+        return jsonify(error="username must be 1-64 chars of a-z, 0-9, _"), 400
     if data.user_exists(username):
         return jsonify(error="username taken"), 409
     if not data.save_new_user(logic.build_new_user_record(username, password)):
