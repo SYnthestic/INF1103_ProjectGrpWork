@@ -10,5 +10,7 @@ users.json
 audit_history.json
 *.json.tmp
 records/
+archive/
+rules_config.json
 *.lock
 app.log
