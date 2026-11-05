@@ -5,7 +5,7 @@ import json
 import os
 import pytest
 
-from data_manager import DataManager, FilenameRules, JsonStore
+from managers.data_manager import DataManager, FilenameRules, JsonStore
 from models import ApplicationRecord
 from report_exporter import ReportContent
 from tests.helpers import temp_data_dir, raises

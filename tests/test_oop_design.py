@@ -4,10 +4,10 @@ substitution, extension without modification, and how the parts are wired
 
 import pytest
 
-from ai_manager import AIClient, AIManager
-from data_manager import DataManager
-from io_manager import IOManager
-from logic_manager import (
+from managers.ai_manager import AIClient, AIManager
+from managers.data_manager import DataManager
+from managers.io_manager import IOManager
+from managers.logic_manager import (
     Case,
     DecisionAdjuster,
     DecisionEngine,

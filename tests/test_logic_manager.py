@@ -1,7 +1,7 @@
 """Tests for the Logic Manager: grant decisions, SME check, subsidy maths
 and password hashing. No network, files or AI are involved."""
 
-from logic_manager import (
+from managers.logic_manager import (
     BorderlineImpactRule,
     EegBaseTierRule,
     EligibilityRule,

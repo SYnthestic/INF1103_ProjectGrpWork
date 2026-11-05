@@ -168,12 +168,12 @@ class InterfaceArt:
 
     @classmethod
     def save_disk_prompt_art(cls, prompt: str = " Name: ", max_len: int = 50):
-        return cls._disk_prompt_art(f"SAVE TO DISK (max {max_len} chars)", prompt, max_len)
+        return cls._disk_prompt_art(f"SAVE TO DISK or click enter to return (max {max_len} chars)", prompt, max_len)
 
     @classmethod
     def load_disk_prompt_art(cls, prompt: str = " Name: ", max_len: int = 50):
         return cls._disk_prompt_art(
-            f"LOAD FROM DISC (max {max_len} chars)", prompt, max_len
+            f"LOAD FROM DISC or click enter to return (max {max_len} chars)", prompt, max_len
         )
 
     @staticmethod

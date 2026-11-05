@@ -15,10 +15,13 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Any
 
-from ai_manager import AIManager
-from data_manager import DataManager
-from io_manager import IOManager
-from logic_manager import LogicManager
+#The 4 managers are imported here so the Application can be tested with doubles.
+from managers.ai_manager import AIManager
+from managers.data_manager import DataManager
+from managers.io_manager import IOManager
+from managers.logic_manager import LogicManager
+
+#These are imported here so the Application can be tested with doubles.
 from models import ApplicationRecord, Proposal
 from session import AiAudit, Record, Records, Session
 
@@ -211,52 +214,84 @@ class Application:
     # ========================================================
     # Saving and loading records: I/O asks -> Data stores/reads -> I/O reports
     # ========================================================
-    def save_records_flow(self, records: Records, jsonfile_name: str) -> str:
-        """Asks for a file name if needed, merges with an existing file if the
-        user agrees, saves, and returns the (possibly updated) jsonfile_name."""
-        if not jsonfile_name:
-            jsonfile_name = self._io.retrieve_json_filename(
+    def save_records_flow(
+    self, records: Records, jsonfile_name: str
+    ) -> tuple[str, bool]:
+        """Ask for a filename if needed, then save the records.
+
+        Returns (filename, saved). An empty or invalid filename is forgotten.
+        """
+        target = jsonfile_name
+
+        if not target:
+            # Keep this as a one-argument call: the I/O method defaults to save mode.
+            target = self._io.retrieve_json_filename(
                 self._data.INVALID_FILENAME_CHARS
             )
+            if target is None:
+                self._io.display_save_result("no_name", "")
+                return "", False
 
-        clean_name, status = self._data.inspect_save_file(jsonfile_name)
+        clean_name, status = self._data.inspect_save_file(target)
+
         if status in ("no_name", "invalid_name"):
-            self._io.display_save_result(status, jsonfile_name)
-            return ""
+            self._io.display_save_result(status, target)
+            return "", False
 
         to_save = records
         if status == "exists":
             action = self._io.ask_existing_file_action(clean_name)
+
             if action == "cancel":
-                return clean_name
+                return jsonfile_name, False
+
             if action == "add":
                 existing, _, load_status = self._data.load_data_from_json(clean_name)
                 if load_status != "loaded":
                     self._io.display_load_result(load_status, clean_name)
-                    return clean_name
+                    return jsonfile_name, False
                 to_save = self._data.merge_records(existing, records)
-            # "replace": the file will hold exactly the records in memory
 
         saved_name, save_status = self._data.save_data_to_json(to_save, clean_name)
         self._io.display_save_result(save_status, clean_name)
-        return saved_name or clean_name
 
+        if save_status == "saved":
+            return saved_name or clean_name, True
+        return jsonfile_name, False
+
+    def offer_save_before_leaving(self, session: Session) -> bool:
+        """Returns True if it is OK to leave (nothing unsaved, saved, or the
+        user chose not to save). False if the user cancelled the save."""
+        if not (session.dirty and session.records):
+            return True
+        if not self._io.confirm_unsaved_exit():      # answered "n": leave without saving
+            return True
+        session.jsonfile_name, saved = self.save_records_flow(
+            session.records, session.jsonfile_name
+        )
+        if saved:
+            session.dirty = False
+            return True
+        self._io.show_leave_cancelled()   # e.g. "Save cancelled. Your records are still in memory."
+        return False                               # cancelled or failed: stay
+    
     def load_records_flow(
         self, records: Records, jsonfile_name: str
     ) -> tuple[Records, str]:
-        """Confirms before replacing records in memory, loads, shows the result,
-        and returns (records, jsonfile_name). On failure both are unchanged."""
-        if (
-            self._data.is_data_loaded(records, jsonfile_name)
-            and not self._io.confirm_overwrite_records()
+        if self._data.is_data_loaded(records, jsonfile_name) and (
+            not self._io.confirm_overwrite_records()
         ):
             return records, jsonfile_name
 
-        name = self._io.retrieve_json_filename(
+        new_name = self._io.retrieve_json_filename(
             self._data.INVALID_FILENAME_CHARS, for_loading=True
         )
-        loaded, clean_name, status = self._data.load_data_from_json(name)
-        self._io.display_load_result(status, clean_name or name)
+        if new_name is None:
+            self._io.display_load_result("no_name", "")
+            return records, jsonfile_name
+
+        loaded, clean_name, status = self._data.load_data_from_json(new_name)
+        self._io.display_load_result(status, clean_name or new_name)
 
         if status == "loaded":
             return loaded, clean_name
@@ -311,6 +346,7 @@ class Application:
         """Menu option 1: collect, audit with AI + Logic, keep in history, and
         offer to save the record to a JSON file."""
         session.records.append(self.collect_application())
+        session.dirty = True
         self._io.display_applied_grants(session.records, key)
 
         # The AI Manager and Logic Manager run automatically on the record just
@@ -331,9 +367,11 @@ class Application:
             self._io.show_audit_saved_to_history(saved_audit)
 
         if self._io.confirm_save_to_json():
-            session.jsonfile_name = self.save_records_flow(
+            session.jsonfile_name, saved = self.save_records_flow(
                 session.records, session.jsonfile_name
             )
+            if saved:
+                session.dirty = False
 
     def update_record_flow(self, session: Session) -> None:
         """Menu option 5: change one detail of one record in memory."""
@@ -356,6 +394,7 @@ class Application:
         )
 
         if status == "updated":
+            session.dirty = True
             self._io.show_record_updated(
                 session.records[index].get("Company Name") or "N/A", field
             )
@@ -380,6 +419,7 @@ class Application:
 
         session.records, status = self._data.delete_record(records, index)
         if status == "deleted":
+            session.dirty = True
             self._io.show_record_deleted(name)
         else:
             self._io.show_record_not_changed()
@@ -425,18 +465,25 @@ class Application:
 
             match key:
                 case 0:
+                    if not self.offer_save_before_leaving(session):
+                        continue                                  # back to the menu
                     self._io.show_goodbye()
                     return False
                 case 1:
                     self.new_application_flow(session, key)
                 case 2:  # Save to JSON
-                    session.jsonfile_name = self.save_records_flow(
+                    session.jsonfile_name, saved = self.save_records_flow(
                         session.records, session.jsonfile_name
                     )
-                case 3:  # Pull from JSON
+                    if saved:
+                        session.dirty = False
+                case 3: #Pull from JSON
+                    before = session.records
                     session.records, session.jsonfile_name = self.load_records_flow(
                         session.records, session.jsonfile_name
                     )
+                    if session.records is not before:
+                        session.dirty = False
                 case 4:  # Display the current records
                     self._io.display_applied_grants(session.records, key)
                 case 5:  # Update a record
@@ -450,6 +497,8 @@ class Application:
                 case IOManager.MENU_AUDIT_HISTORY:  # 9: past audits of this user
                     self.audit_history_flow(username)
                 case IOManager.MENU_LOGOUT:  # 10: back to the login screen
+                    if not self.offer_save_before_leaving(session):
+                        continue
                     self._io.show_logged_out(username)
                     self._data.active_user = None
                     return True

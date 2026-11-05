@@ -1117,23 +1117,21 @@ class IOManager:
     # Saving and loading files
     # ========================================================
     def retrieve_json_filename(
-        self, blocked_chars: str = "", for_loading: bool = False
-    ) -> str:
+    self, blocked_chars: str = "", for_loading: bool = False
+    ) -> str | None:
         """Asks for a save/load file name using the floppy-disk label prompt.
         blocked_chars: characters the typed name may not contain (supplied by
         the controller from the Data Manager, which owns the file-name rules).
         for_loading shows the 'load' disk instead of the 'save' disk.
-        Re-prompts until a non-empty name is entered."""
-        while True:
-            if sys.stdin.isatty():
-                name = self.prompt_filename_on_disk(
-                    for_loading=for_loading, max_len=50, blocked=blocked_chars
-                )
-            else:
-                name = input("Enter JSON file name (e.g. grants): ").strip()
-            if name:
-                return name
-            print("File name cannot be empty. Please try again.")
+        Returns the name, or None if the user entered nothing (cancel)."""
+        if sys.stdin.isatty():
+            name = self.prompt_filename_on_disk(
+                for_loading=for_loading, max_len=50, blocked=blocked_chars
+            )
+        else:
+            name = input("Enter JSON file name (e.g. grants, blank to cancel): ")
+        name = (name or "").strip()
+        return name or None
 
     def confirm_overwrite_records(self) -> bool:
         while True:
@@ -1168,7 +1166,7 @@ class IOManager:
     def display_save_result(self, status: str | None, file_name: str) -> None:
         messages = {
             "saved": f"Data successfully saved to {file_name}.",
-            "no_name": "No file name was given.",
+            "no_name": "Cancelled. Returning to main menu.",
             "invalid_name": "That file name contains illegal characters.",
             "io_error": "The file could not be written.",
         }
@@ -1176,10 +1174,10 @@ class IOManager:
         if status == "saved":
             print(self._art.save_disk_block_deep_blue())
 
-    def display_load_result(self, status: str, file_name: str) -> None:
+    def display_load_result(self, status: str, file_name: str) -> None:   # same indent as above
         messages = {
             "loaded": f"Records loaded successfully from {file_name}.",
-            "no_name": "No file name was given.",
+            "no_name": "Cancelled. Returning to main menu.",
             "invalid_name": "That file name contains illegal characters.",
             "not_found": f"File '{file_name}' was not found.",
             "invalid_json": "The file is corrupt or unreadable. It was set aside as a .corrupt backup.",
@@ -1193,6 +1191,12 @@ class IOManager:
         return self._terminal.execute_choice_interaction(
             art, regions, {"y": True, "n": False}
         )
+
+    def confirm_unsaved_exit(self) -> bool:
+        return input("You have unsaved records. Save before leaving? (y/n): ").strip().lower() == "y"
+
+    def show_leave_cancelled(self) -> None:
+        print("Save cancelled. You still have unsaved records, so you were returned to the menu.")
 
     def prompt_filename_on_disk(
         self, for_loading: bool = False, max_len: int = 50, blocked: str = ""

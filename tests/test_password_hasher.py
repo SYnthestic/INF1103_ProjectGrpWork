@@ -3,7 +3,7 @@
 A low iteration count keeps these fast; the default count is checked separately.
 """
 
-from logic_manager import PasswordHasher
+from managers.logic_manager import PasswordHasher
 
 FAST = 1_000  # iterations used in most tests so the suite stays quick
 
