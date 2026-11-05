@@ -4,21 +4,23 @@ A terminal app that takes an SME's details and a free-text upgrade proposal, use
 
 ## How it is organised
 
-The program is object-oriented. The four managers from Part 1 are still the four main classes, and `main.py` wires them together.
+The program is object-oriented. The four managers from Part 1 are still the four main classes; they live in the `managers/` folder, and `main.py` wires them together.
 
 | File | Main classes | Role |
 |---|---|---|
-| `main.py` | `Application`, `Session` | The controller: runs the login screen and menu and passes data between the managers. The only file that knows about all four. Managers are handed to it, so tests can pass in doubles |
-| `io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
-| `ai_manager.py` | `AIManager`, `AIClient` (abstract), `OpenRouterClient`, `AuditResponseParser` | **AI manager.** Sends the proposal to the AI API and returns a validated JSON result. Depends on the `AIClient` interface, so another provider (or a test fake) can be plugged in |
-| `logic_manager.py` | `LogicManager`, `DecisionEngine`, `EligibilityRule` (abstract, 13 rules), `GrantScheme` (abstract, 4 schemes), `DecisionAdjuster`, `PasswordHasher` | **Logic manager.** Eligibility rules, grant matching, subsidy maths and password hashing (no AI). A new rule or scheme is a new subclass; the engine does not change |
-| `data_manager.py` | `DataManager`, `JsonStore`, `FilenameRules` | **Data manager.** Saving and loading records, user accounts and audit history as JSON |
+| `main.py` | `Application` | The controller: runs the login screen and menu and passes data between the managers. The only file that knows about all four. Managers are handed to it, so tests can pass in doubles |
+| `session.py` | `Session` | What one logged-in user is working on (records in memory, the current file name, whether there are unsaved changes). Created at login and discarded at logout |
+| `managers/io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
+| `managers/ai_manager.py` | `AIManager`, `AIClient` (abstract), `OpenRouterClient`, `AuditResponseParser` | **AI manager.** Sends the proposal to the AI API and returns a validated JSON result. Depends on the `AIClient` interface, so another provider (or a test fake) can be plugged in |
+| `managers/logic_manager.py` | `LogicManager`, `DecisionEngine`, `EligibilityRule` (abstract, 13 rules), `GrantScheme` (abstract, 4 schemes), `DecisionAdjuster`, `PasswordHasher` | **Logic manager.** Eligibility rules, grant matching, subsidy maths and password hashing (no AI). A new rule or scheme is a new subclass; the engine does not change |
+| `managers/data_manager.py` | `DataManager`, `JsonStore`, `FilenameRules` | **Data manager.** Saving and loading records, user accounts and audit history as JSON |
 | `report_exporter.py` | `ReportExporter` (abstract), `PdfReportExporter`, `ReportTheme`, `ReportContent` | PDF report drawing, kept separate from storage. The Data Manager only knows the `ReportExporter` interface |
 | `models.py` | `Proposal` (abstract), `EquipmentProposal`, `ReportingProposal`, `ApplicationRecord`, `RecordSections`, `PlaceholderKeywords` | Small shared domain classes with no I/O. Any manager may import them |
-| `sme_interface_stores/sme_interface_gui.py` | `InterfaceArt`, `ButtonPanel` | Screen art and the clickable buttons. Used only by the I/O manager |
+| `sme_interface_stores/sme_interface_gui.py` | `InterfaceArt` | Screen art: menus, banners and the floppy-disk prompts. Used only by the I/O manager |
+| `sme_interface_stores/buttons.py` | `ButtonPanel` | The clickable buttons. Used only by the I/O manager |
 | `tests/` | | Automated tests, including ones that fail if a manager imports another manager or procedural code reappears |
 
-The managers never import each other and only `io_manager.py` prints or asks for input. Data flows one way: the I/O manager collects and checks the input, the AI manager turns the narrative into a JSON audit, the logic manager decides, then the result goes to the data manager to be stored and back to the I/O manager to be shown.
+The managers never import each other and only the I/O manager prints or asks for input. Data flows one way: the I/O manager collects and checks the input, the AI manager turns the narrative into a JSON audit, the logic manager decides, then the result goes to the data manager to be stored and back to the I/O manager to be shown.
 
 ---
 
@@ -163,28 +165,31 @@ Once logged in, choose **1 (Start)** at the menu and enter:
 
 The app then shows the AI audit and the grant decision, and asks whether to save. Because the AI estimates the energy reduction, exact figures can vary from run to run.
 
-Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **5** change one detail of a record, **6** delete a record, **9** view your past audits (filter them, open one in full and export it as a PDF report), **10** logout. Options 5 and 6 change the records in memory only; use option 2 to save. If the file already exists, option 2 asks whether to **add** to it, **replace** it (use this after deleting a record) or cancel.
+Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **5** change one detail of a record, **6** delete a record, **9** view your past audits (filter them, open one in full and export it as a PDF report), **10** logout. Options 5 and 6 change the records in memory only; use option 2 to save. If the file already exists, option 2 asks whether to **add** to it, **replace** it (use this after deleting a record) or cancel. To back out of options 2 and 3, press Enter without typing a file name.
+
+If you choose **0** (exit) or **10** (logout) while you have records that are not saved, the app asks whether to save first. Answer **n** to leave without saving, or **y** to save; if you then cancel the save, you are taken back to the menu with your records still there.
 
 ## How grant decisions are made
 
-The AI only classifies the proposal (scope, estimated energy reduction, any exclusion keywords). The decision and the subsidy come from fixed Python rules in `logic_manager.py`. They are checked in this order, and the first one that applies decides:
+The AI only classifies the proposal (scope, estimated energy reduction, any exclusion keywords). The decision and the subsidy come from fixed Python rules in `managers/logic_manager.py`. They are checked in this order, and the first one that applies decides:
 
 | # | Condition | Decision |
 |---|---|---|
 | 1 | Exclusion keywords found (e.g. "second-hand"), or the intervention is "Fossil Fuel Modification" | `MANUAL_EXCLUSION_REVIEW` |
 | 2 | Local shareholding under 30%, or annual revenue over SGD 100 million | `REJECT_NON_SME` |
-| 3 | ESG Reporting proposal with a fee over SGD 0 | `PRE_APPROVED_SRG` (30% of the fee, up to SGD 150,000) |
-| 4 | Equipment proposal with no baseline energy spend, or ESG proposal with no fee | `MANUAL_REVIEW` |
-| 5 | The AI could not classify a scope (also when the AI call failed) | `MANUAL_REVIEW` |
-| 6 | Lifetime abatement over 350 tonnes **and** energy reduction of at least 10% | `PRE_APPROVED_TIER_1_ADVANCED` (70% of baseline spend, up to SGD 350,000) |
-| 7 | Scope-1 and energy reduction of at least 20% | `PRE_APPROVED_TIER_1` (70% of baseline spend, up to SGD 30,000) |
-| 8 | Any scope and energy reduction of at least 15% | `PROVISIONAL_APPROVAL_TIER_2` (50% of baseline spend, up to SGD 20,000) |
-| 9 | Energy reduction from 10% to under 15% | `MANUAL_REVIEW` |
-| 10 | Energy reduction under 10% | `REJECT_LOW_IMPACT` |
+| 3 | The AI analysis failed (for example no API key or no internet) | `MANUAL_REVIEW` |
+| 4 | ESG Reporting proposal with a fee over SGD 0 | `PRE_APPROVED_SRG` (30% of the fee, up to SGD 150,000) |
+| 5 | Equipment proposal with no baseline energy spend, or ESG proposal with no fee | `MANUAL_REVIEW` |
+| 6 | The AI could not classify a scope | `MANUAL_REVIEW` |
+| 7 | Lifetime abatement over 350 tonnes **and** energy reduction of at least 10% | `PRE_APPROVED_TIER_1_ADVANCED` (70% of baseline spend, up to SGD 350,000) |
+| 8 | Scope-1 and energy reduction of at least 20% | `PRE_APPROVED_TIER_1` (70% of baseline spend, up to SGD 30,000) |
+| 9 | Any scope and energy reduction of at least 15% | `PROVISIONAL_APPROVAL_TIER_2` (50% of baseline spend, up to SGD 20,000) |
+| 10 | Energy reduction from 10% to under 15% | `MANUAL_REVIEW` |
+| 11 | Energy reduction under 10% | `REJECT_LOW_IMPACT` |
 
-Equipment subsidies (rows 6 to 8) are never larger than the retrofit cost you entered. The grant you pick when entering the application does not change the decision; if the proposal matched a different scheme, a recommendation says so.
+Equipment subsidies (rows 7 to 9) are never larger than the retrofit cost you entered. The grant you pick when entering the application does not change the decision; if the proposal matched a different scheme, a recommendation says so.
 
-In the code each row is one small `rule_*` function in `logic_manager.py`, and the list `DECISION_RULES` fixes their order, so changing a rule or its priority is a one-place edit with a matching test in `tests/test_logic_manager.py`.
+In the code each condition is one small `EligibilityRule` subclass in `managers/logic_manager.py` (some rows above are split into two rules, for 13 in all). The `DecisionEngine` runs them in the order given by `DecisionEngine.with_default_rules()`, and the first rule that returns a decision wins. A new rule is a new subclass added to that list, with a matching test in `tests/test_logic_manager.py`; the engine itself does not change.
 
 ## Accounts and login
 
@@ -242,7 +247,7 @@ docker run --rm sme-grant-auditor python -m pytest tests/test_logic_sample_ai_re
 docker run --rm sme-grant-auditor python -m pytest
 ```
 
-The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py`) plus `test_architecture.py`, which fails if a manager imports another manager, a non-I/O module calls `print()`/`input()`, a module-level function (procedural code) appears, or a design abstraction stops being abstract. `test_oop_design.py` checks polymorphism, substitution (every rule and scheme works through its base class), extension without modification, and how the parts are wired. When you change a rule, change or add the matching test in the same commit.
+The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, and `test_architecture.py`, which fails if a manager imports another manager, a non-I/O module calls `print()`/`input()`, a module-level function (procedural code) appears, or a design abstraction stops being abstract. `test_oop_design.py` checks polymorphism, substitution (every rule and scheme works through its base class), extension without modification, and how the parts are wired. When you change a rule, change or add the matching test in the same commit.
 
 ---
 
