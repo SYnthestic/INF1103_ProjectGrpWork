@@ -597,3 +597,182 @@ def test_main_starts_with_the_welcome_screen_through_the_io_layer():
     logging_on.assert_called_once()
     welcome.assert_called_once()
     wait.assert_called_once()
+
+
+# ---- Unsaved records: cancelling save/load and the prompt before leaving ------
+
+
+def unsaved_session(records=None):
+    """A session holding records that have not been saved yet."""
+    session = Session("alice")
+    session.records = records if records is not None else [rec("A")]
+    session.dirty = True
+    return session
+
+
+def test_blank_save_name_cancels_without_saving():
+    with temp_data_dir() as (dm, folder):
+        app = Application(data=dm)
+        with (
+            mock.patch.object(app.io, "retrieve_json_filename", return_value=None),
+            mock.patch.object(app.io, "display_save_result") as shown,
+        ):
+            assert app.save_records_flow([rec("A")], "") == ("", False)
+        shown.assert_called_once_with("no_name", "")
+        assert not os.path.exists(os.path.join(folder, "records"))
+
+
+def test_blank_load_name_cancels_and_keeps_the_records():
+    with temp_data_dir() as (dm, _):
+        app = Application(data=dm)
+        current = [rec("mine")]
+        with (
+            mock.patch.object(app.io, "confirm_overwrite_records", return_value=True),
+            mock.patch.object(app.io, "retrieve_json_filename", return_value=None),
+            mock.patch.object(app.io, "display_load_result") as shown,
+        ):
+            assert app.load_records_flow(current, "x.json") == (current, "x.json")
+        shown.assert_called_once_with("no_name", "")
+
+
+def test_leaving_with_nothing_unsaved_does_not_ask():
+    app = make_app()
+    session = Session("alice")
+    session.records = [rec("A")]  # loaded or already saved, so not dirty
+    with mock.patch.object(app.io, "confirm_unsaved_exit") as ask:
+        assert app.offer_save_before_leaving(session)
+    ask.assert_not_called()
+
+
+def test_leaving_without_saving_is_allowed():
+    app = make_app()
+    session = unsaved_session()
+    with (
+        mock.patch.object(app.io, "confirm_unsaved_exit", return_value=False),
+        mock.patch.object(app.io, "retrieve_json_filename") as ask_name,
+    ):
+        assert app.offer_save_before_leaving(session)
+    ask_name.assert_not_called()
+
+
+def test_saving_before_leaving_writes_the_file_and_clears_the_flag():
+    with temp_data_dir() as (dm, _):
+        app = Application(data=dm)
+        session = unsaved_session()
+        with (
+            mock.patch.object(app.io, "confirm_unsaved_exit", return_value=True),
+            mock.patch.object(app.io, "retrieve_json_filename", return_value="mine"),
+            mock.patch.object(app.io, "display_save_result"),
+        ):
+            assert app.offer_save_before_leaving(session)
+        assert session.dirty is False
+        assert session.jsonfile_name == "mine.json"
+        assert dm.load_data_from_json("mine")[0] == [rec("A")]
+
+
+def test_a_cancelled_save_keeps_the_user_in_the_menu():
+    app = make_app()
+    session = unsaved_session()
+    with (
+        mock.patch.object(app.io, "confirm_unsaved_exit", return_value=True),
+        mock.patch.object(app.io, "retrieve_json_filename", return_value=None),
+        mock.patch.object(app.io, "display_save_result"),
+        mock.patch.object(app.io, "show_leave_cancelled") as told,
+    ):
+        assert not app.offer_save_before_leaving(session)
+    told.assert_called_once()
+    assert session.dirty is True
+    assert session.records == [rec("A")]
+
+
+def test_exit_with_unsaved_records_returns_to_the_menu_if_the_save_is_cancelled():
+    with temp_data_dir() as (dm, _):
+        app = Application(data=dm)
+        with (
+            mock.patch.object(app.io, "get_menu_choice", side_effect=[1, 0, 0]),
+            mock.patch.object(app, "new_application_flow", side_effect=mark_dirty),
+            mock.patch.object(
+                app.io, "confirm_unsaved_exit", side_effect=[True, False]
+            ),
+            mock.patch.object(app.io, "retrieve_json_filename", return_value=None),
+            mock.patch.object(app.io, "display_save_result"),
+            mock.patch.object(app.io, "show_leave_cancelled") as told,
+            mock.patch.object(app.io, "show_goodbye") as goodbye,
+        ):
+            assert not run_session_quietly(app, "alice")
+        told.assert_called_once()  # first exit attempt was stopped
+        goodbye.assert_called_once()  # second one ("n" = leave anyway) ended it
+
+
+def test_logout_with_unsaved_records_asks_first():
+    with temp_data_dir() as (dm, _):
+        app = Application(data=dm)
+        with (
+            mock.patch.object(
+                app.io, "get_menu_choice", side_effect=[1, IOManager.MENU_LOGOUT]
+            ),
+            mock.patch.object(app, "new_application_flow", side_effect=mark_dirty),
+            mock.patch.object(
+                app.io, "confirm_unsaved_exit", return_value=False
+            ) as asked,
+            mock.patch.object(app.io, "show_logged_out"),
+        ):
+            assert run_session_quietly(app, "alice")
+        asked.assert_called_once()
+
+
+def mark_dirty(session, key):
+    """Stands in for new_application_flow: adds a record and marks it unsaved."""
+    session.records.append(rec("New"))
+    session.dirty = True
+
+
+def test_update_and_delete_mark_the_records_as_unsaved():
+    app = make_app()
+    io = app.io
+    session = edit_and_delete_flow_session()
+    with (
+        mock.patch.object(io, "select_record_index", return_value=0),
+        mock.patch.object(io, "select_field_to_edit", return_value="Company Name"),
+        mock.patch.object(io, "retrieve_field_value", return_value="Renamed"),
+        mock.patch.object(io, "show_record_updated"),
+    ):
+        app.update_record_flow(session)
+    assert session.dirty is True
+
+    session.dirty = False
+    with (
+        mock.patch.object(io, "select_record_index", return_value=0),
+        mock.patch.object(io, "confirm_delete_record", return_value=True),
+        mock.patch.object(io, "show_record_deleted"),
+    ):
+        app.delete_record_flow(session)
+    assert session.dirty is True
+
+
+def test_saving_or_loading_from_the_menu_clears_the_unsaved_flag():
+    with temp_data_dir() as (dm, _):
+        app = Application(data=dm)
+        with (
+            mock.patch.object(app.io, "get_menu_choice", side_effect=[1, 2, 0]),
+            mock.patch.object(app, "new_application_flow", side_effect=mark_dirty),
+            mock.patch.object(app.io, "retrieve_json_filename", return_value="mine"),
+            mock.patch.object(app.io, "display_save_result"),
+            mock.patch.object(app.io, "confirm_unsaved_exit") as asked,
+            mock.patch.object(app.io, "show_goodbye"),
+        ):
+            run_session_quietly(app, "alice")
+        asked.assert_not_called()  # saved with option 2, so nothing to ask
+
+        dm.active_user = "alice"
+        with (
+            mock.patch.object(app.io, "get_menu_choice", side_effect=[1, 3, 0]),
+            mock.patch.object(app, "new_application_flow", side_effect=mark_dirty),
+            mock.patch.object(app.io, "confirm_overwrite_records", return_value=True),
+            mock.patch.object(app.io, "retrieve_json_filename", return_value="mine"),
+            mock.patch.object(app.io, "display_load_result"),
+            mock.patch.object(app.io, "confirm_unsaved_exit") as asked,
+            mock.patch.object(app.io, "show_goodbye"),
+        ):
+            run_session_quietly(app, "alice")
+        asked.assert_not_called()  # the loaded file replaced the unsaved record

@@ -19,6 +19,7 @@ def test_inspect_save_file_statuses():
         assert dm.inspect_save_file("here") == ("here.json", "exists")
         assert dm.inspect_save_file("absent") == ("absent.json", "not_found")
         assert dm.inspect_save_file("") == ("", "no_name")
+        assert dm.inspect_save_file(None) == ("", "no_name")  # user cancelled
         assert dm.inspect_save_file("a/b") == ("", "invalid_name")
 
 
@@ -159,6 +160,7 @@ def test_pdf_handles_markup_characters_and_unicode():
 def test_extension_is_added_once():
     assert FilenameRules.normalise("grants") == "grants.json"
     assert FilenameRules.normalise(" grants.JSON ") == "grants.JSON"
+    assert FilenameRules.normalise(None) == ""
 
 
 def test_valid_and_invalid_names():

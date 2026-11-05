@@ -1174,7 +1174,7 @@ class IOManager:
         if status == "saved":
             print(self._art.save_disk_block_deep_blue())
 
-    def display_load_result(self, status: str, file_name: str) -> None:   # same indent as above
+    def display_load_result(self, status: str, file_name: str) -> None:
         messages = {
             "loaded": f"Records loaded successfully from {file_name}.",
             "no_name": "Cancelled. Returning to main menu.",
@@ -1193,7 +1193,17 @@ class IOManager:
         )
 
     def confirm_unsaved_exit(self) -> bool:
-        return input("You have unsaved records. Save before leaving? (y/n): ").strip().lower() == "y"
+        """Asks until the answer is y or n, so a typo never discards
+        unsaved records."""
+        while True:
+            choice = (
+                input("You have unsaved records. Save before leaving? (y/n): ")
+                .strip()
+                .lower()
+            )
+            if choice in ("y", "n"):
+                return choice == "y"
+            print("Invalid input. Please enter 'y' or 'n'.")
 
     def show_leave_cancelled(self) -> None:
         print("Save cancelled. You still have unsaved records, so you were returned to the menu.")

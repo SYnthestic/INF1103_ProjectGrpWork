@@ -398,3 +398,14 @@ def test_other_industry_and_grant_have_length_limits():
     assert run_with_answers(
         io_mgr.retrieve_sustainability_grant, ["5", long_text, "Green Fund"]
     ) == ("Green Fund")
+
+
+def test_unsaved_exit_prompt_asks_again_until_y_or_n():
+    assert run_with_answers(io_mgr.confirm_unsaved_exit, ["maybe", "", "Y"]) is True
+    assert run_with_answers(io_mgr.confirm_unsaved_exit, ["yes", " n "]) is False
+
+
+def test_blank_file_name_means_cancel():
+    with mock.patch("sys.stdin", io.StringIO()):  # not a terminal: plain prompt
+        assert run_with_answers(io_mgr.retrieve_json_filename, ["   "]) is None
+        assert run_with_answers(io_mgr.retrieve_json_filename, [" grants "]) == "grants"
