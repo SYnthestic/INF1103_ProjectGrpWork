@@ -95,12 +95,23 @@ class Application:
     # ========================================================
     # Account flows: I/O collects -> Logic hashes/verifies -> Data stores
     # ========================================================
-    def create_account_flow(self) -> None:
+    def username_is_taken(self, username: str) -> bool:
+        """Taken by an existing account, or reserved for the administrator
+        named by ADMIN_USERNAME (so nobody else can register that name)."""
+        return (
+            self._data.user_exists(username)
+            or username == self._logic.access.bootstrap_admin
+        )
+
+    def ask_for_free_username(self) -> str:
         username = self._io.retrieve_new_username()
-        while self._data.user_exists(username):
+        while self.username_is_taken(username):
             self._io.show_username_taken(username)
             username = self._io.retrieve_new_username()
+        return username
 
+    def create_account_flow(self) -> None:
+        username = self.ask_for_free_username()
         password = self._io.retrieve_new_password()
         user_record = self._logic.build_new_user_record(username, password)
 
@@ -360,7 +371,11 @@ class Application:
             self._io.show_audit_not_saved_ai_failed()
         else:
             saved_audit = self._data.append_user_audit(
-                session.username, session.records[-1], session.ai_audit, result
+                session.username,
+                session.records[-1],
+                session.ai_audit,
+                result,
+                rules_used=self._logic.rule_config.to_dict(),
             )
             self._io.show_audit_saved_to_history(saved_audit)
 
@@ -448,6 +463,192 @@ class Application:
                 self._io.display_grant_decision(result)
 
     # ========================================================
+    # Administrator: start-up, grant rule thresholds, accounts
+    # I/O asks -> Logic checks (AccessPolicy, RuleConfig) -> Data stores
+    # ========================================================
+    def ensure_admin_account(self) -> None:
+        """If ADMIN_USERNAME names an account that does not exist yet, create
+        it now (before anyone can log in or register that name)."""
+        name = self._logic.access.bootstrap_admin
+        if not name or self._data.load_users() is None or self._data.user_exists(name):
+            return
+        if not self._io.is_valid_username(name):
+            self._io.show_admin_name_invalid(name)
+            return
+        self._io.show_admin_setup(name)
+        password = self._io.retrieve_new_password()
+        record = self._logic.build_new_user_record(name, password, role="admin")
+        if self._data.save_new_user(record):
+            self._io.show_account_created(name)
+        else:
+            self._io.show_account_save_failed()
+
+    def load_rule_settings(self) -> None:
+        """Uses the thresholds saved by an admin, or the defaults if none are
+        saved or they cannot be used. Called at start-up and at every login,
+        so a change made in another copy of the app is picked up."""
+        values, status = self._data.load_rule_config()
+        config = self._logic.default_rule_config()
+        if status == "loaded":
+            problems = self._logic.rule_config_problems(values)
+            if problems:
+                self._io.show_rule_settings_problem("invalid", problems)
+            else:
+                config = self._logic.rule_config_from_dict(values)
+        elif status != "missing":
+            self._io.show_rule_settings_problem(status, [])
+        self._logic.use_rule_config(config)
+
+    def is_admin(self, username: str) -> bool:
+        return self._logic.is_admin(username, self._data.get_user(username))
+
+    def user_rows(self) -> list[Record] | None:
+        """The account list for the admin screens, with each user's effective
+        role (the ADMIN_USERNAME account is always an admin)."""
+        users = self._data.list_users()
+        if users is None:
+            self._io.show_admin_message("The accounts file could not be read.", False)
+            return None
+        for user in users:
+            user["role"] = self._logic.access.role_of(user["username"], user)
+        return users
+
+    def rule_rows(self) -> list[tuple[str, str, float, str]]:
+        config = self._logic.rule_config
+        return [
+            (name, label, getattr(config, name), unit)
+            for name, (label, unit) in config.LABELS.items()
+        ]
+
+    def admin_create_user_flow(self, actor: str) -> None:
+        username = self.ask_for_free_username()
+        role = self._io.retrieve_role()
+        if role is None:
+            return
+        password = self._io.retrieve_new_password()
+        record = self._logic.build_new_user_record(username, password, role=role)
+        if self._data.save_new_user(record):
+            self._io.show_admin_message(f"Account '{username}' created as {role}.")
+        else:
+            self._io.show_account_save_failed()
+
+    def admin_reset_password_flow(self, actor: str) -> None:
+        users = self.user_rows()
+        target = self._io.select_user(users or [], "give a new password")
+        if target is None:
+            return
+        password = self._io.retrieve_new_password()
+        if self._data.set_user_password(target, self._logic.hash_password(password)):
+            self._io.show_admin_message(f"Password for '{target}' changed.")
+        else:
+            self._io.show_admin_message(f"The password for '{target}' was not changed.", False)
+
+    def admin_change_role_flow(self, actor: str) -> None:
+        users = self.user_rows()
+        target = self._io.select_user(users or [], "change the role of")
+        if target is None:
+            return
+        new_role = self._io.retrieve_role()
+        if new_role is None:
+            return
+        problem = self._logic.access.role_change_problem(actor, target, new_role)
+        if problem:
+            self._io.show_admin_message(problem, False)
+        elif self._data.set_user_role(target, new_role):
+            self._io.show_admin_message(f"'{target}' is now {new_role}.")
+        else:
+            self._io.show_admin_message(f"The role of '{target}' was not changed.", False)
+
+    def admin_delete_user_flow(self, actor: str) -> None:
+        users = self.user_rows()
+        target = self._io.select_user(users or [], "delete")
+        if target is None:
+            return
+        problem = self._logic.access.deletion_problem(actor, target)
+        if problem:
+            self._io.show_admin_message(problem, False)
+            return
+        if not self._io.confirm_delete_user(target):
+            self._io.show_admin_message("Cancelled. Nothing was deleted.", False)
+            return
+        folder, status = self._data.archive_user(target, deleted_by=actor)
+        if status == "archived":
+            self._io.show_admin_message(
+                f"'{target}' was deleted. Their data was archived in {folder}"
+            )
+        else:
+            reasons = {
+                "not_found": "that account no longer exists",
+                "busy": "the files are in use, please try again",
+                "unsafe_name": "the stored username cannot be used as a folder name",
+            }
+            self._io.show_admin_message(
+                f"'{target}' was not deleted ({reasons.get(status, 'the files could not be written')}).",
+                False,
+            )
+
+    def apply_new_rule_config(self, config: Any, actor: str) -> None:
+        """Saves checked thresholds and uses them for every later decision."""
+        if self._data.save_rule_config(config.to_dict(), changed_by=actor):
+            self._logic.use_rule_config(config)
+            self._io.show_admin_message("Saved. New decisions use these thresholds.")
+            self._io.display_rule_config(self.rule_rows())
+        else:
+            self._io.show_admin_message("The thresholds could not be saved, so nothing changed.", False)
+
+    def admin_edit_rule_flow(self, actor: str) -> None:
+        rows = self.rule_rows()
+        index = self._io.select_rule_setting(rows)
+        if index is None:
+            return
+        name, label, current, unit = rows[index]
+        value = self._io.retrieve_threshold_value(label, unit, current)
+        if value is None:
+            return
+        try:
+            config = self._logic.rule_config.with_value(name, value)
+        except ValueError:
+            changed = dict(self._logic.rule_config.to_dict(), **{name: value})
+            self._io.show_rule_problems(self._logic.rule_config_problems(changed))
+            return
+        self.apply_new_rule_config(config, actor)
+
+    def admin_reset_rules_flow(self, actor: str) -> None:
+        if self._io.confirm_reset_rules():
+            self.apply_new_rule_config(self._logic.default_rule_config(), actor)
+
+    def admin_console_flow(self, username: str) -> None:
+        """Menu option 11 (admins only)."""
+        while True:
+            # Checked every time: another admin may have changed this account.
+            if not self.is_admin(username):
+                self._io.show_admin_only()
+                return
+            match self._io.get_admin_choice():
+                case 0:
+                    return
+                case 1:
+                    users = self.user_rows()
+                    if users is not None:
+                        self._io.display_user_list(users)
+                case 2:
+                    self.admin_create_user_flow(username)
+                case 3:
+                    self.admin_reset_password_flow(username)
+                case 4:
+                    self.admin_change_role_flow(username)
+                case 5:
+                    self.admin_delete_user_flow(username)
+                case 6:
+                    self._io.display_rule_config(self.rule_rows())
+                case 7:
+                    self.admin_edit_rule_flow(username)
+                case 8:
+                    self.admin_reset_rules_flow(username)
+                case _:
+                    self._io.show_wrong_option_error()
+
+    # ========================================================
     # One logged-in session
     # ========================================================
     def run_session(self, username: str) -> bool:
@@ -455,11 +656,13 @@ class Application:
         login screen comes back) or exits the program (returns False)."""
         # Saved record files (options 2/3) live in this user's own folder.
         self._data.active_user = username
+        self.load_rule_settings()
         self._io.show_audit_count(len(self._data.get_user_audits(username)))
         session = Session(username)
 
         while True:
-            key = self._io.get_menu_choice(username)
+            admin = self.is_admin(username)
+            key = self._io.get_menu_choice(username, admin)
 
             match key:
                 case 0:
@@ -500,6 +703,8 @@ class Application:
                     self._io.show_logged_out(username)
                     self._data.active_user = None
                     return True
+                case IOManager.MENU_ADMIN if admin:  # 11: admins only
+                    self.admin_console_flow(username)
                 case _:
                     self._io.show_wrong_option_error()
 
@@ -525,6 +730,8 @@ class Application:
         self._data.setup_logging()
         self._io.show_welcome_sequence()
         self._io.wait_for_continue()
+        self.ensure_admin_account()
+        self.load_rule_settings()
 
         while True:
             username = self.login_screen()

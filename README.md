@@ -14,8 +14,8 @@ The program is object-oriented. The four managers from Part 1 are still the four
 | `session.py` | `Session` | What one logged-in user is working on (records in memory, the current file name, whether there are unsaved changes). Created at login and discarded at logout |
 | `managers/io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
 | `managers/ai_manager.py` | `AIManager`, `AIClient` (abstract), `OpenRouterClient`, `AuditResponseParser` | **AI manager.** Sends the proposal to the AI API and returns a validated JSON result. Depends on the `AIClient` interface, so another provider (or a test fake) can be plugged in |
-| `managers/logic_manager.py` | `LogicManager`, `DecisionEngine`, `EligibilityRule` (abstract, 13 rules), `GrantScheme` (abstract, 4 schemes), `DecisionAdjuster`, `PasswordHasher` | **Logic manager.** Eligibility rules, grant matching, subsidy maths and password hashing (no AI). A new rule or scheme is a new subclass; the engine does not change |
-| `managers/data_manager.py` | `DataManager`, `JsonStore`, `FilenameRules` | **Data manager.** Saving and loading records, user accounts and audit history as JSON |
+| `managers/logic_manager.py` | `LogicManager`, `DecisionEngine`, `EligibilityRule` (abstract, 13 rules), `GrantScheme` (abstract, 4 schemes), `DecisionAdjuster`, `PasswordHasher`, `RuleConfig`, `AccessPolicy` | **Logic manager.** Eligibility rules, grant matching, subsidy maths, password hashing and who may use the admin console (no AI). A new rule or scheme is a new subclass; the engine does not change. The thresholds the rules use are a `RuleConfig`, so changing them needs no code change |
+| `managers/data_manager.py` | `DataManager`, `JsonStore`, `FilenameRules` | **Data manager.** Saving and loading records, user accounts, audit history and the grant rule thresholds as JSON; archiving deleted accounts |
 | `report_exporter.py` | `ReportExporter` (abstract), `PdfReportExporter`, `ReportTheme`, `ReportContent` | PDF report drawing, kept separate from storage. The Data Manager only knows the `ReportExporter` interface |
 | `models.py` | `Proposal` (abstract), `EquipmentProposal`, `ReportingProposal`, `ApplicationRecord`, `RecordSections`, `PlaceholderKeywords` | Small shared domain classes with no I/O. Any manager may import them |
 | `sme_interface_stores/sme_interface_gui.py` | `InterfaceArt` | Screen art: menus, banners and the floppy-disk prompts. Used only by the I/O manager |
@@ -167,7 +167,7 @@ Once logged in, choose **1 (Start)** at the menu and enter:
 
 The app then shows the AI audit and the grant decision, and asks whether to save. Because the AI estimates the energy reduction, exact figures can vary from run to run.
 
-Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **5** change one detail of a record, **6** delete a record, **9** view your past audits (filter them, open one in full and export it as a PDF report), **10** logout. Options 5 and 6 change the records in memory only; use option 2 to save. If the file already exists, option 2 asks whether to **add** to it, **replace** it (use this after deleting a record) or cancel. To back out of options 2 and 3, press Enter without typing a file name.
+Other menu options: **2** save, **3** load, **4** view records, **7** and **8** re-run the AI and logic steps on the latest record, **5** change one detail of a record, **6** delete a record, **9** view your past audits (filter them, open one in full and export it as a PDF report), **10** logout, **11** admin console (administrators only, see below). Options 5 and 6 change the records in memory only; use option 2 to save. If the file already exists, option 2 asks whether to **add** to it, **replace** it (use this after deleting a record) or cancel. To back out of options 2 and 3, press Enter without typing a file name.
 
 If you choose **0** (exit) or **10** (logout) while you have records that are not saved, the app asks whether to save first. Answer **n** to leave without saving, or **y** to save; if you then cancel the save, you are taken back to the menu with your records still there.
 
@@ -269,6 +269,8 @@ The AI only classifies the proposal (scope, estimated energy reduction, any excl
 | 10 | Energy reduction from 10% to under 15% | `MANUAL_REVIEW` |
 | 11 | Energy reduction under 10% | `REJECT_LOW_IMPACT` |
 
+The percentages and the 350-tonne limit above are the defaults. An administrator can change them in the admin console (see *Administrator console*); every new decision then uses the new values, and each saved audit records the thresholds it was decided with.
+
 Equipment subsidies (rows 7 to 9) are never larger than the retrofit cost you entered. The grant you pick when entering the application does not change the decision; if the proposal matched a different scheme, a recommendation says so.
 
 In the code each condition is one small `EligibilityRule` subclass in `managers/logic_manager.py` (some rows above are split into two rules, for 13 in all). The `DecisionEngine` runs them in the order given by `DecisionEngine.with_default_rules()`, and the first rule that returns a decision wins. A new rule is a new subclass added to that list, with a matching test in `tests/test_logic_manager.py`; the engine itself does not change.
@@ -290,14 +292,34 @@ Passwords are never stored. Each account stores a random salt and a salted SHA-2
 
 Both files are plain JSON and are **not** otherwise protected yet. They are in `.gitignore` and `.dockerignore`, so they are never committed or copied into the Docker image. They are saved with the app's other files (see *Where saved files go*). To reset all accounts, delete both files. A short-lived `users.json.lock` / `audit_history.json.lock` file may appear while the app is writing; it is removed automatically.
 
+## Administrator console
+
+Set `ADMIN_USERNAME` in your `.env` file (for example `ADMIN_USERNAME=admin`, see `.env.example`). On the next start the app asks you to choose that account's password before anyone can log in, and nobody else can register that name. When an administrator logs in, the main menu shows option **11. Admin Console**:
+
+| Option | What it does |
+|---|---|
+| 1 | List users: username, role, number of saved audits, creation date. Password hashes are never shown |
+| 2 | Create a user, choosing the role (`user` or `admin`) and a password |
+| 3 | Reset a user's password |
+| 4 | Change a user's role (promote to admin or back to user) |
+| 5 | Delete a user. You must type their username to confirm. The login is removed, but their data is **archived, not destroyed**: it moves to `archive/<username>_<date-time>/` with `account.json` (account details without the password hash), `audit_history.json` and their `records/` folder |
+| 6 | View the grant rule thresholds |
+| 7 | Change one threshold. The new value is checked first: percentages must be above 0 and at most 100, and must not decrease (minimum <= provisional <= fast track); the tonnes limit must be above 0. An invalid value is explained and nothing changes |
+| 8 | Reset all thresholds to the defaults |
+
+To keep at least one administrator, the `ADMIN_USERNAME` account can never be demoted or deleted, and no administrator can demote or delete their own account. Threshold changes are saved to `rules_config.json` with who changed them and when, and are picked up at every login. If that file is damaged or holds invalid values, the app shows a warning and uses the defaults.
+
+The admin console is in the terminal app only. The web version uses the same accounts and thresholds: its register page refuses the `ADMIN_USERNAME` name, and its grant decisions use the thresholds saved here.
+
 ## Where saved files go
 
 Everything the app saves goes into one folder, chosen by the `DATA_DIR` environment variable:
 
 | What | Where inside that folder |
 |---|---|
-| `users.json`, `audit_history.json` | the folder itself |
+| `users.json`, `audit_history.json`, `rules_config.json` | the folder itself |
 | Records saved with option 2 (and PDF exports) | `records/<your username>/` - each user has a private folder, so users cannot load or overwrite each other's files |
+| Data of deleted accounts | `archive/<username>_<date-time>/` |
 
 Files saved by an older version directly in the folder are not shown to any user; move them into `records/<username>/` to keep using them.
 
@@ -330,7 +352,7 @@ docker run --rm sme-grant-auditor python -m pytest
 python -m flask --app app run --debug
 ```
 
-The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete) and `test_pdf.py` (PDF download). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
+The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, `test_rule_config.py` for the adjustable thresholds, `test_admin.py` for the admin console, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete), `test_pdf.py` (PDF download) and `test_web_admin.py` (the web pages respect the admin name and the saved thresholds). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
 
 ---
 

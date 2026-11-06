@@ -18,7 +18,7 @@ def register():
         return jsonify(error="username and password required"), 400
     if not data.is_safe_username(username):
         return jsonify(error="username must be 1-64 chars of a-z, 0-9, _"), 400
-    if data.user_exists(username):
+    if service.username_is_taken(data, logic, username):
         return jsonify(error="username taken"), 409
     if not data.save_new_user(logic.build_new_user_record(username, password)):
         return jsonify(error="could not save account"), 500

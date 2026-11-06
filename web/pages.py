@@ -119,7 +119,7 @@ def register():
             flash("Username must be 1-64 characters: a-z, 0-9 or _.")
         elif not password:
             flash("Password is required.")
-        elif data.user_exists(username):
+        elif service.username_is_taken(data, logic, username):
             flash("That username is taken.")
         elif not data.save_new_user(logic.build_new_user_record(username, password)):
             flash("Could not create the account.")
@@ -425,10 +425,10 @@ def run_logic():
     if not ws.ai_audit:
         return back_to_records("There is no AI audit yet. Run the AI Manager first.")
     wrapped = ApplicationRecord(ws.records[-1])
+    logic = current_app.extensions["logic"]
     try:
-        result = current_app.extensions["logic"].evaluate_grant_application(
-            wrapped.to_profile(), ws.ai_audit
-        )
+        service.use_saved_rules(logic, current_app.extensions["data"])
+        result = logic.evaluate_grant_application(wrapped.to_profile(), ws.ai_audit)
     except Exception:
         current_app.logger.exception("Grant evaluation raised")
         return back_to_records("The grant evaluation failed.")

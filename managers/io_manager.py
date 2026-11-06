@@ -340,6 +340,7 @@ class IOManager:
     # Kept here so the controller and the printed menu always agree.
     MENU_AUDIT_HISTORY = 9
     MENU_LOGOUT = 10
+    MENU_ADMIN = 11  # shown to administrators only
 
     USERNAME_MIN_LEN = InputValidator.USERNAME_MIN_LEN
     USERNAME_MAX_LEN = InputValidator.USERNAME_MAX_LEN
@@ -457,10 +458,10 @@ class IOManager:
 
         return int(key)
 
-    def get_menu_choice(self, username: str | None = None) -> int:
+    def get_menu_choice(self, username: str | None = None, is_admin: bool = False) -> int:
         key = None
         while key is None:  # Prints the menu and then asks for the key
-            print(self._art.boxed_menu(username))
+            print(self._art.boxed_menu(username, is_admin))
             key = self.key_verifier(input("➔   "))
         return key
 
@@ -565,6 +566,178 @@ class IOManager:
 
     def show_logged_out(self, username: str) -> None:
         print(f"\n{username} has been logged out.\n")
+
+    # ========================================================
+    # Administrator console
+    # ========================================================
+    ADMIN_MENU = (
+        "1. List users",
+        "2. Create a user",
+        "3. Reset a user's password",
+        "4. Change a user's role",
+        "5. Delete a user (their data is archived)",
+        "6. View grant rule thresholds",
+        "7. Change a grant rule threshold",
+        "8. Reset grant rule thresholds to the defaults",
+        "0. Back to the main menu",
+    )
+
+    def get_admin_choice(self) -> int:
+        key = None
+        while key is None:
+            self.print_on_paper(
+                list(self.ADMIN_MENU),
+                title="ADMIN CONSOLE",
+                footer="Changes here affect every user",
+            )
+            key = self.key_verifier(input("➔   "))
+        return key
+
+    def show_admin_message(self, text: str, success: bool = True) -> None:
+        colour = self.GREEN if success else self.RED
+        print(f"\n{colour}{text}{self.RESET}\n")
+
+    def show_admin_only(self) -> None:
+        self.show_admin_message("Only administrators can open the admin console.", False)
+
+    def show_admin_setup(self, username: str) -> None:
+        print(
+            f"\nFirst run: the administrator account '{username}' (ADMIN_USERNAME) "
+            "does not exist yet. Choose its password now."
+        )
+
+    def show_admin_name_invalid(self, username: str) -> None:
+        self.show_admin_message(
+            f"ADMIN_USERNAME '{username}' is not a valid username "
+            f"({self.USERNAME_MIN_LEN}-{self.USERNAME_MAX_LEN} letters, digits or "
+            "underscores), so no administrator account was set up.",
+            False,
+        )
+
+    def display_user_list(self, users: list[Record]) -> None:
+        """users: dicts with username, role, created_at and audit_count."""
+        if not users:
+            self.print_on_paper(["No accounts yet."], title="USERS", footer="")
+            return
+        lines = [f"{'Username':<20} {'Role':<6} {'Audits':>6}  Created"]
+        lines.append("-" * 52)
+        for user in users:
+            created = str(user.get("created_at") or "-")[:10]
+            lines.append(
+                f"{str(user.get('username')):<20} {str(user.get('role')):<6} "
+                f"{user.get('audit_count', 0):>6}  {created}"
+            )
+        self.print_on_paper(lines, title="USERS", footer=f"{len(users)} account(s)")
+
+    def select_user(self, users: list[Record], action: str) -> str | None:
+        """Lists the users and asks which one to `action`. Returns the username
+        or None if cancelled."""
+        if not users:
+            print("\nThere are no accounts.")
+            return None
+        print(f"\nWhich user do you want to {action}?")
+        for number, user in enumerate(users, start=1):
+            print(f"  {number}. {user.get('username')}  ({user.get('role')})")
+        print("  0. Cancel")
+        while True:
+            number = self._choose_number(f"Enter 0-{len(users)}: ", len(users))
+            if number is None:
+                print(f"Please enter a number from 0 to {len(users)}.")
+            elif number == 0:
+                return None
+            else:
+                return str(users[number - 1].get("username"))
+
+    def retrieve_role(self) -> str | None:
+        """Returns "user", "admin", or None if cancelled."""
+        print("\nRole:\n  1. user   (can run and view their own audits)")
+        print("  2. admin  (can also open the admin console)\n  0. Cancel")
+        while True:
+            number = self._choose_number("Enter 0-2: ", 2)
+            if number is None:
+                print("Please enter 0, 1 or 2.")
+            else:
+                return {0: None, 1: "user", 2: "admin"}[number]
+
+    def confirm_delete_user(self, username: str) -> bool:
+        """Deleting an account is serious, so the name must be typed out."""
+        print(
+            f"\nDeleting '{username}' removes the login. Their audits and saved "
+            "files are moved to the archive folder, not destroyed."
+        )
+        typed = input(f"Type the username '{username}' to confirm, or press Enter to cancel: ")
+        return typed.strip().lower() == username
+
+    def display_rule_config(self, rows: list[tuple[str, str, float, str]]) -> None:
+        """rows: (setting name, label, value, unit)."""
+        lines = [
+            f"{number}. {label}: {value:g}{'' if unit == '%' else ' '}{unit}"
+            for number, (_, label, value, unit) in enumerate(rows, start=1)
+        ]
+        self.print_on_paper(
+            lines,
+            title="GRANT RULE THRESHOLDS",
+            footer="Used for every new decision",
+        )
+
+    def select_rule_setting(self, rows: list[tuple[str, str, float, str]]) -> int | None:
+        """Returns the 0-based index of the threshold to change, or None."""
+        self.display_rule_config(rows)
+        print("  0. Cancel")
+        while True:
+            number = self._choose_number(f"Which threshold? (0-{len(rows)}): ", len(rows))
+            if number is None:
+                print(f"Please enter a number from 0 to {len(rows)}.")
+            elif number == 0:
+                return None
+            else:
+                return number - 1
+
+    def retrieve_threshold_value(self, label: str, unit: str, current: float) -> float | None:
+        """A new number for one threshold, or None if the user pressed Enter.
+        Whether the value makes sense is decided by the Logic Manager."""
+        while True:
+            text = input(
+                f"New value for '{label}' in {unit} (now {current:g}, Enter to cancel): "
+            ).strip()
+            if not text:
+                return None
+            try:
+                return self.finite_float(text)
+            except ValueError:
+                print("Please enter a number, e.g. 12.5")
+
+    def show_rule_problems(self, problems: list[str]) -> None:
+        print(f"\n{self.RED}Not changed:{self.RESET}")
+        for problem in problems:
+            print(f"  - {problem}")
+        print()
+
+    def confirm_reset_rules(self) -> bool:
+        while True:
+            choice = (
+                input("Reset every grant rule threshold to the default? (y/n): ")
+                .strip()
+                .lower()
+            )
+            if choice in ("y", "n"):
+                return choice == "y"
+            print("Invalid input. Please enter 'y' or 'n'.")
+
+    def show_rule_settings_problem(self, status: str, problems: list[str]) -> None:
+        """Start-up warning when the saved thresholds cannot be used."""
+        reasons = {
+            "corrupt": "the settings file was damaged and has been set aside",
+            "io_error": "the settings file could not be read",
+            "invalid": "the saved values are not valid",
+        }
+        print(
+            f"\n{self.YELLOW}Saved grant rule thresholds were not used "
+            f"({reasons.get(status, status)}); the defaults apply.{self.RESET}"
+        )
+        for problem in problems:
+            print(f"  - {problem}")
+        print()
 
     # ========================================================
     # Audit history

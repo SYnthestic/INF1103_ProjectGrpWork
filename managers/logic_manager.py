@@ -6,17 +6,24 @@ Class overview
       DecisionEngine        owned by LogicManager   (composition)
         EligibilityRule     abstract rule, 13 subclasses, injected (aggregation)
         DecisionAdjuster    abstract post-processor, 2 subclasses, injected
+      AccessPolicy          owned by LogicManager   (composition): who is an admin
+                            and which account changes are allowed
+    RuleConfig              the adjustable thresholds (energy-reduction
+                            percentages and the Advanced Tier tonnes), handed
+                            to the rules that use them
     GrantScheme             abstract funding scheme, 4 subclasses
     SmeCriteria             the statutory SME test
     CaseBuilder / Case      turns a profile + AI audit into the facts the rules use
 
 Open/Closed: a new rule, scheme or adjustment is a new subclass handed to the
-DecisionEngine. Nothing in DecisionEngine has to change.
+DecisionEngine. Nothing in DecisionEngine has to change. Changing a threshold
+needs no code change at all: it is a new RuleConfig.
 """
 
 import hashlib
 import hmac
 import math
+import os
 import secrets
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -29,7 +36,8 @@ Decision = dict[str, Any]  # what one rule returns
 
 VALID_SCOPES = ["Scope-1", "Scope-2", "Scope-3"]
 
-# Energy-reduction thresholds (percent), as in the project's rule set:
+# Default energy-reduction thresholds (percent), as in the project's rule set.
+# An administrator can change them at run time (see RuleConfig):
 #   >= 20  Scope-1 fast-track (EEG Base Tier)
 #   >= 15  provisional approval for any scope (ESP, 50% co-funding)
 #   >= 10  below 15 but at least 10: referred to a person for review
@@ -138,6 +146,144 @@ class PasswordHasher:
             )
         except (ValueError, TypeError, UnicodeError):
             return False
+
+
+# =========================================================
+# Administrator access
+# =========================================================
+class AccessPolicy:
+    """Who is an administrator, and which account changes are allowed.
+
+    A user is an admin if their stored record says role "admin", or if they
+    are the bootstrap admin named by the ADMIN_USERNAME setting. The bootstrap
+    admin can never be demoted or deleted, so the app always has an admin.
+    Admins may not demote or delete their own account either (another admin
+    has to), which stops anyone locking themselves out by accident."""
+
+    ADMIN = "admin"
+    USER = "user"
+    ROLES = (USER, ADMIN)
+
+    def __init__(self, bootstrap_admin: str | None = None) -> None:
+        name = (bootstrap_admin or "").strip().lower()
+        self._bootstrap_admin = name or None
+
+    @property
+    def bootstrap_admin(self) -> str | None:
+        return self._bootstrap_admin
+
+    def role_of(self, username: str, user_record: Any) -> str:
+        if username and username == self._bootstrap_admin:
+            return self.ADMIN
+        if isinstance(user_record, dict) and user_record.get("role") == self.ADMIN:
+            return self.ADMIN
+        return self.USER
+
+    def is_admin(self, username: str, user_record: Any) -> bool:
+        return self.role_of(username, user_record) == self.ADMIN
+
+    def role_change_problem(self, actor: str, target: str, new_role: str) -> str | None:
+        """Why `actor` may not give `target` the role `new_role`, or None if
+        the change is allowed."""
+        if new_role not in self.ROLES:
+            return f"Unknown role '{new_role}'."
+        if new_role == self.USER and target == self._bootstrap_admin:
+            return f"'{target}' is the main administrator (ADMIN_USERNAME) and stays an admin."
+        if new_role == self.USER and target == actor:
+            return "You cannot remove your own admin rights. Ask another admin."
+        return None
+
+    def deletion_problem(self, actor: str, target: str) -> str | None:
+        """Why `actor` may not delete `target`, or None if it is allowed."""
+        if target == actor:
+            return "You cannot delete your own account while logged in to it."
+        if target == self._bootstrap_admin:
+            return f"'{target}' is the main administrator (ADMIN_USERNAME) and cannot be deleted."
+        return None
+
+
+# =========================================================
+# Adjustable rule thresholds
+# =========================================================
+@dataclass(frozen=True)
+class RuleConfig:
+    """The thresholds the eligibility rules use. Frozen, so a rule can never
+    change them; a new set of values is a new RuleConfig, checked by
+    from_dict() before it is used."""
+
+    minimum_impact_pct: float = MINIMUM_IMPACT_PCT
+    provisional_min_pct: float = PROVISIONAL_MIN_PCT
+    fast_track_min_pct: float = FAST_TRACK_MIN_PCT
+    eeg_advanced_min_tonnes: float = EEG_ADVANCED_MIN_TONNES
+
+    # Field name -> (label shown to the admin, unit). Also fixes the order.
+    LABELS = {
+        "minimum_impact_pct": ("Minimum energy reduction (below = reject)", "%"),
+        "provisional_min_pct": ("Provisional approval (ESP) from", "%"),
+        "fast_track_min_pct": ("Scope-1 fast track (EEG Base Tier) from", "%"),
+        "eeg_advanced_min_tonnes": ("EEG Advanced Tier: lifetime abatement above", "tonnes"),
+    }
+    MAX_TONNES = 1_000_000.0
+
+    def to_dict(self) -> dict[str, float]:
+        return {name: getattr(self, name) for name in self.LABELS}
+
+    @classmethod
+    def problems(cls, values: Any) -> list[str]:
+        """Everything wrong with a proposed set of thresholds (empty if fine)."""
+        if not isinstance(values, dict):
+            return ["The rule settings must be a set of named values."]
+        found = []
+        numbers: dict[str, float] = {}
+        for name, (label, _) in cls.LABELS.items():
+            value = values.get(name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+            ):
+                found.append(f"{label}: must be a number.")
+            else:
+                numbers[name] = float(value)
+        unknown = sorted(set(values) - set(cls.LABELS))
+        if unknown:
+            found.append(f"Unknown setting(s): {', '.join(map(str, unknown))}.")
+        if found:
+            return found
+
+        for name in ("minimum_impact_pct", "provisional_min_pct", "fast_track_min_pct"):
+            if not 0 < numbers[name] <= 100:
+                found.append(f"{cls.LABELS[name][0]}: must be above 0 and at most 100.")
+        if not 0 < numbers["eeg_advanced_min_tonnes"] <= cls.MAX_TONNES:
+            found.append(
+                f"{cls.LABELS['eeg_advanced_min_tonnes'][0]}: must be above 0 "
+                f"and at most {cls.MAX_TONNES:,.0f}."
+            )
+        if not (
+            numbers["minimum_impact_pct"]
+            <= numbers["provisional_min_pct"]
+            <= numbers["fast_track_min_pct"]
+        ):
+            found.append(
+                "The percentages must not decrease: minimum <= provisional <= fast track."
+            )
+        return found
+
+    @classmethod
+    def from_dict(cls, values: Any) -> "RuleConfig":
+        """A checked RuleConfig. Raises ValueError listing every problem."""
+        found = cls.problems(values)
+        if found:
+            raise ValueError(" ".join(found))
+        return cls(**{name: float(values[name]) for name in cls.LABELS})
+
+    def with_value(self, name: str, value: float) -> "RuleConfig":
+        """A copy with one threshold changed, checked like from_dict()."""
+        if name not in self.LABELS:
+            raise ValueError(f"Unknown setting '{name}'.")
+        values = self.to_dict()
+        values[name] = value
+        return self.from_dict(values)
 
 
 # =========================================================
@@ -532,17 +678,22 @@ class UnclassifiedScopeRule(EligibilityRule):
 
 
 class EegAdvancedTierRule(EligibilityRule):
-    """More than 350 tonnes of lifetime abatement. The AI's tonnes figure is
-    only an estimate, so the proposal must also reach the minimum energy
-    reduction (a claimed 400 tonnes with 0% reduction does not qualify)."""
+    """More than 350 tonnes of lifetime abatement (by default). The AI's
+    tonnes figure is only an estimate, so the proposal must also reach the
+    minimum energy reduction (a claimed 400 tonnes with 0% reduction does not
+    qualify)."""
 
-    def __init__(self, scheme: GrantScheme | None = None) -> None:
+    def __init__(
+        self, scheme: GrantScheme | None = None, config: RuleConfig | None = None
+    ) -> None:
         self._scheme = scheme or EegAdvancedScheme()
+        self._config = config or RuleConfig()
 
     def evaluate(self, case: Case) -> Decision | None:
+        limit = self._config.eeg_advanced_min_tonnes
         if not (
-            case.lifetime_tonnes > EEG_ADVANCED_MIN_TONNES
-            and case.energy_reduction_pct >= MINIMUM_IMPACT_PCT
+            case.lifetime_tonnes > limit
+            and case.energy_reduction_pct >= self._config.minimum_impact_pct
         ):
             return None
 
@@ -552,7 +703,7 @@ class EegAdvancedTierRule(EligibilityRule):
                 "Company meets the SME eligibility requirements.",
                 f"Estimated lifetime carbon abatement of "
                 f"{case.lifetime_tonnes:.1f} tonnes exceeds the "
-                "350-tonne Advanced Tier threshold.",
+                f"{limit:g}-tonne Advanced Tier threshold.",
             ],
             [
                 "Engage an independent energy assessor to verify the "
@@ -564,20 +715,21 @@ class EegAdvancedTierRule(EligibilityRule):
 
 
 class EegBaseTierRule(EligibilityRule):
-    """Scope-1 fast track: at least 20% energy reduction."""
+    """Scope-1 fast track: at least 20% energy reduction (by default)."""
 
     def __init__(
         self,
         scheme: GrantScheme | None = None,
         companion_scheme: GrantScheme | None = None,
+        config: RuleConfig | None = None,
     ) -> None:
         self._scheme = scheme or EegBaseScheme()
         self._companion = companion_scheme or EspScheme()
+        self._config = config or RuleConfig()
 
     def evaluate(self, case: Case) -> Decision | None:
-        if not (
-            case.scope == "Scope-1" and case.energy_reduction_pct >= FAST_TRACK_MIN_PCT
-        ):
+        threshold = self._config.fast_track_min_pct
+        if not (case.scope == "Scope-1" and case.energy_reduction_pct >= threshold):
             return None
 
         return self.make_decision(
@@ -586,7 +738,7 @@ class EegBaseTierRule(EligibilityRule):
                 "Company meets the SME eligibility requirements.",
                 "Proposal targets Scope-1 emissions.",
                 f"Estimated energy reduction of {case.energy_reduction_pct:.1f}% "
-                "meets the 20% threshold for this system's fast-track rule.",
+                f"meets the {threshold:g}% threshold for this system's fast-track rule.",
             ],
             [],
             [self._scheme.name, self._companion.name],
@@ -596,13 +748,17 @@ class EegBaseTierRule(EligibilityRule):
 
 class EspProvisionalRule(EligibilityRule):
     """Any valid scope that misses the Scope-1 fast track but still reaches
-    15% (so Scope-1 at 15-20% lands here too)."""
+    15% by default (so Scope-1 at 15-20% lands here too)."""
 
-    def __init__(self, scheme: GrantScheme | None = None) -> None:
+    def __init__(
+        self, scheme: GrantScheme | None = None, config: RuleConfig | None = None
+    ) -> None:
         self._scheme = scheme or EspScheme()
+        self._config = config or RuleConfig()
 
     def evaluate(self, case: Case) -> Decision | None:
-        if case.energy_reduction_pct < PROVISIONAL_MIN_PCT:
+        threshold = self._config.provisional_min_pct
+        if case.energy_reduction_pct < threshold:
             return None
 
         return self.make_decision(
@@ -611,7 +767,7 @@ class EspProvisionalRule(EligibilityRule):
                 "Company meets the SME eligibility requirements.",
                 f"Proposal targets {case.scope} emissions.",
                 f"Estimated energy reduction of {case.energy_reduction_pct:.1f}% "
-                "meets the 15% threshold for provisional capability-support approval.",
+                f"meets the {threshold:g}% threshold for provisional capability-support approval.",
             ],
             [
                 "Prepare supporting baseline energy and emissions "
@@ -623,45 +779,53 @@ class EspProvisionalRule(EligibilityRule):
 
 
 class BorderlineImpactRule(EligibilityRule):
-    """10% to under 15%: above the rejection line but below the provisional
-    approval line, so neither an automatic approval nor an automatic
-    rejection is fair."""
+    """10% to under 15% by default: above the rejection line but below the
+    provisional approval line, so neither an automatic approval nor an
+    automatic rejection is fair."""
+
+    def __init__(self, config: RuleConfig | None = None) -> None:
+        self._config = config or RuleConfig()
 
     def evaluate(self, case: Case) -> Decision | None:
-        if not MINIMUM_IMPACT_PCT <= case.energy_reduction_pct < PROVISIONAL_MIN_PCT:
+        minimum = self._config.minimum_impact_pct
+        provisional = self._config.provisional_min_pct
+        if not minimum <= case.energy_reduction_pct < provisional:
             return None
 
         return self.make_decision(
             "MANUAL_REVIEW",
             [
                 f"Estimated energy reduction of {case.energy_reduction_pct:.1f}% meets the "
-                f"minimum of {MINIMUM_IMPACT_PCT:.0f}% but is below the "
-                f"{PROVISIONAL_MIN_PCT:.0f}% needed for provisional approval."
+                f"minimum of {minimum:g}% but is below the "
+                f"{provisional:g}% needed for provisional approval."
             ],
             [
                 "Submit supporting baseline and measurement data so a "
                 "reviewer can assess the proposal.",
                 "Consider measures that raise the projected energy reduction "
-                f"to at least {PROVISIONAL_MIN_PCT:.0f}%.",
+                f"to at least {provisional:g}%.",
             ],
         )
 
 
 class LowImpactRule(EligibilityRule):
-    """Everything else: under 10% is rejected. This rule never returns None,
-    so it is the catch-all that ends every rule list."""
+    """Everything else: under 10% (by default) is rejected. This rule never
+    returns None, so it is the catch-all that ends every rule list."""
+
+    def __init__(self, config: RuleConfig | None = None) -> None:
+        self._config = config or RuleConfig()
 
     def evaluate(self, case: Case) -> Decision:
         return self.make_decision(
             "REJECT_LOW_IMPACT",
             [
                 f"Estimated energy reduction of {case.energy_reduction_pct:.1f}% "
-                f"is below the minimum threshold of {MINIMUM_IMPACT_PCT:.1f}% "
+                f"is below the minimum threshold of {self._config.minimum_impact_pct:.1f}% "
                 "used by this system."
             ],
             [
                 "Consider increasing the projected energy-efficiency "
-                "improvement to at least 15%.",
+                f"improvement to at least {self._config.provisional_min_pct:g}%.",
                 "Consider additional energy-efficiency measures such "
                 "as equipment upgrades, HVAC optimisation, lighting "
                 "efficiency, or other applicable interventions.",
@@ -754,8 +918,10 @@ class DecisionEngine:
         self._adjusters = tuple(adjusters)
 
     @classmethod
-    def with_default_rules(cls) -> "DecisionEngine":
-        """The project's rule set, highest priority first."""
+    def with_default_rules(cls, config: RuleConfig | None = None) -> "DecisionEngine":
+        """The project's rule set, highest priority first. `config` sets the
+        thresholds the rules use (the defaults if it is None)."""
+        config = config or RuleConfig()
         return cls(
             rules=[
                 ExclusionKeywordsRule(),
@@ -766,11 +932,11 @@ class DecisionEngine:
                 ReportingGrantRule(),
                 MissingBaselineSpendRule(),
                 UnclassifiedScopeRule(),
-                EegAdvancedTierRule(),
-                EegBaseTierRule(),
-                EspProvisionalRule(),
-                BorderlineImpactRule(),
-                LowImpactRule(),
+                EegAdvancedTierRule(config=config),
+                EegBaseTierRule(config=config),
+                EspProvisionalRule(config=config),
+                BorderlineImpactRule(config=config),
+                LowImpactRule(config=config),
             ],
             adjusters=[RetrofitCostCap(), SchemeMismatchNote()],
         )
@@ -797,20 +963,65 @@ class DecisionEngine:
 # The Logic Manager
 # =========================================================
 class LogicManager:
-    """The Logic Manager as the controller sees it. It owns a PasswordHasher
-    and a CaseBuilder (composition: they are created here and live and die
-    with it) and uses a DecisionEngine that may be supplied (aggregation)."""
+    """The Logic Manager as the controller sees it. It owns a PasswordHasher,
+    a CaseBuilder and an AccessPolicy (composition: they are created here and
+    live and die with it) and uses a DecisionEngine that may be supplied
+    (aggregation)."""
 
-    def __init__(self, engine: DecisionEngine | None = None) -> None:
+    def __init__(
+        self,
+        engine: DecisionEngine | None = None,
+        rule_config: RuleConfig | None = None,
+        admin_username: str | None = None,
+    ) -> None:
         self._hasher = PasswordHasher()
         self._case_builder = CaseBuilder()
         self._sme = SmeCriteria()
         self._mismatch = SchemeMismatchNote()
-        self._engine = engine or DecisionEngine.with_default_rules()
+        self._rule_config = rule_config or RuleConfig()
+        # A supplied engine is kept as it is; the default one is rebuilt
+        # whenever the thresholds change.
+        self._custom_engine = engine is not None
+        self._engine = engine or DecisionEngine.with_default_rules(self._rule_config)
+        if admin_username is None:
+            admin_username = os.environ.get("ADMIN_USERNAME")
+        self._access = AccessPolicy(admin_username)
 
     @property
     def engine(self) -> DecisionEngine:
         return self._engine
+
+    # ----- adjustable thresholds -----
+    @property
+    def rule_config(self) -> RuleConfig:
+        return self._rule_config
+
+    def use_rule_config(self, config: RuleConfig) -> None:
+        """Every later decision uses these thresholds."""
+        self._rule_config = config
+        if not self._custom_engine:
+            self._engine = DecisionEngine.with_default_rules(config)
+
+    @staticmethod
+    def default_rule_config() -> RuleConfig:
+        return RuleConfig()
+
+    @staticmethod
+    def rule_config_problems(values: Any) -> list[str]:
+        return RuleConfig.problems(values)
+
+    @staticmethod
+    def rule_config_from_dict(values: Any) -> RuleConfig:
+        """Raises ValueError (listing the problems) for invalid settings."""
+        return RuleConfig.from_dict(values)
+
+    # ----- administrator access -----
+    @property
+    def access(self) -> AccessPolicy:
+        return self._access
+
+    def is_admin(self, username: str, user_record: Any) -> bool:
+        return self._access.is_admin(username, user_record)
 
     # ----- passwords -----
     def hash_password(
@@ -821,8 +1032,16 @@ class LogicManager:
     ) -> dict[str, Any]:
         return self._hasher.hash_password(password, salt_hex, iterations)
 
-    def build_new_user_record(self, username: str, password: str) -> dict[str, Any]:
-        return self._hasher.build_new_user_record(username, password)
+    def build_new_user_record(
+        self, username: str, password: str, role: str = AccessPolicy.USER
+    ) -> dict[str, Any]:
+        """A new account to store: the password hash plus the role (accounts
+        made on the login screen are always ordinary users)."""
+        if role not in AccessPolicy.ROLES:
+            raise ValueError(f"Unknown role '{role}'.")
+        record = self._hasher.build_new_user_record(username, password)
+        record["role"] = role
+        return record
 
     def verify_password(self, password: Any, user_record: Any) -> bool:
         return self._hasher.verify_password(password, user_record)
