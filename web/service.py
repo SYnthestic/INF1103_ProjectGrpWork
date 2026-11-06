@@ -8,6 +8,23 @@ REQUIRED_NUMBERS = ("Company Total Revenue", "Total Employees", "Local Equity")
 
 
 
+def username_is_taken(data, logic, username: str) -> bool:
+    """Taken by an account, or reserved for the ADMIN_USERNAME administrator
+    (so the web pages cannot be used to claim the admin name)."""
+    return data.user_exists(username) or username == logic.access.bootstrap_admin
+
+
+def use_saved_rules(logic, data) -> None:
+    """Uses the grant rule thresholds an administrator saved in the terminal
+    admin console, so web decisions match terminal decisions. Falls back to the
+    defaults if none are saved or the saved values cannot be used."""
+    values, status = data.load_rule_config()
+    if status == "loaded" and not logic.rule_config_problems(values):
+        logic.use_rule_config(logic.rule_config_from_dict(values))
+    else:
+        logic.use_rule_config(logic.default_rule_config())
+
+
 def start_session(username: str) -> None:
     flask_session.clear()
     flask_session["username"] = username
@@ -52,12 +69,15 @@ def create_audit(username: str, record) -> tuple[dict | None, str | None, int]:
         return None, "AI call failed", 502
 
     try:
+        use_saved_rules(logic, data)
         result = logic.evaluate_grant_application(wrapped.to_profile(), ai_audit)
     except Exception:
         current_app.logger.exception("Grant evaluation raised")
         return None, "grant evaluation failed", 500
 
-    saved = data.append_user_audit(username, record, ai_audit, result)
+    saved = data.append_user_audit(
+        username, record, ai_audit, result, rules_used=logic.rule_config.to_dict()
+    )
     if saved is None:
         return None, "could not save audit", 500
     return saved, None, 201

@@ -309,6 +309,8 @@ Set `ADMIN_USERNAME` in your `.env` file (for example `ADMIN_USERNAME=admin`, se
 
 To keep at least one administrator, the `ADMIN_USERNAME` account can never be demoted or deleted, and no administrator can demote or delete their own account. Threshold changes are saved to `rules_config.json` with who changed them and when, and are picked up at every login. If that file is damaged or holds invalid values, the app shows a warning and uses the defaults.
 
+The admin console is in the terminal app only. The web version uses the same accounts and thresholds: its register page refuses the `ADMIN_USERNAME` name, and its grant decisions use the thresholds saved here.
+
 ## Where saved files go
 
 Everything the app saves goes into one folder, chosen by the `DATA_DIR` environment variable:
@@ -350,7 +352,7 @@ docker run --rm sme-grant-auditor python -m pytest
 python -m flask --app app run --debug
 ```
 
-The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, `test_rule_config.py` for the adjustable thresholds, `test_admin.py` for the admin console, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete) and `test_pdf.py` (PDF download). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
+The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, `test_rule_config.py` for the adjustable thresholds, `test_admin.py` for the admin console, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete), `test_pdf.py` (PDF download) and `test_web_admin.py` (the web pages respect the admin name and the saved thresholds). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
 
 ---
 
