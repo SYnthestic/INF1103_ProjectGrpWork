@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Past audits</h1>
+{% if not audits %}<p>No audits yet. <a href="{{ url_for('pages.new_audit') }}">Create one</a>.</p>{% endif %}
+<ul>
+{% for a in audits %}
+  <li><a href="{{ url_for('pages.detail', audit_id=a.audit_id) }}">
+    #{{ a.audit_id }} {{ a.application.get('Company Name', 'N/A') }}</a>
+    ({{ a.timestamp }}) {{ (a.result or {}).get('decision_status', '') }}
+    - <a href="{{ url_for('pages.audit_pdf', audit_id=a.audit_id) }}">PDF</a></li>
+{% endfor %}
+</ul>
+{% endblock %}

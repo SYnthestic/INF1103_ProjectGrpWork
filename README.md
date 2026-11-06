@@ -1,6 +1,6 @@
 # SME Green Grant Eligibility & Scope-3 Compliance Auditor
 
-A terminal app that takes an SME's details and a free-text upgrade proposal, uses an AI model to classify the proposal under the GHG Protocol, then applies deterministic Python rules to decide grant eligibility and calculate the subsidy.
+A grant-eligibility auditor that takes an SME's details and a free-text upgrade proposal, uses an AI model to classify the proposal under the GHG Protocol, then applies deterministic Python rules to decide grant eligibility and calculate the subsidy. It runs two ways: as a **terminal app** (`main.py`) or as a **web app** built with Flask (`app.py`). Both use the same four managers.
 
 ## How it is organised
 
@@ -8,6 +8,8 @@ The program is object-oriented. The four managers from Part 1 are still the four
 
 | File | Main classes | Role |
 |---|---|---|
+| `app.py` | `create_app()` | **Flask entry point.** Builds the web app and hands it the same AI, Logic and Data managers the terminal app uses |
+| `web/` | blueprints, `Workspaces`, `service` | **Web layer.** Routes (`pages.py` for HTML pages, `auth.py` and `audits.py` for the JSON API), the shared audit function, per-user in-memory records, and the templates in `web/templates/`. It contains no business logic, only calls into the managers |
 | `main.py` | `Application` | The controller: runs the login screen and menu and passes data between the managers. The only file that knows about all four. Managers are handed to it, so tests can pass in doubles |
 | `session.py` | `Session` | What one logged-in user is working on (records in memory, the current file name, whether there are unsaved changes). Created at login and discarded at logout |
 | `managers/io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
@@ -169,6 +171,86 @@ Other menu options: **2** save, **3** load, **4** view records, **7** and **8** 
 
 If you choose **0** (exit) or **10** (logout) while you have records that are not saved, the app asks whether to save first. Answer **n** to leave without saving, or **y** to save; if you then cancel the save, you are taken back to the menu with your records still there.
 
+---
+
+## Step 6 (optional): Run the web version
+
+The same audits are available in a browser. Pick **one** option.
+
+### Option A: Plain Python
+
+1. Complete Step 2 (`.env` with your OpenRouter key) and Step 3, Option B (virtual environment and `pip install -r requirements.txt`).
+2. Add a secret key for login cookies to your `.env`:
+
+   ```
+   FLASK_SECRET_KEY=any-long-random-string
+   ```
+
+   Generate one with `python -c "import secrets; print(secrets.token_hex(32))"`. Without it the app falls back to a development-only key, which is fine for trying it out but not for anything shared.
+3. Start the development server:
+
+   ```
+   python -m flask --app app run --debug
+   ```
+
+4. Open http://127.0.0.1:5000/ and register an account, then log in. `http://127.0.0.1:5000/health` returns `{"status": "ok"}` if the server is up.
+5. Stop it with `Ctrl+C`.
+
+`python -m flask` works even when the `flask` command is not on your PATH. Debug mode reloads the server on every code change and shows an interactive error page. **Records held in memory are lost on each reload**, so save to a file before editing code. Never use `--debug` on a shared or public machine.
+
+### Option B: Docker
+
+The image still starts the terminal app by default. To run the web version instead, override the command and publish the port:
+
+```
+docker build -t sme-grant-auditor .
+docker run --rm -p 5000:5000 --env-file .env -v "C:\SME_Grant_Data:/app/data" sme-grant-auditor gunicorn -w 1 -b 0.0.0.0:5000 "app:create_app()"
+```
+
+Then open http://localhost:5000/. On Mac/Linux replace the `-v` path with `"$HOME/SME_Grant_Data:/app/data"`.
+
+- Use **one** worker (`-w 1`). Each user's records in memory live inside the server process, so several workers would each have their own separate copy.
+- `-it` is not needed, because the web version does not read from the keyboard.
+- Keep the `-v` option, or the accounts and saved files are lost when the container is removed.
+- Put `FLASK_SECRET_KEY=...` in the same `.env` file, since `--env-file` passes it in.
+
+### What the web version offers
+
+| Page | What it does | Terminal equivalent |
+|---|---|---|
+| Register / Log in / Log out | Accounts, using the same `users.json` and password rules | Login screen, option 10 |
+| New audit | Form with dropdowns for industry and grant (each has an "Others" box that appears when chosen). Runs the AI and Logic managers, saves the audit to your history and keeps the record in memory | Option 1 |
+| Records | Lists the records in memory, with Edit and Delete buttons | Options 4, 5, 6 |
+| Save to JSON / Pull from JSON | Saves to or loads from your private `records/<username>/` folder. A blank file name cancels, and loading over unsaved records asks first | Options 2, 3 |
+| Run AI Manager (only) / Run Logic Manager (only) | Re-runs one step on the latest record | Options 7, 8 |
+| History | Lists your past audits, opens one in full, and downloads it as a PDF | Option 9 |
+| Log out | Warns if you have unsaved records and lets you save or leave without saving | Options 0 and 10 |
+
+Things that differ from the terminal app:
+
+- Records in memory are kept **per user, in the server process**. They are lost when the server restarts, so save to a file if you want to keep them.
+- Saving again to the file you are already using replaces it without asking. Saving to a different existing file asks you to add, replace or cancel.
+- The Pull from JSON page lists your saved files in a dropdown instead of asking you to type a name.
+
+### JSON API
+
+The same audit logic is available without the pages. Log in first; the session cookie is used for the other calls.
+
+| Method and path | Purpose |
+|---|---|
+| `POST /api/register` | Body `{"username": "...", "password": "..."}`. 201 on success, 409 if taken |
+| `POST /api/login` | Same body. 200 on success, 401 otherwise |
+| `POST /api/logout` | Ends the session |
+| `POST /api/audits` | Body is one application record (same keys as the saved records). Returns the saved audit |
+| `GET /api/audits` | Your audits |
+| `GET /api/audits/<id>` | One of your audits (404 for anyone else's) |
+
+Example in PowerShell:
+
+```
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5000/api/register -ContentType "application/json" -Body '{"username":"tester","password":"Test1234!"}'
+```
+
 ## How grant decisions are made
 
 The AI only classifies the proposal (scope, estimated energy reduction, any exclusion keywords). The decision and the subsidy come from fixed Python rules in `managers/logic_manager.py`. They are checked in this order, and the first one that applies decides:
@@ -245,9 +327,10 @@ You can also run the tests inside the Docker image. Build it first, then run eit
 docker build -t sme-grant-auditor .
 docker run --rm sme-grant-auditor python -m pytest tests/test_logic_sample_ai_responses.py
 docker run --rm sme-grant-auditor python -m pytest
+python -m flask --app app run --debug
 ```
 
-The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, and `test_architecture.py`, which fails if a manager imports another manager, a non-I/O module calls `print()`/`input()`, a module-level function (procedural code) appears, or a design abstraction stops being abstract. `test_oop_design.py` checks polymorphism, substitution (every rule and scheme works through its base class), extension without modification, and how the parts are wired. When you change a rule, change or add the matching test in the same commit.
+The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete) and `test_pdf.py` (PDF download). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
 
 ---
 
@@ -255,6 +338,14 @@ The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test
 
 | Problem | Fix |
 |---|---|
+| `flask : The term 'flask' is not recognized` | The `flask` command is not on your PATH. Use `python -m flask --app app run --debug`, with the virtual environment activated |
+| `ModuleNotFoundError: No module named 'flask'` | Flask is not installed in the active environment. Run `python -m pip install -r requirements.txt` |
+| Browser shows "Not Found" at `/` | Check that you are running the latest `app.py`. `/` redirects to the login page. `/health` is the quick check |
+| Pages look old after a change | Hard refresh with `Ctrl+Shift+R`. Templates are cached by the browser |
+| Records vanish from the Records page | The server restarted (debug reload, or you stopped it). Records in memory are lost on restart, so save to a file first |
+| Docker web version: page will not load | Check that you used `-p 5000:5000` and the `gunicorn ... 0.0.0.0:5000` command. Binding to `127.0.0.1` inside the container is not reachable from your computer |
+| `gunicorn` fails to start on Windows | Gunicorn runs only on Linux and Mac. Use the Flask command locally and gunicorn inside Docker |
+| Logged out unexpectedly | The `FLASK_SECRET_KEY` changed between runs, which invalidates the cookies. Set a fixed value in `.env` |
 | `AuthenticationError 401 - User not found` | The key in `.env` is wrong or shortened. Paste the full key. To check it loads: `python -c "import os; from dotenv import load_dotenv; load_dotenv(override=True); print(len(os.environ.get('OPENROUTER_API_KEY','')))"`. A real key is roughly 70 characters. |
 | Result says `MANUAL_REVIEW` and scope `Unknown` | The AI call failed. Read `ai_reasoning_summary` in the AI Audit Result for the reason. |
 | App hangs or `EOFError` in Docker | You forgot `-it` on `docker run`. |
@@ -265,3 +356,5 @@ The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test
 | Accounts or saved files disappear in Docker, or no `.json` files appear in your folder | The files were saved inside the container. Recreate the container with `-v "<your folder>:/app/data"` (Step 3, Option A, item 3). A container created earlier without it must be removed with `docker rm sme-auditor` first, and the image rebuilt if your Dockerfile is old. |
 | `Could not save the new account` / an audit is not saved | Another copy of the app is writing at the same moment, or the data folder is not writable. Try again; if it keeps failing, check the folder's permissions (and delete a stale `*.lock` file in it). |
 | Filename rejected when saving | Use a plain name such as `Save1`, with no `/`, `\` or other special characters. |
+
+python -m flask --app app run --debug

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Pull from JSON</h1>
+{% if not files %}
+  <p>You have no saved files yet.</p>
+{% else %}
+<form method="post">
+  <label>Saved file
+    <select name="filename">
+      <option value="">(none: cancel)</option>
+      {% for f in files %}<option {{ 'selected' if f == selected }}>{{ f }}</option>{% endfor %}
+    </select>
+  </label>
+  {% if needs_confirm %}
+  <label><input type="checkbox" name="confirm" value="1" style="width:auto">
+    This will replace the records currently in memory. Continue?</label>
+  {% endif %}
+  <p><button>Load</button></p>
+</form>
+{% endif %}
+<a href="{{ url_for('pages.records_page') }}">Back to records</a>
+{% endblock %}

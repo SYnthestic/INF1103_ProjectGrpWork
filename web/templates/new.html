@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>New audit</h1>
+<form method="post">
+  <label>Company Name <input name="Company Name" value="{{ values.get('Company Name', '') }}" required></label>
+  <label>Company Industry
+    <select name="Company Industry" id="industry-choice">
+      <option value="" disabled {{ 'selected' if not values.get('Company Industry') }}>Select an industry</option>
+      {% for i in industries %}
+        <option {{ 'selected' if values.get('Company Industry') == i }}>{{ i }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label id="industry-other-label" style="display:none">
+    Please specify your company's industry sector
+    <input name="Industry Other" id="industry-other" value="{{ values.get('Industry Other', '') }}">
+  </label>
+  <label>Company Total Revenue <input name="Company Total Revenue" type="number" step="any" min="0" value="{{ values.get('Company Total Revenue', '') }}" required></label>
+  <label>Total Employees <input name="Total Employees" type="number" min="0" value="{{ values.get('Total Employees', '') }}" required></label>
+  <label>Local Equity (%) <input name="Local Equity" type="number" step="any" min="0" max="100" value="{{ values.get('Local Equity', '') }}" required></label>
+  <label>Proposal Type
+    <select name="Proposal Type">{% for t in proposal_types %}<option {{ 'selected' if values.get('Proposal Type') == t }}>{{ t }}</option>{% endfor %}</select>
+  </label>
+  <label>Sustainability Grant
+    <select name="Sustainability Grant" id="grant-choice">
+      {% for g in grants %}<option {{ 'selected' if values.get('Sustainability Grant') == g }}>{{ g }}</option>{% endfor %}
+    </select>
+  </label>
+  <label id="grant-other-label" style="display:none">
+    Please specify the Sustainability Grant that is not stated in the options
+    <input name="Grant Other" id="grant-other" maxlength="50" value="{{ values.get('Grant Other', '') }}">
+  </label>
+  <label>Proposal Narrative <textarea name="Proposal Narrative" rows="6" required>{{ values.get('Proposal Narrative', '') }}</textarea></label>
+  <label>Baseline Energy Expenditure <input name="Baseline Energy Expenditure" type="number" step="any" min="0" value="{{ values.get('Baseline Energy Expenditure', '') }}"></label>
+  <label>Estimated Retrofit Cost <input name="Estimated Retrofit Cost" type="number" step="any" min="0" value="{{ values.get('Estimated Retrofit Cost', '') }}"></label>
+  <label>Reporting Advisory Fee <input name="Reporting Advisory Fee" type="number" step="any" min="0" value="{{ values.get('Reporting Advisory Fee', '') }}"></label>
+  <p><button>Run audit</button> (the AI call can take a few seconds)</p>
+</form>
+
+<script>
+  (function () {
+    function link(selectId, labelId, inputId, otherValue) {
+      const select = document.getElementById(selectId);
+      const label = document.getElementById(labelId);
+      const input = document.getElementById(inputId);
+      if (!select || !label || !input) {
+        console.error("Missing element:", { selectId, labelId, inputId });
+        return;
+      }
+      function sync() {
+        const isOther = select.value === otherValue;
+        label.style.display = isOther ? "block" : "none";
+        input.required = isOther;
+      }
+      select.addEventListener("change", sync);
+      sync();
+    }
+    link("industry-choice", "industry-other-label", "industry-other", "Others");
+    link("grant-choice", "grant-other-label", "grant-other", "5. Others");
+  })();
+</script>
+{% endblock %}

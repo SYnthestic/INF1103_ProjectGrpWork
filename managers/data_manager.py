@@ -27,7 +27,7 @@ class FilenameRules:
     INVALID_CHARS = '/\\:*?"<>|'
 
     @staticmethod
-    def normalise(jsonfile_name: str | None) -> str:
+    def normalise(jsonfile_name: str | None | None) -> str:
         """Strips whitespace and makes sure the name ends with .json
         (any capitalisation of the extension is accepted)."""
         if jsonfile_name is None:
