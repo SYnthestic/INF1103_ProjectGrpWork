@@ -14,10 +14,10 @@ The program is object-oriented. The four managers from Part 1 are still the four
 | `session.py` | `Session` | What one logged-in user is working on (records in memory, the current file name, whether there are unsaved changes). Created at login and discarded at logout |
 | `managers/io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
 | `managers/ai_manager.py` | `AIManager`, `AIClient` (abstract), `OpenRouterClient`, `AuditResponseParser` | **AI manager.** Sends the proposal to the AI API and returns a validated JSON result. Depends on the `AIClient` interface, so another provider (or a test fake) can be plugged in |
-| `managers/logic_manager.py` | `LogicManager`, `DecisionEngine`, `EligibilityRule` (abstract, 13 rules), `GrantScheme` (abstract, 4 schemes), `DecisionAdjuster`, `PasswordHasher`, `RuleConfig`, `AccessPolicy` | **Logic manager.** Eligibility rules, grant matching, subsidy maths, password hashing and who may use the admin console (no AI). A new rule or scheme is a new subclass; the engine does not change. The thresholds the rules use are a `RuleConfig`, so changing them needs no code change |
+| `managers/logic_manager.py` | `LogicManager`, `DecisionEngine`, `EligibilityRule` (abstract, 13 rules), `GrantScheme` (abstract, 4 schemes), `DecisionAdjuster`, `PasswordHasher`, `AesGcmCipher`, `RuleConfig`, `AccessPolicy` | **Logic manager.** Eligibility rules, grant matching, subsidy maths, password hashing, AES-256-GCM encryption of the data files and who may use the admin console (no AI). A new rule or scheme is a new subclass; the engine does not change. The thresholds the rules use are a `RuleConfig`, so changing them needs no code change |
 | `managers/data_manager.py` | `DataManager`, `JsonStore`, `FilenameRules` | **Data manager.** Saving and loading records, user accounts, audit history and the grant rule thresholds as JSON; archiving deleted accounts |
 | `report_exporter.py` | `ReportExporter` (abstract), `PdfReportExporter`, `ReportTheme`, `ReportContent` | PDF report drawing, kept separate from storage. The Data Manager only knows the `ReportExporter` interface |
-| `models.py` | `Proposal` (abstract), `EquipmentProposal`, `ReportingProposal`, `ApplicationRecord`, `RecordSections`, `PlaceholderKeywords` | Small shared domain classes with no I/O. Any manager may import them |
+| `models.py` | `Proposal` (abstract), `EquipmentProposal`, `ReportingProposal`, `ApplicationRecord`, `RecordSections`, `PlaceholderKeywords`, `FileCipher` (interface), `PlainFileCipher` | Small shared domain classes with no I/O. Any manager may import them |
 | `sme_interface_stores/sme_interface_gui.py` | `InterfaceArt` | Screen art: menus, banners and the floppy-disk prompts. Used only by the I/O manager |
 | `sme_interface_stores/buttons.py` | `ButtonPanel` | The clickable buttons. Used only by the I/O manager |
 | `tests/` | | Automated tests, including ones that fail if a manager imports another manager or procedural code reappears |
@@ -62,11 +62,20 @@ cd INF1103_ProjectGrpWork
 
 ## Step 2: Create your `.env` file
 
-In the project folder (next to `main.py`), copy `.env.example` to a new file named exactly `.env` (or create it yourself) containing one line:
+In the project folder (next to `main.py`), copy `.env.example` to a new file named exactly `.env` (or create it yourself) containing two lines:
 
 ```
 OPENROUTER_API_KEY=sk-or-v1-paste-your-full-key-here
+DATA_ENCRYPTION_KEY=paste-the-generated-key-here
 ```
+
+`DATA_ENCRYPTION_KEY` is required: every data file is encrypted with it and the app will not start without it (see *Data encryption* below). Generate one and paste the printed line into `.env`:
+
+```
+python main.py --generate-key
+```
+
+With Docker only (no Python installed), build the image first (Step 3) and run `docker run --rm sme-grant-auditor python main.py --generate-key`.
 
 Rules that matter:
 
@@ -290,7 +299,7 @@ Passwords are never stored. Each account stores a random salt and a salted SHA-2
 | `users.json` | Usernames, salts and password hashes |
 | `audit_history.json` | Each user's saved audits (inputs, AI result, decision) |
 
-Both files are plain JSON and are **not** otherwise protected yet. They are in `.gitignore` and `.dockerignore`, so they are never committed or copied into the Docker image. They are saved with the app's other files (see *Where saved files go*). To reset all accounts, delete both files. A short-lived `users.json.lock` / `audit_history.json.lock` file may appear while the app is writing; it is removed automatically.
+Both files are encrypted with AES-256-GCM (see *Data encryption*). They are in `.gitignore` and `.dockerignore`, so they are never committed or copied into the Docker image. They are saved with the app's other files (see *Where saved files go*). To reset all accounts, delete both files. A short-lived `users.json.lock` / `audit_history.json.lock` file may appear while the app is writing; it is removed automatically.
 
 ## Administrator console
 
@@ -310,6 +319,26 @@ Set `ADMIN_USERNAME` in your `.env` file (for example `ADMIN_USERNAME=admin`, se
 To keep at least one administrator, the `ADMIN_USERNAME` account can never be demoted or deleted, and no administrator can demote or delete their own account. Threshold changes are saved to `rules_config.json` with who changed them and when, and are picked up at every login. If that file is damaged or holds invalid values, the app shows a warning and uses the defaults.
 
 The admin console is in the terminal app only. The web version uses the same accounts and thresholds: its register page refuses the `ADMIN_USERNAME` name, and its grant decisions use the thresholds saved here.
+
+## Data encryption
+
+Every JSON data file the app saves is encrypted with **AES-256-GCM**: `users.json`, `audit_history.json`, `rules_config.json`, the record files in `records/` and everything in `archive/`. `app.log` and exported PDFs are not encrypted (you need to read them).
+
+- **The key.** `DATA_ENCRYPTION_KEY` in `.env`: 32 random bytes written as base64. Create one with `python main.py --generate-key`. It is never committed (`.env` is in `.gitignore`), never stored in a data file and never shown by the app. **If it is lost, the files cannot be opened again**, so keep a copy somewhere safe.
+- **Fails closed.** Without a valid key the app (terminal and web) refuses to start, so data is never saved unencrypted by mistake.
+- **Tamper-evident.** Each file holds a marker (`SMEENC1`), a fresh random 12-byte nonce, the encrypted JSON and a 16-byte authentication tag. A wrong key or any changed byte is detected; the file is then left untouched and the app reports it instead of loading it.
+- **Each teammate** can use their own key, because each person's data folder stays on their own computer. Share a key (privately, never in the repo or group chat) only if you also share a data folder.
+- **Existing plain files** (saved before encryption was added) are not trusted automatically. Encrypt them once, while the app is not running:
+
+  ```
+  python main.py --encrypt-existing-data
+  ```
+
+  Docker: `docker run --rm --env-file .env -v "<your folder>:/app/data" sme-grant-auditor python main.py --encrypt-existing-data`
+
+- **Tests and CI** create a throwaway key for each test, so no secret is needed on GitHub.
+
+The encryption code is `AesGcmCipher` in `managers/logic_manager.py`, which implements the `FileCipher` interface in `models.py`. `main.py` passes it to the `DataManager`, whose `JsonStore` encrypts on every save and decrypts on every load without knowing which cipher it has.
 
 ## Where saved files go
 
@@ -377,6 +406,9 @@ The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test
 | Code changes have no effect in Docker | The image still holds the old code. Rebuild and recreate the container (Step 3, Option A, item 5). |
 | Accounts or saved files disappear in Docker, or no `.json` files appear in your folder | The files were saved inside the container. Recreate the container with `-v "<your folder>:/app/data"` (Step 3, Option A, item 3). A container created earlier without it must be removed with `docker rm sme-auditor` first, and the image rebuilt if your Dockerfile is old. |
 | `Could not save the new account` / an audit is not saved | Another copy of the app is writing at the same moment, or the data folder is not writable. Try again; if it keeps failing, check the folder's permissions (and delete a stale `*.lock` file in it). |
+| `The app cannot start: DATA_ENCRYPTION_KEY is not set` | Add the key to `.env` (Step 2). Generate one with `python main.py --generate-key` |
+| `... cannot be decrypted: the key ... is wrong, or the file was modified` | `DATA_ENCRYPTION_KEY` is not the key these files were saved with. Put the original key back. Nothing was changed or deleted |
+| `... is not encrypted yet` | Data saved before encryption was added. Run `python main.py --encrypt-existing-data` once |
 | Filename rejected when saving | Use a plain name such as `Save1`, with no `/`, `\` or other special characters. |
 
 python -m flask --app app run --debug
