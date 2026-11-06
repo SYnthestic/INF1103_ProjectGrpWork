@@ -16,10 +16,8 @@ from types import TracebackType
 from typing import Any
 
 #The 4 managers are imported here so the Application can be tested with doubles.
+from managers import DataManager, LogicManager, IOManager
 from managers.ai_manager import AIManager
-from managers.data_manager import DataManager
-from managers.io_manager import IOManager
-from managers.logic_manager import LogicManager
 
 #These are imported here so the Application can be tested with doubles.
 from models import ApplicationRecord, Proposal

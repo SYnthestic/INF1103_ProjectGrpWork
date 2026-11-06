@@ -1,6 +1,6 @@
 import os
 
-from managers.data_manager import DataManager
+from managers import DataManager
 from models import ApplicationRecord
 from functools import wraps
 
