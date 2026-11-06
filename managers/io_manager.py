@@ -724,6 +724,88 @@ class IOManager:
                 return choice == "y"
             print("Invalid input. Please enter 'y' or 'n'.")
 
+    # ========================================================
+    # Encryption
+    # ========================================================
+    KEY_COMMAND = "python main.py --generate-key"
+    MIGRATE_COMMAND = "python main.py --encrypt-existing-data"
+    ENCRYPTED_LOAD_MESSAGES = {
+        "decrypt_failed": "The file could not be decrypted: the encryption key is "
+        "wrong or the file was modified. It was left unchanged.",
+        "not_encrypted": "The file is not encrypted, so it was not trusted. Run "
+        f"'{MIGRATE_COMMAND}' once to encrypt your existing files.",
+        "encrypted_no_key": "The file is encrypted, but no encryption key is in use.",
+    }
+    SHARED_FILE_PROBLEMS = {
+        "wrong_key": "cannot be decrypted: the key in DATA_ENCRYPTION_KEY is "
+        "wrong, or the file was modified",
+        "damaged": "is incomplete (truncated) and cannot be decrypted",
+        "not_encrypted": "is not encrypted yet",
+        "no_key": "is encrypted, but no key is in use",
+        "io_error": "could not be read",
+    }
+
+    def show_new_encryption_key(self, key: str) -> None:
+        print(
+            "\nNew encryption key (keep it secret, never commit it).\n"
+            "Add this line to your .env file:\n"
+        )
+        print(f"    DATA_ENCRYPTION_KEY={key}\n")
+        print(
+            f"{self.YELLOW}If you lose this key, files encrypted with it can "
+            f"never be opened again. Keep a copy somewhere safe.{self.RESET}\n"
+        )
+
+    def show_encryption_key_problem(self, reason: str, message: str) -> None:
+        print(f"\n{self.RED}The app cannot start: {message}{self.RESET}")
+        if reason == "missing_library":
+            return
+        print(
+            "\nAll data files are encrypted, so a valid DATA_ENCRYPTION_KEY is "
+            "required.\n"
+            f"  1. Generate one:   {self.KEY_COMMAND}\n"
+            "  2. Add the printed line to your .env file\n"
+            "     (Docker: pass it with --env-file .env)\n"
+            "  3. Start the app again.\n"
+        )
+
+    def show_encrypted_files_problem(self, problems: list[tuple[str, str]]) -> None:
+        print(f"\n{self.RED}The app cannot start: these data files cannot be opened.{self.RESET}")
+        for name, reason in problems:
+            print(f"  - {name} {self.SHARED_FILE_PROBLEMS.get(reason, reason)}")
+        reasons = {reason for _name, reason in problems}
+        if "not_encrypted" in reasons:
+            print(f"\nTo encrypt existing plain files once, run:  {self.MIGRATE_COMMAND}")
+        if reasons & {"wrong_key", "damaged"}:
+            print(
+                "\nCheck DATA_ENCRYPTION_KEY is the key these files were saved "
+                "with. Nothing was changed or deleted."
+            )
+        print()
+
+    def show_encryption_migration_start(self, data_dir: str) -> None:
+        print(f"\nEncrypting the plain JSON data files in {os.path.abspath(data_dir)} ...")
+
+    def show_encryption_migration_result(self, result: dict[str, list[str]]) -> None:
+        headings = {
+            "encrypted": "Encrypted now",
+            "already": "Already encrypted (left alone)",
+            "unreadable": "Encrypted with a DIFFERENT key or damaged (left alone)",
+            "invalid": "Not valid JSON (left alone)",
+            "failed": "Could not be read or written (left alone)",
+        }
+        if not any(result.values()):
+            print("No data files were found. Nothing to do.\n")
+            return
+        for status, heading in headings.items():
+            files = result.get(status, [])
+            if files:
+                colour = self.GREEN if status in ("encrypted", "already") else self.YELLOW
+                print(f"\n{colour}{heading}: {len(files)}{self.RESET}")
+                for name in files:
+                    print(f"  - {name}")
+        print()
+
     def show_rule_settings_problem(self, status: str, problems: list[str]) -> None:
         """Start-up warning when the saved thresholds cannot be used."""
         reasons = {
@@ -1355,6 +1437,7 @@ class IOManager:
             "invalid_json": "The file is corrupt or unreadable. It was set aside as a .corrupt backup.",
             "invalid_format": "The file is valid JSON but not a list of audit records. It was set aside.",
             "io_error": "The operating system refused to read the file.",
+            **self.ENCRYPTED_LOAD_MESSAGES,
         }
         print(messages.get(status, f"Unknown load status: {status}"))
 

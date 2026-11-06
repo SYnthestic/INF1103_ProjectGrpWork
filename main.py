@@ -8,6 +8,10 @@
 The Application is the only class that knows all four. It is handed them
 (aggregation), so tests can pass in doubles and nothing here creates a
 manager's internals. Run with:  python main.py
+
+Needs DATA_ENCRYPTION_KEY in .env (data files are encrypted).
+    python main.py --generate-key            make a new key
+    python main.py --encrypt-existing-data   encrypt old plain files once
 """
 
 import sys
@@ -20,7 +24,7 @@ from managers import DataManager, LogicManager, IOManager
 from managers.ai.ai_manager import AIManager
 
 #These are imported here so the Application can be tested with doubles.
-from models import ApplicationRecord, Proposal
+from models import ApplicationRecord, EncryptionKeyError, Proposal
 from session import AiAudit, Record, Records, Session
 
 
@@ -37,7 +41,8 @@ class Application:
         self._io = io or IOManager()
         self._ai = ai or AIManager()
         self._logic = logic or LogicManager()
-        self._data = data or DataManager()
+        # DataManager encrypts files with LogicManager's cipher
+        self._data = data or DataManager(cipher=self._logic.file_cipher)
 
     @property
     def io(self) -> IOManager:
@@ -69,11 +74,47 @@ class Application:
         except ImportError:
             pass
 
+    GENERATE_KEY_FLAG = "--generate-key"
+    ENCRYPT_EXISTING_FLAG = "--encrypt-existing-data"
+
     @classmethod
-    def launch(cls) -> None:
-        """Entry point used by `python main.py`."""
+    def launch(cls, argv: list[str] | None = None) -> None:
+        """Entry point. Stops if DATA_ENCRYPTION_KEY is missing or invalid
+        (app won't run unencrypted)."""
+        argv = sys.argv[1:] if argv is None else argv
         cls.load_environment()
-        cls().run()
+        io = IOManager()
+        logic = LogicManager()
+        if cls.GENERATE_KEY_FLAG in argv:
+            io.show_new_encryption_key(logic.generate_encryption_key())
+            return
+        try:
+            data = DataManager(cipher=logic.file_cipher)
+        except EncryptionKeyError as error:
+            io.show_encryption_key_problem(error.reason, str(error))
+            raise SystemExit(1) from None
+        app = cls(io=io, logic=logic, data=data)
+        if cls.ENCRYPT_EXISTING_FLAG in argv:
+            app.encrypt_existing_data_flow()
+            return
+        app.run()
+
+    # ========================================================
+    # Encryption
+    # ========================================================
+    def shared_files_are_readable(self) -> bool:
+        """Checks the key works before login. Otherwise a wrong key would look
+        like a wrong password and could overwrite users.json."""
+        problems = self._data.check_shared_files()
+        if problems:
+            self._io.show_encrypted_files_problem(problems)
+            return False
+        return True
+
+    def encrypt_existing_data_flow(self) -> None:
+        """--encrypt-existing-data: encrypts old plain files once."""
+        self._io.show_encryption_migration_start(self._data.data_dir)
+        self._io.show_encryption_migration_result(self._data.encrypt_existing_files())
 
     def handle_uncaught(
         self,
@@ -728,6 +769,8 @@ class Application:
     def run(self) -> None:
         sys.excepthook = self.handle_uncaught
         self._data.setup_logging()
+        if not self.shared_files_are_readable():
+            raise SystemExit(1)
         self._io.show_welcome_sequence()
         self._io.wait_for_continue()
         self.ensure_admin_account()
