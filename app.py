@@ -3,7 +3,7 @@ import secrets
 
 from flask import Flask
 from managers import DataManager, LogicManager
-from managers.ai_manager import AIManager
+from managers.ai.ai_manager import AIManager
 
 
 def create_app(config: dict | None = None) -> Flask:

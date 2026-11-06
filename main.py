@@ -17,7 +17,7 @@ from typing import Any
 
 #The 4 managers are imported here so the Application can be tested with doubles.
 from managers import DataManager, LogicManager, IOManager
-from managers.ai_manager import AIManager
+from managers.ai.ai_manager import AIManager
 
 #These are imported here so the Application can be tested with doubles.
 from models import ApplicationRecord, Proposal

@@ -1,13 +1,30 @@
 """Tests for the AI Manager's output cleaning. The network call itself is
 not tested; these cover what happens to whatever the model sends back."""
 
+import io
 import json
+import logging
 import os
 from unittest import mock
 
-import managers.ai_manager as ai
-from managers.ai_manager import AIClient, AIManager, AuditResponseParser, OpenRouterClient
+import managers.ai.ai_manager as ai
+from managers.ai.ai_client import AIClient
+from managers.ai.ai_config import DEFAULT_AI_AUDIT
+from managers.ai.ai_manager import AIManager
+from managers.ai import audit_response_parser
+from managers.ai.audit_response_parser import AuditResponseParser
+from managers.ai.openrouter_client import OpenRouterClient
 from tests.helpers import raises
+
+
+def capture_log(logger):
+    """Returns (stream, handler): everything `logger` logs goes into stream.
+        Remove the handler afterwards with logger.removeHandler(handler)."""
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    logger.addHandler(handler)
+    return stream, handler
+
 
 parser = AuditResponseParser()
 
@@ -158,12 +175,12 @@ def test_sanitise_handles_non_dicts_and_wrong_types():
 
 
 def test_sanitise_does_not_modify_the_defaults_or_its_input():
-    defaults_before = json.dumps(ai.DEFAULT_AI_AUDIT, sort_keys=True)
+    defaults_before = json.dumps(DEFAULT_AI_AUDIT, sort_keys=True)
     raw = {"scope_category": "Scope-2", "detected_exclusion_keywords": ["used"]}
     raw_before = json.dumps(raw, sort_keys=True)
     audit = parser.sanitise(raw)
     audit["detected_exclusion_keywords"].append("tampered")
-    assert json.dumps(ai.DEFAULT_AI_AUDIT, sort_keys=True) == defaults_before
+    assert json.dumps(DEFAULT_AI_AUDIT, sort_keys=True) == defaults_before
     assert json.dumps(raw, sort_keys=True) == raw_before
 
 
@@ -340,7 +357,7 @@ def test_energy_reduction_is_clamped_to_0_100():
 
 
 def test_default_is_failed():
-    assert AIManager.ai_call_failed(dict(ai.DEFAULT_AI_AUDIT))
+    assert AIManager.ai_call_failed(dict(DEFAULT_AI_AUDIT))
 
 
 def test_non_dict_is_failed():
@@ -371,15 +388,14 @@ def capture_ai_log():
 
 
 def test_an_unusable_answer_is_logged_and_replaced_by_defaults():
-    stream, handler = capture_ai_log()
+    stream, handler = capture_log(audit_response_parser.logger)
     try:
         audit = parser.parse("this is not json")
     finally:
-        ai.logger.removeHandler(handler)
+        audit_response_parser.logger.removeHandler(handler)
     assert AIManager.ai_call_failed(audit)
     assert "could not be used" in stream.getvalue()
     assert "no JSON object found" in stream.getvalue()
-
 
 def test_a_good_answer_logs_nothing():
     stream, handler = capture_ai_log()

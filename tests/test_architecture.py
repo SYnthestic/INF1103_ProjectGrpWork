@@ -15,7 +15,7 @@ import subprocess
 import sys
 from abc import ABC
 
-import managers.ai_manager as ai_manager
+import managers.ai.ai_manager as ai_manager
 import managers.data_manager as data_manager
 import managers.io_manager as io_manager
 import managers.logic_manager as logic_manager
@@ -35,7 +35,11 @@ MODULE_PATHS = {
     "session": "session.py",
     "report_exporter": "report_exporter.py",
     "managers.io_manager": "managers/io_manager.py",
-    "managers.ai_manager": "managers/ai_manager.py",
+    "managers.ai.ai_config": "managers/ai/ai_config.py",
+    "managers.ai.ai_client": "managers/ai/ai_client.py",
+    "managers.ai.openrouter_client": "managers/ai/openrouter_client.py",
+    "managers.ai.audit_response_parser": "managers/ai/audit_response_parser.py",
+    "managers.ai.ai_manager": "managers/ai/ai_manager.py",
     "managers.logic_manager": "managers/logic_manager.py",
     "managers.data_manager": "managers/data_manager.py",
     "sme_interface_stores.sme_interface_gui":
@@ -45,7 +49,11 @@ APPLICATION_MODULES = (
     "main",
     "models",
     "managers.io_manager",
-    "managers.ai_manager",
+    "managers.ai.ai_config",
+    "managers.ai.ai_client",
+    "managers.ai.openrouter_client",
+    "managers.ai.audit_response_parser",
+    "managers.ai.ai_manager",
     "managers.logic_manager",
     "managers.data_manager",
     "report_exporter",
@@ -56,7 +64,16 @@ APPLICATION_MODULES = (
 SUPPORT_MODULES = {"models", "report_exporter", "sme_interface_stores"}
 ALLOWED = {
     "managers.io_manager": SUPPORT_MODULES,
-    "managers.ai_manager": SUPPORT_MODULES,
+    "managers.ai.ai_config": set(),
+    "managers.ai.ai_client": set(),
+    "managers.ai.openrouter_client": {"managers.ai.ai_client", "managers.ai.ai_config"},
+    "managers.ai.audit_response_parser": {"managers.ai.ai_config", "models"},
+    "managers.ai.ai_manager": {
+        "managers.ai.ai_client",
+        "managers.ai.ai_config",
+        "managers.ai.audit_response_parser",
+        "managers.ai.openrouter_client",
+    },
     "managers.logic_manager": SUPPORT_MODULES,
     "managers.data_manager": SUPPORT_MODULES,
     "main": MANAGERS | {"models", "session"},
@@ -112,7 +129,7 @@ def test_importing_a_manager_prints_nothing():
     code = (
     "import models, report_exporter, main; "
     "import managers.logic_manager, managers.data_manager, "
-    "managers.ai_manager, managers.io_manager"
+    "managers.ai, managers.io_manager"
     )
     done = subprocess.run(
         [sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True
