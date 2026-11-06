@@ -9,6 +9,8 @@ each other" rule.
       ReportingProposal          is-a Proposal: an ESG reporting/advisory fee
     ApplicationRecord            adapter around one stored application dict
     PlaceholderKeywords          words such as "none" that are not exclusions
+    FileCipher (interface)       encrypts/decrypts data files
+      PlainFileCipher            no encryption (used in tests)
 """
 
 from abc import ABC, abstractmethod
@@ -68,6 +70,70 @@ class PlaceholderKeywords:
     def matches(cls, text: Any) -> bool:
         lowered = str(text).strip().lower().strip(".")
         return lowered in cls._WORDS or lowered.startswith("none ")
+
+
+# ---------------------------------------------------------------------------
+# File encryption
+# ---------------------------------------------------------------------------
+
+
+class EncryptionKeyError(ValueError):
+    """Key is missing or invalid. reason: missing / not_base64 / wrong_length."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+class FileDecryptionError(Exception):
+    """File can't be decrypted. reason: no_key, not_encrypted, damaged or wrong_key.
+    The file is never changed, since the key might just be wrong."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+class FileCipher(ABC):
+    """Interface for encrypting data files. DataManager uses any FileCipher
+    without knowing which one (polymorphism)."""
+
+    # Header on every encrypted file, so we can tell it apart from plain JSON.
+    MAGIC = b"SMEENC1"
+
+    @property
+    @abstractmethod
+    def encrypts(self) -> bool: ...
+
+    @abstractmethod
+    def encrypt(self, plaintext: bytes) -> bytes:
+        """Returns the bytes to save to disk."""
+
+    @abstractmethod
+    def decrypt(self, stored: bytes) -> bytes:
+        """Returns the original JSON bytes. Raises FileDecryptionError."""
+
+    @classmethod
+    def is_encrypted(cls, stored: bytes) -> bool:
+        return stored.startswith(cls.MAGIC)
+
+
+class PlainFileCipher(FileCipher):
+    """FileCipher that doesn't encrypt. Used in tests."""
+
+    @property
+    def encrypts(self) -> bool:
+        return False
+
+    def encrypt(self, plaintext: bytes) -> bytes:
+        return plaintext
+
+    def decrypt(self, stored: bytes) -> bytes:
+        if self.is_encrypted(stored):
+            raise FileDecryptionError(
+                "no_key", "This file is encrypted, but no encryption key is in use."
+            )
+        return stored
 
 
 # ---------------------------------------------------------------------------
