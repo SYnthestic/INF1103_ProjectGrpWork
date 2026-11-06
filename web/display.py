@@ -5,7 +5,15 @@ templates."""
 
 from typing import Any
 
-from managers.logic_manager import RuleConfig
+from managers.logic_manager import (
+    EFS_GREEN_NAME,
+    EegAdvancedScheme,
+    EegBaseScheme,
+    EspScheme,
+    RuleConfig,
+    SmeCriteria,
+    SrgScheme,
+)
 
 # decision_status -> (heading shown to the user, tone used for the colour)
 DECISIONS = {
@@ -118,6 +126,77 @@ def application_rows(application: Any) -> list[tuple[str, str]]:
     return rows
 
 
+def percent(rate: float) -> str:
+    return f"{rate * 100:g}%"
+
+
+def grant_cards(config: RuleConfig) -> list[dict[str, Any]]:
+    """One card per grant the auditor decides on, for the home page. The
+    names, co-funding rates and caps come from the GrantScheme classes and
+    the conditions from the thresholds in use, so the page always matches
+    the rules the Logic Manager applies."""
+    advanced, base, esp, srg = EegAdvancedScheme(), EegBaseScheme(), EspScheme(), SrgScheme()
+    return [
+        {
+            "name": advanced.name,
+            "for": "Equipment and energy upgrades with a large lifetime carbon saving",
+            "funding": f"{percent(advanced.rate)} of your baseline annual energy spend",
+            "cap": money(advanced.cap),
+            "conditions": [
+                f"Lifetime carbon abatement above {config.eeg_advanced_min_tonnes:g} tonnes",
+                f"Energy reduction of at least {config.minimum_impact_pct:g}%",
+            ],
+        },
+        {
+            "name": base.name,
+            "for": "Fast track for upgrades that cut direct (Scope 1) emissions",
+            "funding": f"{percent(base.rate)} of your baseline annual energy spend",
+            "cap": money(base.cap),
+            "conditions": [
+                "The upgrade targets Scope 1 emissions (for example fuel burned on site or in vehicles)",
+                f"Energy reduction of at least {config.fast_track_min_pct:g}%",
+                f"Also matched with the {esp.name}",
+            ],
+        },
+        {
+            "name": esp.name,
+            "for": "Provisional support for energy upgrades in any emission scope",
+            "funding": f"{percent(esp.rate)} of your baseline annual energy spend",
+            "cap": money(esp.cap),
+            "conditions": [
+                "Any GHG scope (1, 2 or 3)",
+                f"Energy reduction of at least {config.provisional_min_pct:g}%",
+            ],
+        },
+        {
+            "name": srg.name,
+            "for": "Your company's first ESG / sustainability report",
+            "funding": f"{percent(srg.rate)} of the external reporting or advisory fee",
+            "cap": money(srg.cap),
+            "conditions": [
+                "Choose the ESG Reporting / Advisory proposal type",
+                "A quoted reporting or advisory fee above SGD 0",
+            ],
+        },
+    ]
+
+
+def eligibility_points(config: RuleConfig) -> list[str]:
+    """What every applicant must meet, and what happens near the thresholds."""
+    sme = SmeCriteria
+    return [
+        f"Be an SME: at least {sme.MIN_LOCAL_EQUITY_PCT:g}% local shareholding and "
+        f"annual group revenue of at most {money(sme.MAX_REVENUE_SGD)}.",
+        "Use brand-new equipment: second-hand, refurbished or fossil-fuel "
+        "modifications are sent for an exclusion review.",
+        f"Equipment proposals with an energy reduction from {config.minimum_impact_pct:g}% "
+        f"to under {config.provisional_min_pct:g}% are sent for manual review; below "
+        f"{config.minimum_impact_pct:g}% they are not funded.",
+        "Equipment subsidies are never more than the retrofit cost you enter.",
+        f"Companies that are not SMEs are pointed to the {EFS_GREEN_NAME} instead.",
+    ]
+
+
 FILTERS = {
     "decision_label": decision_label,
     "decision_tone": decision_tone,
@@ -125,6 +204,8 @@ FILTERS = {
 }
 HELPERS = {
     "ai_rows": ai_rows,
+    "grant_cards": grant_cards,
+    "eligibility_points": eligibility_points,
     "threshold_rows": threshold_rows,
     "application_rows": application_rows,
 }

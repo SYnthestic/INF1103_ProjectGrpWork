@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Find out which green grant your upgrade qualifies for</h1>
+  <p>Describe your energy or sustainability upgrade in your own words. The AI classifies it, then
+     the auditor applies the grant rules below and tells you which grant you match, how much
+     co-funding to expect, and why.</p>
+  <div class="actions">
+    {% if session.username %}
+      <a class="button" href="{{ url_for('pages.new_audit') }}">Start a new audit</a>
+      <a class="button secondary" href="{{ url_for('pages.history') }}">My past audits</a>
+    {% else %}
+      <a class="button" href="{{ url_for('pages.login') }}">Log in to start an audit</a>
+      <a class="button secondary" href="{{ url_for('pages.register') }}">Create an account</a>
+    {% endif %}
+  </div>
+</section>
+
+<h2 class="section-title">Available grants</h2>
+<div class="grants">
+  {% for grant in grant_cards(config) %}
+  <article class="card grant">
+    <h3>{{ grant.name }}</h3>
+    <p class="muted">{{ grant.for }}</p>
+    <div class="facts">
+      <div><span>Co-funding</span><strong>{{ grant.funding }}</strong></div>
+      <div><span>Up to</span><strong>{{ grant.cap }}</strong></div>
+    </div>
+    <h4>You qualify when</h4>
+    <ul class="points">{% for c in grant.conditions %}<li>{{ c }}</li>{% endfor %}</ul>
+  </article>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>Who can apply</h2>
+  <ul class="points">{% for p in eligibility_points(config) %}<li>{{ p }}</li>{% endfor %}</ul>
+  <p class="muted small">These are the rules this auditor applies, with the thresholds currently set by an
+     administrator. They are a guide only: check each scheme's official terms before you apply.</p>
+</div>
+{% endblock %}

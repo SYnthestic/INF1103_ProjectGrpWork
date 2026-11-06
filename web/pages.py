@@ -108,8 +108,11 @@ def back_to_records(message: str):
 
 @bp.get("/")
 def home():
-    target = "pages.history" if "username" in flask_session else "pages.login"
-    return redirect(url_for(target))
+    """The home page (the logo links here): the grants the auditor checks,
+    with the conditions currently in force. Open to everyone."""
+    logic = current_app.extensions["logic"]
+    service.use_saved_rules(logic, current_app.extensions["data"])
+    return render_template("home.html", config=logic.rule_config)
 
 
 @bp.route("/register", methods=["GET", "POST"])
