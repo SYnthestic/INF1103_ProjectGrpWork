@@ -1,11 +1,36 @@
 from flask import current_app
 from flask import session as flask_session
 
+from managers.io_manager import InputValidator
 from models import ApplicationRecord
 
 REQUIRED_TEXT = ("Company Name", "Company Industry", "Proposal Narrative")
 REQUIRED_NUMBERS = ("Company Total Revenue", "Total Employees", "Local Equity")
 
+
+
+def account_problem(username, password) -> str | None:
+    """Why a new web account cannot be created with these details, or None.
+    Uses the same rules as the terminal app (InputValidator), so an account
+    made on the web works in the terminal and the other way round."""
+    if not isinstance(username, str) or not isinstance(password, str):
+        return "Username and password must be text."
+    if not username or not password:
+        return "Username and password are required."
+    if not InputValidator.is_valid_username(username):
+        return (
+            f"Username must be {InputValidator.USERNAME_MIN_LEN}-"
+            f"{InputValidator.USERNAME_MAX_LEN} characters: letters, digits or _."
+        )
+    problems = InputValidator.password_problems(password)
+    if problems:
+        return "Password must " + ", ".join(problems) + "."
+    return None
+
+
+def clean_username(value) -> str:
+    """Usernames are not case-sensitive, as in the terminal app."""
+    return value.strip().lower() if isinstance(value, str) else ""
 
 
 def username_is_taken(data, logic, username: str) -> bool:

@@ -12,12 +12,12 @@ def register():
     if "username" in flask_session:
         return jsonify(error="already logged in; log out first"), 409
     body = request.get_json(silent=True) or {}
-    username, password = body.get("username", ""), body.get("password", "")
+    password = body.get("password", "")
+    username = service.clean_username(body.get("username", ""))
     data, logic = current_app.extensions["data"], current_app.extensions["logic"]
-    if not username or not password:
-        return jsonify(error="username and password required"), 400
-    if not data.is_safe_username(username):
-        return jsonify(error="username must be 1-64 chars of a-z, 0-9, _"), 400
+    problem = service.account_problem(username, password)
+    if problem:
+        return jsonify(error=problem), 400
     if service.username_is_taken(data, logic, username):
         return jsonify(error="username taken"), 409
     if not data.save_new_user(logic.build_new_user_record(username, password)):
@@ -30,7 +30,8 @@ def login():
     if "username" in flask_session:
         return jsonify(error="already logged in; log out first"), 409
     body = request.get_json(silent=True) or {}
-    username, password = body.get("username", ""), body.get("password", "")
+    username = service.clean_username(body.get("username", ""))
+    password = body.get("password", "")
     data, logic = current_app.extensions["data"], current_app.extensions["logic"]
     if logic.verify_password(password, data.get_user(username)):
         service.start_session(username)

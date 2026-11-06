@@ -8,9 +8,15 @@ from managers.ai.ai_manager import AIManager
 
 def create_app(config: dict | None = None) -> Flask:
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
+    # The secret key signs the login cookie. Without FLASK_SECRET_KEY a random
+    # key is made at every start (never a fixed one in the code, which anyone
+    # could read and use to forge a login). Logins end on restart anyway.
+    secret = os.environ.get("FLASK_SECRET_KEY")
+    app.config["SECRET_KEY"] = secret or secrets.token_hex(32)
     if config:
         app.config.update(config)
+    if not secret and not app.config.get("TESTING"):
+        app.logger.warning("FLASK_SECRET_KEY is not set; using a random key for this run.")
 
     from flask import request
     from flask import session as flask_session
@@ -62,4 +68,6 @@ def create_app(config: dict | None = None) -> Flask:
 
 
 if __name__ == "__main__":
-    create_app().run(debug=True)
+    # The debugger lets anyone who can reach the page run code on this
+    # machine, so it is only on when asked for: FLASK_DEBUG=1.
+    create_app().run(debug=os.environ.get("FLASK_DEBUG") == "1")

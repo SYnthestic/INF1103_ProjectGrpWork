@@ -111,14 +111,13 @@ def register():
         flash("You are already logged in. Log out first to switch accounts.")
         return redirect(url_for("pages.history"))
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        username = service.clean_username(request.form.get("username", ""))
         password = request.form.get("password", "")
         data = current_app.extensions["data"]
         logic = current_app.extensions["logic"]
-        if not data.is_safe_username(username):
-            flash("Username must be 1-64 characters: a-z, 0-9 or _.")
-        elif not password:
-            flash("Password is required.")
+        problem = service.account_problem(username, password)
+        if problem:
+            flash(problem)
         elif service.username_is_taken(data, logic, username):
             flash("That username is taken.")
         elif not data.save_new_user(logic.build_new_user_record(username, password)):
@@ -135,7 +134,7 @@ def login():
         flash("You are already logged in. Log out first to switch accounts.")
         return redirect(url_for("pages.history"))
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        username = service.clean_username(request.form.get("username", ""))
         password = request.form.get("password", "")
         data = current_app.extensions["data"]
         logic = current_app.extensions["logic"]
