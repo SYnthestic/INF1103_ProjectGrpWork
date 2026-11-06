@@ -1,12 +1,37 @@
 {% extends "base.html" %}
+{% from "_results.html" import decision_panel, rows_table %}
+{% block title %}Audit #{{ audit.audit_id }} - SME Green Grant Auditor{% endblock %}
 {% block content %}
-<h1>Audit #{{ audit.audit_id }}: {{ audit.application.get('Company Name', 'N/A') }}</h1>
-<p>{{ audit.timestamp }}</p>
-<p>
-  <a href="{{ url_for('pages.audit_pdf', audit_id=audit.audit_id) }}">Save as PDF</a> |
-  <a href="{{ url_for('pages.history') }}">Back to history</a>
-</p>
-<h2>Decision</h2><pre>{{ audit.result | tojson(indent=2) }}</pre>
-<h2>AI audit</h2><pre>{{ audit.ai_audit | tojson(indent=2) }}</pre>
-<h2>Application</h2><pre>{{ audit.application | tojson(indent=2) }}</pre>
+<h1>Audit #{{ audit.audit_id }}: {{ application.get('Company Name', 'N/A') }}</h1>
+<p class="muted">Audited {{ (audit.timestamp or '') | replace('T', ' at ') }}</p>
+<div class="actions">
+  <a class="button" href="{{ url_for('pages.audit_pdf', audit_id=audit.audit_id) }}">Save as PDF</a>
+  <a class="button secondary" href="{{ url_for('pages.history') }}">Back to history</a>
+</div>
+
+<div class="card">
+  {{ decision_panel(audit.result) }}
+</div>
+
+<div class="card">
+  <h2>AI audit</h2>
+  {{ rows_table(ai_rows(audit.ai_audit), 'No AI audit was saved.') }}
+</div>
+
+<div class="card">
+  <h2>Application</h2>
+  {{ rows_table(application_rows(application)) }}
+</div>
+
+{% if audit.rules_used %}
+<div class="card">
+  <h2>Thresholds used for this decision</h2>
+  {{ rows_table(threshold_rows(audit.rules_used)) }}
+</div>
+{% endif %}
+
+<details>
+  <summary>Raw data (JSON)</summary>
+  <pre>{{ audit | tojson(indent=2) }}</pre>
+</details>
 {% endblock %}

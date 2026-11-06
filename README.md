@@ -9,7 +9,7 @@ The program is object-oriented. The four managers from Part 1 are still the four
 | File | Main classes | Role |
 |---|---|---|
 | `app.py` | `create_app()` | **Flask entry point.** Builds the web app and hands it the same AI, Logic and Data managers the terminal app uses |
-| `web/` | blueprints, `Workspaces`, `service` | **Web layer.** Routes (`pages.py` for HTML pages, `auth.py` and `audits.py` for the JSON API), the shared audit function, per-user in-memory records, and the templates in `web/templates/`. It contains no business logic, only calls into the managers |
+| `web/` | blueprints, `Workspaces`, `service` | **Web layer.** Routes (`pages.py` for HTML pages, `auth.py` and `audits.py` for the JSON API), the shared audit function, per-user in-memory records, `display.py` (how decisions, money and the AI audit are shown) and the templates in `web/templates/`. It contains no business logic, only calls into the managers |
 | `main.py` | `Application` | The controller: runs the login screen and menu and passes data between the managers. The only file that knows about all four. Managers are handed to it, so tests can pass in doubles |
 | `session.py` | `Session` | What one logged-in user is working on (records in memory, the current file name, whether there are unsaved changes). Created at login and discarded at logout |
 | `managers/io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
@@ -223,7 +223,7 @@ Then open http://localhost:5000/. On Mac/Linux replace the `-v` path with `"$HOM
 | Records | Lists the records in memory, with Edit and Delete buttons | Options 4, 5, 6 |
 | Save to JSON / Pull from JSON | Saves to or loads from your private `records/<username>/` folder. A blank file name cancels, and loading over unsaved records asks first | Options 2, 3 |
 | Run AI Manager (only) / Run Logic Manager (only) | Re-runs one step on the latest record | Options 7, 8 |
-| History | Lists your past audits, opens one in full, and downloads it as a PDF | Option 9 |
+| History | Lists your past audits with a coloured decision and the subsidy. Opening one shows the decision in plain English (green approved, amber review, red rejected) with the subsidy, matched schemes, reasons and recommendations, then the AI audit, the application and the thresholds it was decided with. Each can be downloaded as a PDF | Option 9 |
 | Log out | Warns if you have unsaved records and lets you save or leave without saving | Options 0 and 10 |
 
 Things that differ from the terminal app:
@@ -352,7 +352,7 @@ docker run --rm sme-grant-auditor python -m pytest
 python -m flask --app app run --debug
 ```
 
-The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, `test_rule_config.py` for the adjustable thresholds, `test_admin.py` for the admin console, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete), `test_pdf.py` (PDF download), `test_web_admin.py` (the web pages respect the admin name and the saved thresholds) and `test_web_security.py` (the terminal's account rules, no fixed secret key, debugger off by default). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
+The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, `test_rule_config.py` for the adjustable thresholds, `test_admin.py` for the admin console, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete), `test_pdf.py` (PDF download), `test_web_admin.py` (the web pages respect the admin name and the saved thresholds) and `test_web_security.py` (the terminal's account rules, no fixed secret key, debugger off by default) and `test_web_display.py` (how decisions are shown). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
 
 ---
 

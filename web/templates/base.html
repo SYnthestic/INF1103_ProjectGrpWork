@@ -2,37 +2,103 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Grant Audit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SME Green Grant Auditor{% endblock %}</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
-    label { display: block; margin-top: .8rem; }
+    :root {
+      --bg: #f4f6f5; --surface: #ffffff; --text: #1d2621; --muted: #5d6b63;
+      --border: #dde3df; --brand: #1f6f4a; --brand-dark: #165537; --brand-soft: #e5f2eb;
+      --approved: #1f7a4d; --approved-bg: #e3f4ea;
+      --review: #8a5a00; --review-bg: #fff4d9;
+      --rejected: #b3261e; --rejected-bg: #fde8e6;
+      --neutral: #44515a; --neutral-bg: #eef1f3;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+           font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    a { color: var(--brand); }
+    header.site { background: var(--brand); color: #fff; }
+    header.site .bar { max-width: 960px; margin: 0 auto; padding: .75rem 1rem;
+                       display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.25rem; }
+    header.site .brand { font-weight: 700; color: #fff; text-decoration: none; margin-right: auto; }
+    header.site nav { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; }
+    header.site nav a { color: #fff; text-decoration: none; padding: .25rem .4rem; border-radius: 6px; }
+    header.site nav a:hover { background: rgba(255,255,255,.15); }
+    header.site nav form { display: inline; }
+    header.site nav button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.6);
+                             padding: .3rem .7rem; }
+    main { max-width: 960px; margin: 1.5rem auto 3rem; padding: 0 1rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+    h1 { font-size: 1.6rem; margin: 0 0 1rem; line-height: 1.25; }
+    h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
+    .muted { color: var(--muted); }
+    label { display: block; margin-top: .9rem; font-weight: 600; font-size: .95rem; }
+    input, select, textarea { width: 100%; margin-top: .3rem; padding: .55rem .65rem; font: inherit;
+                              border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+    input[type=checkbox] { width: auto; margin-right: .4rem; }
+    button, .button { display: inline-block; font: inherit; font-weight: 600; cursor: pointer;
+                      padding: .5rem 1rem; border-radius: 8px; border: 1px solid var(--brand);
+                      background: var(--brand); color: #fff; text-decoration: none; }
+    button:hover, .button:hover { background: var(--brand-dark); }
+    .button.secondary, button.secondary { background: #fff; color: var(--brand); }
+    form.inline { display: inline; }
+    .flash { background: var(--brand-soft); border: 1px solid #bcdcca; padding: .7rem 1rem;
+             margin: 0 0 1rem; border-radius: 8px; }
     .is-hidden { display: none; }
     [hidden] { display: none !important; }
-    input, select, textarea { width: 100%; padding: .4rem; box-sizing: border-box; }
-    .flash { background: #fff3cd; padding: .6rem; margin: 1rem 0; border-radius: 4px; }
-    nav a, nav button { margin-right: 1rem; }
-    pre { background: #f4f4f4; padding: .8rem; overflow-x: auto; }
     table { border-collapse: collapse; width: 100%; }
-td, th { border-bottom: 1px solid #ddd; padding: .4rem; text-align: left; }
-form.inline { display: inline; }
-    
+    td, th { border-bottom: 1px solid var(--border); padding: .55rem .5rem; text-align: left; vertical-align: top; }
+    th { font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+    table.kv th { text-transform: none; letter-spacing: 0; font-size: .95rem; width: 38%; color: var(--text); }
+    .table-wrap { overflow-x: auto; }
+    pre { background: #f4f4f4; padding: .8rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+    td.nowrap { white-space: nowrap; }
+    .hint { font-weight: 400; font-size: .85rem; color: var(--muted); }
+    .badge { display: inline-block; padding: .15rem .55rem; border-radius: 999px; font-size: .85rem;
+             font-weight: 600; white-space: nowrap; }
+    .tone-approved { color: var(--approved); background: var(--approved-bg); }
+    .tone-review { color: var(--review); background: var(--review-bg); }
+    .tone-rejected { color: var(--rejected); background: var(--rejected-bg); }
+    .tone-neutral { color: var(--neutral); background: var(--neutral-bg); }
+    .decision { border-left: 6px solid currentColor; border-radius: var(--radius); padding: 1rem 1.25rem;
+                margin-bottom: 1rem; }
+    .decision .status { font-size: 1.35rem; font-weight: 700; margin: 0; }
+    .decision .code { font-size: .8rem; opacity: .8; font-family: ui-monospace, monospace; }
+    .facts { display: flex; flex-wrap: wrap; gap: .75rem 2rem; margin-top: .75rem; color: var(--text); }
+    .facts div span { display: block; font-size: .8rem; color: var(--muted); text-transform: uppercase; }
+    .facts div strong { font-size: 1.15rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem 1.5rem; }
+    ul.points { margin: .25rem 0 0; padding-left: 1.2rem; }
+    ul.points li { margin-bottom: .35rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0 1.25rem; }
+    details summary { cursor: pointer; color: var(--muted); }
   </style>
 </head>
 <body>
-  <nav>
-    {% if session.username %}
-      <a href="{{ url_for('pages.new_audit') }}">New audit</a>
-      <a href="{{ url_for('pages.records_page') }}">Records</a>
-      <a href="{{ url_for('pages.history') }}">History</a>
-      <form action="{{ url_for('pages.logout') }}" method="post" style="display:inline">
-        <button>Log out ({{ session.username }})</button>
-      </form>
-    {% else %}
-      <a href="{{ url_for('pages.login') }}">Log in</a>
-      <a href="{{ url_for('pages.register') }}">Register</a>
-    {% endif %}
-  </nav>
-  {% for message in get_flashed_messages() %}<div class="flash">{{ message }}</div>{% endfor %}
-  {% block content %}{% endblock %}
+  <header class="site">
+    <div class="bar">
+      <a class="brand" href="{{ url_for('pages.home') }}">🌱 SME Green Grant Auditor</a>
+      <nav>
+        {% if session.username %}
+          <a href="{{ url_for('pages.new_audit') }}">New audit</a>
+          <a href="{{ url_for('pages.records_page') }}">Records</a>
+          <a href="{{ url_for('pages.history') }}">History</a>
+          <form action="{{ url_for('pages.logout') }}" method="post">
+            <button>Log out ({{ session.username }})</button>
+          </form>
+        {% else %}
+          <a href="{{ url_for('pages.login') }}">Log in</a>
+          <a href="{{ url_for('pages.register') }}">Register</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+  <main>
+    {% for message in get_flashed_messages() %}<div class="flash">{{ message }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
 </body>
 </html>

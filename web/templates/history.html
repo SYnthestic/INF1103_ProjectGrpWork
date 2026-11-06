@@ -1,13 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Past audits</h1>
-{% if not audits %}<p>No audits yet. <a href="{{ url_for('pages.new_audit') }}">Create one</a>.</p>{% endif %}
-<ul>
-{% for a in audits %}
-  <li><a href="{{ url_for('pages.detail', audit_id=a.audit_id) }}">
-    #{{ a.audit_id }} {{ a.application.get('Company Name', 'N/A') }}</a>
-    ({{ a.timestamp }}) {{ (a.result or {}).get('decision_status', '') }}
-    - <a href="{{ url_for('pages.audit_pdf', audit_id=a.audit_id) }}">PDF</a></li>
-{% endfor %}
-</ul>
+{% if not audits %}
+<div class="card"><p>No audits yet. <a href="{{ url_for('pages.new_audit') }}">Create one</a>.</p></div>
+{% else %}
+<div class="card table-wrap">
+<table>
+  <tr><th>#</th><th>Company</th><th>Date</th><th>Decision</th><th>Subsidy</th><th></th></tr>
+  {% for a in audits %}
+  {% set result = a.result or {} %}
+  <tr>
+    <td>{{ a.audit_id }}</td>
+    <td><a href="{{ url_for('pages.detail', audit_id=a.audit_id) }}">{{ a.application.get('Company Name', 'N/A') }}</a></td>
+    <td class="nowrap">{{ (a.timestamp or '')[:10] }}</td>
+    <td><span class="badge tone-{{ result.get('decision_status') | decision_tone }}">{{ result.get('decision_status') | decision_label }}</span></td>
+    <td class="nowrap">{{ result.get('approved_subsidy_sgd') | money }}</td>
+    <td><a href="{{ url_for('pages.audit_pdf', audit_id=a.audit_id) }}">PDF</a></td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
 {% endblock %}

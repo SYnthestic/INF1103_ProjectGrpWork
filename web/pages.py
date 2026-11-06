@@ -8,12 +8,19 @@ from flask import (Blueprint, current_app, flash, redirect, render_template,
                    request, send_from_directory, url_for)
 from flask import session as flask_session
 
-from web import service
+from web import display, service
 
 
 OTHER_GRANT = "5. Others"
 OTHER_TEXT_MAX_LEN = 60   # TODO: copy the real max length from IOManager so the CLI and web offer the same choices.
 bp = Blueprint("pages", __name__, template_folder="templates")
+
+
+@bp.record_once
+def add_display_helpers(state) -> None:
+    """Lets the templates show decisions, money and labelled rows (web/display.py)."""
+    state.app.jinja_env.filters.update(display.FILTERS)
+    state.app.jinja_env.globals.update(display.HELPERS)
 
 # TODO: copy the real lists from IOManager so the CLI and web offer the same choices.
 PROPOSAL_TYPES = ["Equipment / Energy Upgrade", "ESG Reporting / Advisory"]
@@ -237,7 +244,8 @@ def detail(audit_id: int):
     audit = find_audit(audit_id)
     if audit is None:
         return render_template("notfound.html"), 404
-    return render_template("detail.html", audit=audit)
+    application = ApplicationRecord(audit.get("application") or {}).flat
+    return render_template("detail.html", audit=audit, application=application)
 
 
 @bp.get("/history/<int:audit_id>/pdf")
@@ -411,7 +419,7 @@ def run_ai():
     if ai.ai_call_failed(audit):
         return back_to_records("The AI call failed. Please try again.")
     ws.ai_audit = audit
-    return render_template("result.html", title="AI audit",
+    return render_template("result.html", title="AI audit", kind="ai",
                            company=wrapped.company_name, data=audit)
 
 
@@ -431,5 +439,5 @@ def run_logic():
     except Exception:
         current_app.logger.exception("Grant evaluation raised")
         return back_to_records("The grant evaluation failed.")
-    return render_template("result.html", title="Grant decision",
+    return render_template("result.html", title="Grant decision", kind="decision",
                            company=wrapped.company_name, data=result)

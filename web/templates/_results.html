@@ -1,0 +1,49 @@
+{# Shared pieces for showing a grant decision and an AI audit. #}
+
+{% macro decision_panel(result) %}
+{% set result = result or {} %}
+{% set status = result.get('decision_status') %}
+<section class="decision tone-{{ status | decision_tone }}" aria-label="Grant decision">
+  <p class="status">{{ status | decision_label }}</p>
+  {% if status %}<div class="code">{{ status }}</div>{% endif %}
+  <div class="facts">
+    {% if 'approved_subsidy_sgd' in result %}
+    <div><span>Approved subsidy</span><strong>{{ result.get('approved_subsidy_sgd') | money }}</strong></div>
+    {% endif %}
+    {% if 'is_sme' in result %}
+    <div><span>SME</span><strong>{{ 'Yes' if result.get('is_sme') else 'No' }}</strong></div>
+    {% endif %}
+    {% if 'audit_passed' in result %}
+    <div><span>Audit passed</span><strong>{{ 'Yes' if result.get('audit_passed') else 'No' }}</strong></div>
+    {% endif %}
+  </div>
+</section>
+<div class="grid">
+  {% if result.get('matched_schemes') %}
+  <div>
+    <h2>Matched schemes</h2>
+    <ul class="points">{% for s in result.get('matched_schemes') %}<li>{{ s }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if result.get('reasons') %}
+  <div>
+    <h2>Why</h2>
+    <ul class="points">{% for r in result.get('reasons') %}<li>{{ r }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if result.get('recommendations') %}
+  <div>
+    <h2>Recommendations</h2>
+    <ul class="points">{% for r in result.get('recommendations') %}<li>{{ r }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro rows_table(rows, empty='Nothing to show.') %}
+{% if rows %}
+<div class="table-wrap"><table class="kv">
+  {% for label, value in rows %}<tr><th scope="row">{{ label }}</th><td>{{ value }}</td></tr>{% endfor %}
+</table></div>
+{% else %}<p class="muted">{{ empty }}</p>{% endif %}
+{% endmacro %}

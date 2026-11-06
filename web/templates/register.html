@@ -2,8 +2,10 @@
 {% block content %}
 <h1>Register</h1>
 <form method="post">
-  <label>Username <input name="username" required></label>
-  <label>Password <input name="password" type="password" required></label>
+  <label>Username <span class="hint">3-20 letters, digits or _ (not case-sensitive)</span>
+    <input name="username" required minlength="3" maxlength="20" autocomplete="username"></label>
+  <label>Password <span class="hint">8-64 characters, with at least one letter and one digit</span>
+    <input name="password" type="password" required minlength="8" maxlength="64" autocomplete="new-password"></label>
   <p><button>Register</button></p>
 </form>
 {% endblock %}
