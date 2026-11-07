@@ -78,13 +78,31 @@
     .hero { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
             padding: 1.5rem; margin-bottom: 1.5rem; }
     .hero p { max-width: 65ch; }
+    .hero { display: grid; grid-template-columns: 1fr; gap: 1.5rem; align-items: center; }
+   .hero-img { width: 100%; height: auto; border-radius: var(--radius); }
+   @media (max-width: 720px) { .hero { grid-template-columns: 1fr; } }
     .section-title { margin: 0 0 .75rem; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.step { display: flex; gap: .75rem; align-items: flex-start; }
+.step p { margin: .15rem 0 0; }
+.step-num { flex: none; width: 2rem; height: 2rem; border-radius: 50%; background: var(--brand); color: #fff;
+  .step-num svg { width: 1.1rem; height: 1.1rem; }
+            display: flex; align-items: center; justify-content: center; font-weight: 600; }
     .grants { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
     .grants .card { margin-bottom: 0; border-top: 4px solid var(--brand); }
     .grant h3 { margin: 0 0 .25rem; font-size: 1.1rem; }
     .grant h4 { margin: 1rem 0 .25rem; font-size: .95rem; }
     .grant .facts { margin-top: .5rem; }
     .small { font-size: .85rem; }
+  .auth-card { max-width: none; margin: 1.5rem 0; background: var(--surface); border: 1px solid var(--border);
+             border-radius: var(--radius); padding: 1.75rem; }
+.auth-card h1 { margin: 0 0 .25rem; }
+.auth-card label { display: block; font-weight: 600; font-size: .9rem; margin: 1rem 0 .3rem; }
+.auth-card input[type=text], .auth-card input[type=password] { width: 100%; box-sizing: border-box; }
+.auth-card .hint { margin: .3rem 0 0; }
+.auth-card .show-pw { display: flex; align-items: center; gap: .4rem; font-weight: 400; margin-top: .6rem; color: var(--muted); }
+.auth-card button { width: 100%; margin-top: 1rem; }
+.auth-alt { text-align: center; margin: 1rem 0 0; font-size: .9rem; }
   </style>
 </head>
 <body>
