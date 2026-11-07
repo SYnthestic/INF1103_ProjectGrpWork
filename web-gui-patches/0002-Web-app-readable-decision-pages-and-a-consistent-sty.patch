@@ -1,0 +1,745 @@
+From 56ad05a578d4cebc16bd08fe8128f28598a37d6b Mon Sep 17 00:00:00 2001
+From: Timothy Tan <2604749@sit.singaporetech.edu.sg>
+Date: Fri, 6 Nov 2026 18:43:07 +0800
+Subject: [PATCH 2/2] Web app: readable decision pages and a consistent style
+
+- The audit page shows the decision in plain English with a colour for the
+  outcome (green approved, amber review, red rejected), the approved subsidy,
+  SME and audit-passed flags, and the matched schemes, reasons and
+  recommendations as lists. The AI audit, the application and the thresholds
+  the decision used are labelled tables; the raw JSON is still there, folded.
+- History lists each audit with a coloured decision badge and the subsidy.
+- 'Run AI/Logic Manager (only)' use the same panel and table.
+- web/display.py holds the presentation helpers (labels, tones, money,
+  labelled rows); it decides nothing.
+- One stylesheet in base.html: header bar, cards, buttons, form fields and
+  tables, readable on a phone. The register page states the account rules.
+- Tests in tests/test_web_display.py.
+---
+ README.md                   |   6 +-
+ tests/test_web_display.py   | 141 ++++++++++++++++++++++++++++++++++++
+ web/display.py              | 130 +++++++++++++++++++++++++++++++++
+ web/pages.py                |  16 +++-
+ web/templates/_results.html |  49 +++++++++++++
+ web/templates/base.html     | 118 +++++++++++++++++++++++-------
+ web/templates/detail.html   |  45 +++++++++---
+ web/templates/history.html  |  31 +++++---
+ web/templates/login.html    |   4 +-
+ web/templates/register.html |   6 +-
+ web/templates/result.html   |  15 +++-
+ 11 files changed, 500 insertions(+), 61 deletions(-)
+ create mode 100644 tests/test_web_display.py
+ create mode 100644 web/display.py
+ create mode 100644 web/templates/_results.html
+
+diff --git a/README.md b/README.md
+index 1f6ee11..8b01291 100644
+--- a/README.md
++++ b/README.md
+@@ -9,7 +9,7 @@ The program is object-oriented. The four managers from Part 1 are still the four
+ | File | Main classes | Role |
+ |---|---|---|
+ | `app.py` | `create_app()` | **Flask entry point.** Builds the web app and hands it the same AI, Logic and Data managers the terminal app uses |
+-| `web/` | blueprints, `Workspaces`, `service` | **Web layer.** Routes (`pages.py` for HTML pages, `auth.py` and `audits.py` for the JSON API), the shared audit function, per-user in-memory records, and the templates in `web/templates/`. It contains no business logic, only calls into the managers |
++| `web/` | blueprints, `Workspaces`, `service` | **Web layer.** Routes (`pages.py` for HTML pages, `auth.py` and `audits.py` for the JSON API), the shared audit function, per-user in-memory records, `display.py` (how decisions, money and the AI audit are shown) and the templates in `web/templates/`. It contains no business logic, only calls into the managers |
+ | `main.py` | `Application` | The controller: runs the login screen and menu and passes data between the managers. The only file that knows about all four. Managers are handed to it, so tests can pass in doubles |
+ | `session.py` | `Session` | What one logged-in user is working on (records in memory, the current file name, whether there are unsaved changes). Created at login and discarded at logout |
+ | `managers/io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
+@@ -223,7 +223,7 @@ Then open http://localhost:5000/. On Mac/Linux replace the `-v` path with `"$HOM
+ | Records | Lists the records in memory, with Edit and Delete buttons | Options 4, 5, 6 |
+ | Save to JSON / Pull from JSON | Saves to or loads from your private `records/<username>/` folder. A blank file name cancels, and loading over unsaved records asks first | Options 2, 3 |
+ | Run AI Manager (only) / Run Logic Manager (only) | Re-runs one step on the latest record | Options 7, 8 |
+-| History | Lists your past audits, opens one in full, and downloads it as a PDF | Option 9 |
++| History | Lists your past audits with a coloured decision and the subsidy. Opening one shows the decision in plain English (green approved, amber review, red rejected) with the subsidy, matched schemes, reasons and recommendations, then the AI audit, the application and the thresholds it was decided with. Each can be downloaded as a PDF | Option 9 |
+ | Log out | Warns if you have unsaved records and lets you save or leave without saving | Options 0 and 10 |
+ 
+ Things that differ from the terminal app:
+@@ -352,7 +352,7 @@ docker run --rm sme-grant-auditor python -m pytest
+ python -m flask --app app run --debug
+ ```
+ 
+-The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, `test_rule_config.py` for the adjustable thresholds, `test_admin.py` for the admin console, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete), `test_pdf.py` (PDF download), `test_web_admin.py` (the web pages respect the admin name and the saved thresholds) and `test_web_security.py` (the terminal's account rules, no fixed secret key, debugger off by default). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
++The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, `test_rule_config.py` for the adjustable thresholds, `test_admin.py` for the admin console, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete), `test_pdf.py` (PDF download), `test_web_admin.py` (the web pages respect the admin name and the saved thresholds) and `test_web_security.py` (the terminal's account rules, no fixed secret key, debugger off by default) and `test_web_display.py` (how decisions are shown). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
+ 
+ ---
+ 
+diff --git a/tests/test_web_display.py b/tests/test_web_display.py
+new file mode 100644
+index 0000000..1994c02
+--- /dev/null
++++ b/tests/test_web_display.py
+@@ -0,0 +1,141 @@
++"""The web pages show grant decisions in a readable way: a plain-English
++heading coloured by outcome, the subsidy, reasons and recommendations as
++lists, and the AI audit and thresholds as labelled tables."""
++
++import pytest
++
++from web import display
++
++USER = {"username": "tester", "password": "Test1234!"}
++RECORD = {
++    "Company Name": "Apex <Logistics>",
++    "Company Industry": "Logistics",
++    "Company Total Revenue": "8450000",
++    "Total Employees": "38",
++    "Local Equity": "85",
++    "Proposal Type": "Equipment / Energy Upgrade",
++    "Sustainability Grant": "1. Energy Efficiency Grant (EEG) -Base Tier",
++    "Proposal Narrative": "Electric vans",
++    "Baseline Energy Expenditure": "120000",
++    "Estimated Retrofit Cost": "150000",
++}
++DECISION = {
++    "is_sme": True,
++    "decision_status": "PRE_APPROVED_TIER_1",
++    "reasons": ["Proposal targets Scope-1 emissions.", "Meets <the> 20% threshold."],
++    "recommendations": ["Keep receipts."],
++    "matched_schemes": ["Energy Efficiency Grant (EEG) - Base Tier"],
++    "approved_subsidy_sgd": 30000.0,
++    "audit_passed": True,
++}
++AI_AUDIT = {
++    "scope_category": "Scope-1",
++    "primary_intervention_type": "Commercial Fleet Electrification",
++    "estimated_energy_reduction_pct": 28.0,
++    "estimated_lifetime_abatement_tonnes": 0.0,
++    "detected_exclusion_keywords": [],
++    "ai_reasoning_summary": "Diesel to electric.",
++    "ai_status": "ok",
++}
++
++
++@pytest.fixture
++def audited(app, client):
++    """Logged in, with one audit whose decision is DECISION."""
++    app.extensions["ai"].get_ai_response = lambda narrative, progress=None: dict(AI_AUDIT)
++    app.extensions["logic"].evaluate_grant_application = lambda profile, ai: dict(DECISION)
++    client.post("/register", data=USER)
++    client.post("/login", data=USER)
++    client.post("/new", data=RECORD)
++    return client
++
++
++# ---- Helpers in web/display.py ------------------------------------------------
++
++
++@pytest.mark.parametrize(
++    "status, label, tone",
++    [
++        ("PRE_APPROVED_TIER_1", "Pre-approved: EEG Base Tier", "approved"),
++        ("PROVISIONAL_APPROVAL_TIER_2", "Provisionally approved: ESP", "approved"),
++        ("MANUAL_REVIEW", "Needs manual review", "review"),
++        ("MANUAL_EXCLUSION_REVIEW", "Exclusion review needed", "review"),
++        ("REJECT_NON_SME", "Rejected: not an SME", "rejected"),
++        ("REJECT_LOW_IMPACT", "Rejected: energy reduction too low", "rejected"),
++        ("SOMETHING_NEW", "SOMETHING_NEW", "neutral"),
++        (None, "No decision", "neutral"),
++    ],
++)
++def test_every_decision_has_a_heading_and_a_tone(status, label, tone):
++    assert display.decision_label(status) == label
++    assert display.decision_tone(status) == tone
++
++
++def test_money_and_numbers_are_formatted():
++    assert display.money(30000) == "SGD 30,000.00"
++    assert display.money(None) == "-" and display.money(True) == "-"
++    assert display.number(28.0, "%") == "28%"
++    assert display.number(12.5, "%") == "12.5%"
++    assert display.number(350.0, "tonnes") == "350 tonnes"
++
++
++def test_ai_rows_are_labelled_in_a_fixed_order_and_keep_extra_fields():
++    rows = display.ai_rows(dict(AI_AUDIT, model_note="extra"))
++    labels = [label for label, _ in rows]
++    assert labels[:3] == ["GHG scope", "Intervention", "Estimated energy reduction"]
++    assert ("Exclusion keywords", "None") in rows
++    assert ("Model note", "extra") in rows
++    assert "ai_status" not in str(rows)
++    assert display.ai_rows(None) == [] and display.ai_rows("x") == []
++
++
++def test_threshold_rows_use_the_admin_labels():
++    rows = display.threshold_rows({"provisional_min_pct": 12.0, "eeg_advanced_min_tonnes": 350.0})
++    assert ("Provisional approval (ESP) from", "12%") in rows
++    assert ("EEG Advanced Tier: lifetime abatement above", "350 tonnes") in rows
++    assert display.threshold_rows(None) == []
++
++
++# ---- The pages ----------------------------------------------------------------
++
++
++def test_the_audit_page_shows_a_readable_decision(audited):
++    page = audited.get("/history/1").data
++    assert b"Pre-approved: EEG Base Tier" in page
++    assert b"tone-approved" in page
++    assert b"SGD 30,000.00" in page
++    assert b"<li>Proposal targets Scope-1 emissions.</li>" in page
++    assert b"<li>Keep receipts.</li>" in page
++    assert b"Commercial Fleet Electrification" in page and b"28%" in page
++    assert b"SGD 8,450,000.00" in page
++
++
++def test_the_audit_page_shows_the_thresholds_used(audited):
++    page = audited.get("/history/1").data
++    assert b"Thresholds used for this decision" in page
++    assert b"Scope-1 fast track (EEG Base Tier) from" in page
++
++
++def test_text_from_the_record_and_the_rules_is_escaped(audited):
++    page = audited.get("/history/1").data
++    assert b"Apex <Logistics>" not in page and b"Apex &lt;Logistics&gt;" in page
++    assert b"Meets <the>" not in page
++
++
++def test_the_history_list_shows_a_coloured_decision_and_the_subsidy(audited):
++    page = audited.get("/history").data
++    assert b'badge tone-approved' in page
++    assert b"Pre-approved: EEG Base Tier" in page and b"SGD 30,000.00" in page
++
++
++def test_run_logic_shows_the_decision_panel_and_run_ai_shows_a_table(audited):
++    logic_page = audited.post("/records/logic").data
++    assert b"Grant decision" in logic_page and b"tone-approved" in logic_page
++    ai_page = audited.post("/records/ai").data
++    assert b"AI audit" in ai_page and b"GHG scope" in ai_page
++
++
++def test_the_register_page_explains_the_rules(client):
++    page = client.get("/register").data
++    assert b"3-20 letters, digits or _" in page
++    assert b"8-64 characters" in page
+diff --git a/web/display.py b/web/display.py
+new file mode 100644
+index 0000000..ff33be4
+--- /dev/null
++++ b/web/display.py
+@@ -0,0 +1,130 @@
++"""How the web pages present results: friendly decision names, colour tones,
++money, and labelled rows for the AI audit and the thresholds used. Nothing
++here decides anything; it only turns the managers' output into text for the
++templates."""
++
++from typing import Any
++
++from managers.logic_manager import RuleConfig
++
++# decision_status -> (heading shown to the user, tone used for the colour)
++DECISIONS = {
++    "PRE_APPROVED_TIER_1_ADVANCED": ("Pre-approved: EEG Advanced Tier", "approved"),
++    "PRE_APPROVED_TIER_1": ("Pre-approved: EEG Base Tier", "approved"),
++    "PROVISIONAL_APPROVAL_TIER_2": ("Provisionally approved: ESP", "approved"),
++    "PRE_APPROVED_SRG": ("Pre-approved: Sustainability Reporting Grant", "approved"),
++    "MANUAL_REVIEW": ("Needs manual review", "review"),
++    "MANUAL_EXCLUSION_REVIEW": ("Exclusion review needed", "review"),
++    "REJECT_NON_SME": ("Rejected: not an SME", "rejected"),
++    "REJECT_LOW_IMPACT": ("Rejected: energy reduction too low", "rejected"),
++}
++
++# AI audit key -> (label, unit or None)
++AI_FIELDS = (
++    ("scope_category", "GHG scope", None),
++    ("primary_intervention_type", "Intervention", None),
++    ("estimated_energy_reduction_pct", "Estimated energy reduction", "%"),
++    ("estimated_lifetime_abatement_tonnes", "Lifetime abatement", "tonnes CO2e"),
++    ("detected_exclusion_keywords", "Exclusion keywords", None),
++    ("implementation_bottleneck", "Implementation bottleneck", None),
++    ("ai_reasoning_summary", "AI reasoning", None),
++)
++HIDDEN_AI_KEYS = {"ai_status"}
++
++
++def decision_label(status: Any) -> str:
++    """'PRE_APPROVED_TIER_1' -> 'Pre-approved: EEG Base Tier'. Unknown
++    statuses are shown as they are."""
++    if not status:
++        return "No decision"
++    return DECISIONS.get(status, (str(status), "neutral"))[0]
++
++
++def decision_tone(status: Any) -> str:
++    """approved / review / rejected / neutral (used as a CSS class)."""
++    return DECISIONS.get(status, ("", "neutral"))[1]
++
++
++def money(amount: Any) -> str:
++    if isinstance(amount, bool) or not isinstance(amount, (int, float)):
++        return "-"
++    return f"SGD {amount:,.2f}"
++
++
++def number(value: Any, unit: str | None = None) -> str:
++    if isinstance(value, bool) or not isinstance(value, (int, float)):
++        return str(value) if value not in (None, "") else "-"
++    text = f"{value:,.2f}".rstrip("0").rstrip(".")
++    if not unit:
++        return text
++    return f"{text}%" if unit == "%" else f"{text} {unit}"
++
++
++def text_value(value: Any) -> str:
++    if isinstance(value, (list, tuple)):
++        return ", ".join(str(item) for item in value) if value else "None"
++    if value in (None, ""):
++        return "-"
++    return str(value)
++
++
++def ai_rows(ai_audit: Any) -> list[tuple[str, str]]:
++    """(label, value) rows for an AI audit: the known fields first, in a
++    fixed order, then anything else the AI returned."""
++    if not isinstance(ai_audit, dict):
++        return []
++    rows = []
++    for key, label, unit in AI_FIELDS:
++        if key in ai_audit:
++            value = ai_audit[key]
++            shown = number(value, unit) if unit else text_value(value)
++            rows.append((label, shown))
++    known = {key for key, _, _ in AI_FIELDS} | HIDDEN_AI_KEYS
++    for key, value in ai_audit.items():
++        if key not in known:
++            rows.append((key.replace("_", " ").capitalize(), text_value(value)))
++    return rows
++
++
++def threshold_rows(rules_used: Any) -> list[tuple[str, str]]:
++    """(label, value) rows for the thresholds an audit was decided with."""
++    if not isinstance(rules_used, dict):
++        return []
++    rows = []
++    for key, (label, unit) in RuleConfig.LABELS.items():
++        if key in rules_used:
++            rows.append((label, number(rules_used[key], unit)))
++    return rows
++
++
++def application_rows(application: Any) -> list[tuple[str, str]]:
++    if not isinstance(application, dict):
++        return []
++    rows = []
++    for key, value in application.items():
++        is_amount = key in (
++            "Company Total Revenue",
++            "Baseline Energy Expenditure",
++            "Estimated Retrofit Cost",
++            "Reporting Advisory Fee",
++        )
++        if is_amount:
++            shown = money(value)
++        elif key == "Local Equity":
++            shown = number(value, "%")
++        else:
++            shown = text_value(value)
++        rows.append((key, shown))
++    return rows
++
++
++FILTERS = {
++    "decision_label": decision_label,
++    "decision_tone": decision_tone,
++    "money": money,
++}
++HELPERS = {
++    "ai_rows": ai_rows,
++    "threshold_rows": threshold_rows,
++    "application_rows": application_rows,
++}
+diff --git a/web/pages.py b/web/pages.py
+index b0ce9d2..609eefa 100644
+--- a/web/pages.py
++++ b/web/pages.py
+@@ -8,13 +8,20 @@ from flask import (Blueprint, current_app, flash, redirect, render_template,
+                    request, send_from_directory, url_for)
+ from flask import session as flask_session
+ 
+-from web import service
++from web import display, service
+ 
+ 
+ OTHER_GRANT = "5. Others"
+ OTHER_TEXT_MAX_LEN = 60   # TODO: copy the real max length from IOManager so the CLI and web offer the same choices.
+ bp = Blueprint("pages", __name__, template_folder="templates")
+ 
++
++@bp.record_once
++def add_display_helpers(state) -> None:
++    """Lets the templates show decisions, money and labelled rows (web/display.py)."""
++    state.app.jinja_env.filters.update(display.FILTERS)
++    state.app.jinja_env.globals.update(display.HELPERS)
++
+ # TODO: copy the real lists from IOManager so the CLI and web offer the same choices.
+ PROPOSAL_TYPES = ["Equipment / Energy Upgrade", "ESG Reporting / Advisory"]
+ INDUSTRIES = [
+@@ -237,7 +244,8 @@ def detail(audit_id: int):
+     audit = find_audit(audit_id)
+     if audit is None:
+         return render_template("notfound.html"), 404
+-    return render_template("detail.html", audit=audit)
++    application = ApplicationRecord(audit.get("application") or {}).flat
++    return render_template("detail.html", audit=audit, application=application)
+ 
+ 
+ @bp.get("/history/<int:audit_id>/pdf")
+@@ -411,7 +419,7 @@ def run_ai():
+     if ai.ai_call_failed(audit):
+         return back_to_records("The AI call failed. Please try again.")
+     ws.ai_audit = audit
+-    return render_template("result.html", title="AI audit",
++    return render_template("result.html", title="AI audit", kind="ai",
+                            company=wrapped.company_name, data=audit)
+ 
+ 
+@@ -431,5 +439,5 @@ def run_logic():
+     except Exception:
+         current_app.logger.exception("Grant evaluation raised")
+         return back_to_records("The grant evaluation failed.")
+-    return render_template("result.html", title="Grant decision",
++    return render_template("result.html", title="Grant decision", kind="decision",
+                            company=wrapped.company_name, data=result)
+\ No newline at end of file
+diff --git a/web/templates/_results.html b/web/templates/_results.html
+new file mode 100644
+index 0000000..9129f94
+--- /dev/null
++++ b/web/templates/_results.html
+@@ -0,0 +1,49 @@
++{# Shared pieces for showing a grant decision and an AI audit. #}
++
++{% macro decision_panel(result) %}
++{% set result = result or {} %}
++{% set status = result.get('decision_status') %}
++<section class="decision tone-{{ status | decision_tone }}" aria-label="Grant decision">
++  <p class="status">{{ status | decision_label }}</p>
++  {% if status %}<div class="code">{{ status }}</div>{% endif %}
++  <div class="facts">
++    {% if 'approved_subsidy_sgd' in result %}
++    <div><span>Approved subsidy</span><strong>{{ result.get('approved_subsidy_sgd') | money }}</strong></div>
++    {% endif %}
++    {% if 'is_sme' in result %}
++    <div><span>SME</span><strong>{{ 'Yes' if result.get('is_sme') else 'No' }}</strong></div>
++    {% endif %}
++    {% if 'audit_passed' in result %}
++    <div><span>Audit passed</span><strong>{{ 'Yes' if result.get('audit_passed') else 'No' }}</strong></div>
++    {% endif %}
++  </div>
++</section>
++<div class="grid">
++  {% if result.get('matched_schemes') %}
++  <div>
++    <h2>Matched schemes</h2>
++    <ul class="points">{% for s in result.get('matched_schemes') %}<li>{{ s }}</li>{% endfor %}</ul>
++  </div>
++  {% endif %}
++  {% if result.get('reasons') %}
++  <div>
++    <h2>Why</h2>
++    <ul class="points">{% for r in result.get('reasons') %}<li>{{ r }}</li>{% endfor %}</ul>
++  </div>
++  {% endif %}
++  {% if result.get('recommendations') %}
++  <div>
++    <h2>Recommendations</h2>
++    <ul class="points">{% for r in result.get('recommendations') %}<li>{{ r }}</li>{% endfor %}</ul>
++  </div>
++  {% endif %}
++</div>
++{% endmacro %}
++
++{% macro rows_table(rows, empty='Nothing to show.') %}
++{% if rows %}
++<div class="table-wrap"><table class="kv">
++  {% for label, value in rows %}<tr><th scope="row">{{ label }}</th><td>{{ value }}</td></tr>{% endfor %}
++</table></div>
++{% else %}<p class="muted">{{ empty }}</p>{% endif %}
++{% endmacro %}
+diff --git a/web/templates/base.html b/web/templates/base.html
+index 6eb11b4..2e6ad47 100644
+--- a/web/templates/base.html
++++ b/web/templates/base.html
+@@ -2,37 +2,103 @@
+ <html lang="en">
+ <head>
+   <meta charset="utf-8">
+-  <title>Grant Audit</title>
++  <meta name="viewport" content="width=device-width, initial-scale=1">
++  <title>{% block title %}SME Green Grant Auditor{% endblock %}</title>
+   <style>
+-    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+-    label { display: block; margin-top: .8rem; }
++    :root {
++      --bg: #f4f6f5; --surface: #ffffff; --text: #1d2621; --muted: #5d6b63;
++      --border: #dde3df; --brand: #1f6f4a; --brand-dark: #165537; --brand-soft: #e5f2eb;
++      --approved: #1f7a4d; --approved-bg: #e3f4ea;
++      --review: #8a5a00; --review-bg: #fff4d9;
++      --rejected: #b3261e; --rejected-bg: #fde8e6;
++      --neutral: #44515a; --neutral-bg: #eef1f3;
++      --radius: 10px;
++    }
++    * { box-sizing: border-box; }
++    body { margin: 0; background: var(--bg); color: var(--text);
++           font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
++    a { color: var(--brand); }
++    header.site { background: var(--brand); color: #fff; }
++    header.site .bar { max-width: 960px; margin: 0 auto; padding: .75rem 1rem;
++                       display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.25rem; }
++    header.site .brand { font-weight: 700; color: #fff; text-decoration: none; margin-right: auto; }
++    header.site nav { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; }
++    header.site nav a { color: #fff; text-decoration: none; padding: .25rem .4rem; border-radius: 6px; }
++    header.site nav a:hover { background: rgba(255,255,255,.15); }
++    header.site nav form { display: inline; }
++    header.site nav button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.6);
++                             padding: .3rem .7rem; }
++    main { max-width: 960px; margin: 1.5rem auto 3rem; padding: 0 1rem; }
++    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
++            padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
++    h1 { font-size: 1.6rem; margin: 0 0 1rem; line-height: 1.25; }
++    h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
++    .muted { color: var(--muted); }
++    label { display: block; margin-top: .9rem; font-weight: 600; font-size: .95rem; }
++    input, select, textarea { width: 100%; margin-top: .3rem; padding: .55rem .65rem; font: inherit;
++                              border: 1px solid var(--border); border-radius: 8px; background: #fff; }
++    input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
++    input[type=checkbox] { width: auto; margin-right: .4rem; }
++    button, .button { display: inline-block; font: inherit; font-weight: 600; cursor: pointer;
++                      padding: .5rem 1rem; border-radius: 8px; border: 1px solid var(--brand);
++                      background: var(--brand); color: #fff; text-decoration: none; }
++    button:hover, .button:hover { background: var(--brand-dark); }
++    .button.secondary, button.secondary { background: #fff; color: var(--brand); }
++    form.inline { display: inline; }
++    .flash { background: var(--brand-soft); border: 1px solid #bcdcca; padding: .7rem 1rem;
++             margin: 0 0 1rem; border-radius: 8px; }
+     .is-hidden { display: none; }
+     [hidden] { display: none !important; }
+-    input, select, textarea { width: 100%; padding: .4rem; box-sizing: border-box; }
+-    .flash { background: #fff3cd; padding: .6rem; margin: 1rem 0; border-radius: 4px; }
+-    nav a, nav button { margin-right: 1rem; }
+-    pre { background: #f4f4f4; padding: .8rem; overflow-x: auto; }
+     table { border-collapse: collapse; width: 100%; }
+-td, th { border-bottom: 1px solid #ddd; padding: .4rem; text-align: left; }
+-form.inline { display: inline; }
+-    
++    td, th { border-bottom: 1px solid var(--border); padding: .55rem .5rem; text-align: left; vertical-align: top; }
++    th { font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
++    table.kv th { text-transform: none; letter-spacing: 0; font-size: .95rem; width: 38%; color: var(--text); }
++    .table-wrap { overflow-x: auto; }
++    pre { background: #f4f4f4; padding: .8rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
++    td.nowrap { white-space: nowrap; }
++    .hint { font-weight: 400; font-size: .85rem; color: var(--muted); }
++    .badge { display: inline-block; padding: .15rem .55rem; border-radius: 999px; font-size: .85rem;
++             font-weight: 600; white-space: nowrap; }
++    .tone-approved { color: var(--approved); background: var(--approved-bg); }
++    .tone-review { color: var(--review); background: var(--review-bg); }
++    .tone-rejected { color: var(--rejected); background: var(--rejected-bg); }
++    .tone-neutral { color: var(--neutral); background: var(--neutral-bg); }
++    .decision { border-left: 6px solid currentColor; border-radius: var(--radius); padding: 1rem 1.25rem;
++                margin-bottom: 1rem; }
++    .decision .status { font-size: 1.35rem; font-weight: 700; margin: 0; }
++    .decision .code { font-size: .8rem; opacity: .8; font-family: ui-monospace, monospace; }
++    .facts { display: flex; flex-wrap: wrap; gap: .75rem 2rem; margin-top: .75rem; color: var(--text); }
++    .facts div span { display: block; font-size: .8rem; color: var(--muted); text-transform: uppercase; }
++    .facts div strong { font-size: 1.15rem; }
++    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem 1.5rem; }
++    ul.points { margin: .25rem 0 0; padding-left: 1.2rem; }
++    ul.points li { margin-bottom: .35rem; }
++    .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0 1.25rem; }
++    details summary { cursor: pointer; color: var(--muted); }
+   </style>
+ </head>
+ <body>
+-  <nav>
+-    {% if session.username %}
+-      <a href="{{ url_for('pages.new_audit') }}">New audit</a>
+-      <a href="{{ url_for('pages.records_page') }}">Records</a>
+-      <a href="{{ url_for('pages.history') }}">History</a>
+-      <form action="{{ url_for('pages.logout') }}" method="post" style="display:inline">
+-        <button>Log out ({{ session.username }})</button>
+-      </form>
+-    {% else %}
+-      <a href="{{ url_for('pages.login') }}">Log in</a>
+-      <a href="{{ url_for('pages.register') }}">Register</a>
+-    {% endif %}
+-  </nav>
+-  {% for message in get_flashed_messages() %}<div class="flash">{{ message }}</div>{% endfor %}
+-  {% block content %}{% endblock %}
++  <header class="site">
++    <div class="bar">
++      <a class="brand" href="{{ url_for('pages.home') }}">🌱 SME Green Grant Auditor</a>
++      <nav>
++        {% if session.username %}
++          <a href="{{ url_for('pages.new_audit') }}">New audit</a>
++          <a href="{{ url_for('pages.records_page') }}">Records</a>
++          <a href="{{ url_for('pages.history') }}">History</a>
++          <form action="{{ url_for('pages.logout') }}" method="post">
++            <button>Log out ({{ session.username }})</button>
++          </form>
++        {% else %}
++          <a href="{{ url_for('pages.login') }}">Log in</a>
++          <a href="{{ url_for('pages.register') }}">Register</a>
++        {% endif %}
++      </nav>
++    </div>
++  </header>
++  <main>
++    {% for message in get_flashed_messages() %}<div class="flash">{{ message }}</div>{% endfor %}
++    {% block content %}{% endblock %}
++  </main>
+ </body>
+-</html>
+\ No newline at end of file
++</html>
+diff --git a/web/templates/detail.html b/web/templates/detail.html
+index e221079..454c77b 100644
+--- a/web/templates/detail.html
++++ b/web/templates/detail.html
+@@ -1,12 +1,37 @@
+ {% extends "base.html" %}
++{% from "_results.html" import decision_panel, rows_table %}
++{% block title %}Audit #{{ audit.audit_id }} - SME Green Grant Auditor{% endblock %}
+ {% block content %}
+-<h1>Audit #{{ audit.audit_id }}: {{ audit.application.get('Company Name', 'N/A') }}</h1>
+-<p>{{ audit.timestamp }}</p>
+-<p>
+-  <a href="{{ url_for('pages.audit_pdf', audit_id=audit.audit_id) }}">Save as PDF</a> |
+-  <a href="{{ url_for('pages.history') }}">Back to history</a>
+-</p>
+-<h2>Decision</h2><pre>{{ audit.result | tojson(indent=2) }}</pre>
+-<h2>AI audit</h2><pre>{{ audit.ai_audit | tojson(indent=2) }}</pre>
+-<h2>Application</h2><pre>{{ audit.application | tojson(indent=2) }}</pre>
+-{% endblock %}
+\ No newline at end of file
++<h1>Audit #{{ audit.audit_id }}: {{ application.get('Company Name', 'N/A') }}</h1>
++<p class="muted">Audited {{ (audit.timestamp or '') | replace('T', ' at ') }}</p>
++<div class="actions">
++  <a class="button" href="{{ url_for('pages.audit_pdf', audit_id=audit.audit_id) }}">Save as PDF</a>
++  <a class="button secondary" href="{{ url_for('pages.history') }}">Back to history</a>
++</div>
++
++<div class="card">
++  {{ decision_panel(audit.result) }}
++</div>
++
++<div class="card">
++  <h2>AI audit</h2>
++  {{ rows_table(ai_rows(audit.ai_audit), 'No AI audit was saved.') }}
++</div>
++
++<div class="card">
++  <h2>Application</h2>
++  {{ rows_table(application_rows(application)) }}
++</div>
++
++{% if audit.rules_used %}
++<div class="card">
++  <h2>Thresholds used for this decision</h2>
++  {{ rows_table(threshold_rows(audit.rules_used)) }}
++</div>
++{% endif %}
++
++<details>
++  <summary>Raw data (JSON)</summary>
++  <pre>{{ audit | tojson(indent=2) }}</pre>
++</details>
++{% endblock %}
+diff --git a/web/templates/history.html b/web/templates/history.html
+index 9be779a..1186e5e 100644
+--- a/web/templates/history.html
++++ b/web/templates/history.html
+@@ -1,13 +1,24 @@
+ {% extends "base.html" %}
+ {% block content %}
+ <h1>Past audits</h1>
+-{% if not audits %}<p>No audits yet. <a href="{{ url_for('pages.new_audit') }}">Create one</a>.</p>{% endif %}
+-<ul>
+-{% for a in audits %}
+-  <li><a href="{{ url_for('pages.detail', audit_id=a.audit_id) }}">
+-    #{{ a.audit_id }} {{ a.application.get('Company Name', 'N/A') }}</a>
+-    ({{ a.timestamp }}) {{ (a.result or {}).get('decision_status', '') }}
+-    - <a href="{{ url_for('pages.audit_pdf', audit_id=a.audit_id) }}">PDF</a></li>
+-{% endfor %}
+-</ul>
+-{% endblock %}
+\ No newline at end of file
++{% if not audits %}
++<div class="card"><p>No audits yet. <a href="{{ url_for('pages.new_audit') }}">Create one</a>.</p></div>
++{% else %}
++<div class="card table-wrap">
++<table>
++  <tr><th>#</th><th>Company</th><th>Date</th><th>Decision</th><th>Subsidy</th><th></th></tr>
++  {% for a in audits %}
++  {% set result = a.result or {} %}
++  <tr>
++    <td>{{ a.audit_id }}</td>
++    <td><a href="{{ url_for('pages.detail', audit_id=a.audit_id) }}">{{ a.application.get('Company Name', 'N/A') }}</a></td>
++    <td class="nowrap">{{ (a.timestamp or '')[:10] }}</td>
++    <td><span class="badge tone-{{ result.get('decision_status') | decision_tone }}">{{ result.get('decision_status') | decision_label }}</span></td>
++    <td class="nowrap">{{ result.get('approved_subsidy_sgd') | money }}</td>
++    <td><a href="{{ url_for('pages.audit_pdf', audit_id=a.audit_id) }}">PDF</a></td>
++  </tr>
++  {% endfor %}
++</table>
++</div>
++{% endif %}
++{% endblock %}
+diff --git a/web/templates/login.html b/web/templates/login.html
+index 4da43d8..e1663f1 100644
+--- a/web/templates/login.html
++++ b/web/templates/login.html
+@@ -2,8 +2,8 @@
+ {% block content %}
+ <h1>Log in</h1>
+ <form method="post">
+-  <label>Username <input name="username" required></label>
+-  <label>Password <input name="password" type="password" required></label>
++  <label>Username <input name="username" required autocomplete="username"></label>
++  <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
+   <p><button>Log in</button></p>
+ </form>
+ {% endblock %}
+\ No newline at end of file
+diff --git a/web/templates/register.html b/web/templates/register.html
+index 1547c67..201a3d6 100644
+--- a/web/templates/register.html
++++ b/web/templates/register.html
+@@ -2,8 +2,10 @@
+ {% block content %}
+ <h1>Register</h1>
+ <form method="post">
+-  <label>Username <input name="username" required></label>
+-  <label>Password <input name="password" type="password" required></label>
++  <label>Username <span class="hint">3-20 letters, digits or _ (not case-sensitive)</span>
++    <input name="username" required minlength="3" maxlength="20" autocomplete="username"></label>
++  <label>Password <span class="hint">8-64 characters, with at least one letter and one digit</span>
++    <input name="password" type="password" required minlength="8" maxlength="64" autocomplete="new-password"></label>
+   <p><button>Register</button></p>
+ </form>
+ {% endblock %}
+\ No newline at end of file
+diff --git a/web/templates/result.html b/web/templates/result.html
+index c8724c2..8d7d2a8 100644
+--- a/web/templates/result.html
++++ b/web/templates/result.html
+@@ -1,7 +1,14 @@
+ {% extends "base.html" %}
++{% from "_results.html" import decision_panel, rows_table %}
+ {% block content %}
+ <h1>{{ title }}</h1>
+-<p>Latest record: {{ company }}</p>
+-<pre>{{ data | tojson(indent=2) }}</pre>
+-<a href="{{ url_for('pages.records_page') }}">Back to records</a>
+-{% endblock %}
+\ No newline at end of file
++<p class="muted">Latest record: {{ company }}</p>
++<div class="card">
++  {% if kind == 'decision' %}
++    {{ decision_panel(data) }}
++  {% else %}
++    {{ rows_table(ai_rows(data)) }}
++  {% endif %}
++</div>
++<a class="button secondary" href="{{ url_for('pages.records_page') }}">Back to records</a>
++{% endblock %}
+-- 
+2.43.0
+
