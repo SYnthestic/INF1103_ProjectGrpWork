@@ -63,24 +63,37 @@ def test_usernames_are_not_case_sensitive(client):
 # ---- No insecure defaults ------------------------------------------------------
 
 
-def test_without_a_secret_key_setting_each_start_gets_a_random_key():
-    with mock.patch.dict(os.environ, {}, clear=True):
-        first = create_app({"TESTING": True}).config["SECRET_KEY"]
-        second = create_app({"TESTING": True}).config["SECRET_KEY"]
+def only_these_settings(tmp_path, **settings):
+    """An environment with nothing but `settings`, the test encryption key
+    and a temporary data folder (so a real users.json is never touched)."""
+    env = {
+        "DATA_ENCRYPTION_KEY": os.environ["DATA_ENCRYPTION_KEY"],
+        "DATA_DIR": str(tmp_path),
+    }
+    env.update(settings)
+    return env
+
+
+def test_without_a_secret_key_setting_each_start_gets_a_random_key(tmp_path):
+    with mock.patch.dict(os.environ, only_these_settings(tmp_path), clear=True):
+        config = {"TESTING": True, "DATA_DIR": str(tmp_path)}
+        first = create_app(config).config["SECRET_KEY"]
+        second = create_app(config).config["SECRET_KEY"]
     assert first != second
     assert len(first) >= 32 and "dev-only" not in first
 
 
-def test_the_secret_key_setting_is_used_when_given():
+def test_the_secret_key_setting_is_used_when_given(tmp_path):
     with mock.patch.dict(os.environ, {"FLASK_SECRET_KEY": "from-the-env-file"}):
-        assert create_app({"TESTING": True}).config["SECRET_KEY"] == "from-the-env-file"
+        app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path)})
+        assert app.config["SECRET_KEY"] == "from-the-env-file"
 
 
 @pytest.mark.parametrize("setting, expected", [(None, False), ("0", False), ("1", True)])
-def test_the_debugger_is_off_unless_asked_for(setting, expected):
+def test_the_debugger_is_off_unless_asked_for(tmp_path, setting, expected):
     env = {} if setting is None else {"FLASK_DEBUG": setting}
     with (
-        mock.patch.dict(os.environ, env, clear=True),
+        mock.patch.dict(os.environ, only_these_settings(tmp_path, **env), clear=True),
         mock.patch("flask.Flask.run") as run,
     ):
         runpy.run_path(os.path.join(ROOT, "app.py"), run_name="__main__")
