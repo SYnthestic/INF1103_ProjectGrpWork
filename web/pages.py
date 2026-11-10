@@ -61,6 +61,11 @@ LOAD_MESSAGES = {
     "invalid_json": "The file is corrupt or unreadable. It was set aside as a .corrupt backup.",
     "invalid_format": "The file is valid JSON but not a list of audit records. It was set aside.",
     "io_error": "The operating system refused to read the file.",
+    "decrypt_failed": "The file could not be decrypted: the encryption key is wrong "
+    "or the file was modified. It was left unchanged.",
+    "not_encrypted": "The file is not encrypted, so it was not trusted. Run "
+    "'python main.py --encrypt-existing-data' once to encrypt existing files.",
+    "encrypted_no_key": "The file is encrypted, but no encryption key is in use.",
 }
 
 PDF_MESSAGES = {
@@ -84,7 +89,8 @@ def user_data() -> DataManager:
     active_user is never shared between users."""
     shared = current_app.extensions["data"]
     data = DataManager(data_dir=shared.data_dir,
-                       exporter=current_app.extensions.get("exporter"))
+                       exporter=current_app.extensions.get("exporter"),
+                       cipher=shared.cipher)
     data.active_user = flask_session["username"]
     return data
 

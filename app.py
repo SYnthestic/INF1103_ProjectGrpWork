@@ -37,8 +37,19 @@ def create_app(config: dict | None = None) -> Flask:
         return response
 
     app.extensions["ai"] = AIManager()
-    app.extensions["logic"] = LogicManager()
-    app.extensions["data"] = DataManager(data_dir=app.config.get("DATA_DIR"))
+    logic = LogicManager()
+    app.extensions["logic"] = logic
+    # No valid key -> EncryptionKeyError, so the server won't start.
+    data = DataManager(data_dir=app.config.get("DATA_DIR"), cipher=logic.file_cipher)
+    problems = data.check_shared_files()
+    if problems:
+        details = ", ".join(f"{name} ({reason})" for name, reason in problems)
+        raise RuntimeError(
+            f"Data files cannot be opened with DATA_ENCRYPTION_KEY: {details}. "
+            "Check the key, or run 'python main.py --encrypt-existing-data' "
+            "once for old unencrypted files."
+        )
+    app.extensions["data"] = data
     app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")   # blocks most cross-site form posts
 
     

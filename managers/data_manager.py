@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
 
-from models import RecordSections
+from models import FileCipher, FileDecryptionError, PlainFileCipher, RecordSections
 from report_exporter import PdfReportExporter, ReportExporter
 
 Record = dict[str, Any]
@@ -92,13 +92,19 @@ class FilenameRules:
 class JsonStore:
     """Safe JSON file access inside one data folder: atomic writes, corrupt
     files set aside, and a small lock file so two copies of the app sharing a
-    folder cannot overwrite each other's change."""
+    folder cannot overwrite each other's change. Files are encrypted/decrypted
+    by the cipher passed in (aggregation)."""
 
     LOCK_TIMEOUT_SECONDS = 5.0
     LOCK_STALE_SECONDS = 30.0
 
-    def __init__(self, data_dir: str) -> None:
+    def __init__(self, data_dir: str, cipher: FileCipher | None = None) -> None:
         self._data_dir = data_dir
+        self._cipher = cipher or PlainFileCipher()
+
+    @property
+    def cipher(self) -> FileCipher:
+        return self._cipher
 
     @property
     def data_dir(self) -> str:
@@ -121,24 +127,41 @@ class JsonStore:
             logger.error("Could not back up corrupt file %s: %s", path, err)
 
     @staticmethod
-    def write_path(path: str, data: Any) -> bool:
-        """Writes data to a temporary file first and then swaps it in, so a
-        crash midway can never leave a half-written file behind.
+    def write_bytes(path: str, content: bytes) -> bool:
+        """Writes to a temporary file first and then swaps it in, so a crash
+        midway can never leave a half-written file behind.
         Returns True on success, False otherwise."""
         tmp_path = path + ".tmp"
         try:
             os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-            with open(tmp_path, "w", encoding="utf-8") as file:
-                json.dump(data, file, indent=4, ensure_ascii=False)
+            with open(tmp_path, "wb") as file:
+                file.write(content)
             os.replace(tmp_path, path)
             return True
-        except (OSError, TypeError, ValueError) as err:
+        except OSError as err:
             logger.error("Could not save to %s: %s", path, err)
             try:
                 os.remove(tmp_path)
             except OSError:
                 pass
             return False
+
+    def write_path(self, path: str, data: Any) -> bool:
+        """Saves data as encrypted JSON."""
+        try:
+            text = json.dumps(data, indent=4, ensure_ascii=False)
+        except (TypeError, ValueError, RecursionError) as err:
+            logger.error("Could not save to %s: %s", path, err)
+            return False
+        return self.write_bytes(path, self._cipher.encrypt(text.encode("utf-8")))
+
+    def load_path(self, path: str) -> Any:
+        """Reads and decrypts a JSON file. Raises OSError, FileDecryptionError
+        or ValueError."""
+        with open(path, "rb") as file:
+            stored = file.read()
+        plaintext = self._cipher.decrypt(stored)
+        return json.loads(plaintext.decode("utf-8"))
 
     def write_json_file(self, filename: str, data: Any) -> bool:
         return self.write_path(self.full_path(filename), data)
@@ -147,13 +170,16 @@ class JsonStore:
         """The parsed contents of a data file, or `default` if the file does
         not exist yet. Returns None if the file exists but cannot be read, so
         callers never overwrite data they failed to load. A corrupt file is
-        set aside as .corrupt, like the record save files."""
+        set aside as .corrupt, like the record save files. Files that can't be
+        decrypted are left alone, since the key might just be wrong."""
         path = self.full_path(filename)
         if not os.path.isfile(path):
             return default
         try:
-            with open(path, "r", encoding="utf-8") as file:
-                data = json.load(file)
+            data = self.load_path(path)
+        except FileDecryptionError as err:
+            logger.error("Could not decrypt %s (%s): %s", path, err.reason, err)
+            return None
         except ValueError:  # JSONDecodeError and UnicodeDecodeError
             logger.error("%s contains invalid JSON.", path)
             self.backup_corrupt_file(path)
@@ -222,6 +248,12 @@ class DataManager:
     RULES_CONFIG_FILE = "rules_config.json"
     RECORDS_DIR_NAME = "records"
     ARCHIVE_DIR_NAME = "archive"
+    DECRYPTION_STATUSES = {
+        "no_key": "encrypted_no_key",
+        "not_encrypted": "not_encrypted",
+        "damaged": "decrypt_failed",
+        "wrong_key": "decrypt_failed",
+    }
     RESERVED_FILES = (
         USERS_FILE.lower(),
         AUDIT_HISTORY_FILE.lower(),
@@ -247,14 +279,20 @@ class DataManager:
         self,
         data_dir: str | None = None,
         exporter: ReportExporter | None = None,
+        cipher: FileCipher | None = None,
     ) -> None:
         # Where save files live. Override with the DATA_DIR environment
         # variable (e.g. a mounted volume when running in Docker).
         if data_dir is None:
             data_dir = os.environ.get("DATA_DIR", ".")
-        self._store = JsonStore(data_dir)  # owned: lives and dies with us
+        # cipher comes from LogicManager via main.py (aggregation). None = plain JSON, for tests.
+        self._store = JsonStore(data_dir, cipher)  # owned: lives and dies with us
         self._exporter = exporter or PdfReportExporter()
         self._active_user: str | None = None
+
+    @property
+    def cipher(self) -> FileCipher:
+        return self._store.cipher
 
     # Folders and the active user
     @property
@@ -417,20 +455,25 @@ class DataManager:
             "invalid_json"    file is corrupt/unreadable (set aside as .corrupt)
             "invalid_format"  valid JSON but not a list of audit records (set aside)
             "io_error"        the OS refused to read the file
+            "decrypt_failed"  wrong key, or the file was edited/truncated
+            "not_encrypted"   plain JSON file while encryption is on
+            "encrypted_no_key" encrypted file but no key
         """
         name = FilenameRules.normalise(jsonfile_name)
         if not name:
             return [], "", "no_name"
         if not FilenameRules.is_valid(name) or self._is_reserved(name):
             return [], "", "invalid_name"
-        
+
         path = self._record_path(name)
         if not os.path.isfile(path):
             return [], name, "not_found"
 
         try:
-            with open(path, "r", encoding="utf-8") as file:
-                data = json.load(file)
+            data = self._store.load_path(path)
+        except FileDecryptionError as err:
+            logger.error("Could not decrypt %s (%s): %s", path, err.reason, err)
+            return [], name, self.DECRYPTION_STATUSES.get(err.reason, "decrypt_failed")
         except ValueError:  # JSONDecodeError and UnicodeDecodeError
             logger.error("%s contains invalid JSON.", path)
             self._store.backup_corrupt_file(path)
@@ -472,7 +515,7 @@ class DataManager:
         if not FilenameRules.is_valid(name) or self._is_reserved(name):
             return None, "invalid_name"
 
-        if JsonStore.write_path(self._record_path(name), data):
+        if self._store.write_path(self._record_path(name), data):
             return name, "saved"
         return None, "io_error"
 
@@ -683,8 +726,8 @@ class DataManager:
             moved = False
             try:
                 if not (
-                    JsonStore.write_path(os.path.join(archive_dir, "account.json"), account)
-                    and JsonStore.write_path(
+                    self._store.write_path(os.path.join(archive_dir, "account.json"), account)
+                    and self._store.write_path(
                         os.path.join(archive_dir, self.AUDIT_HISTORY_FILE), audits
                     )
                 ):
@@ -741,6 +784,78 @@ class DataManager:
             if not locked:
                 return False
             return self._store.write_json_file(self.RULES_CONFIG_FILE, stored)
+
+    # Encryption
+    def _data_files(self) -> list[str]:
+        """Shared files + records/ + archive/ (no logs or PDFs)."""
+        root = self._store.data_dir
+        files = [
+            self._store.full_path(name)
+            for name in self.RESERVED_FILES
+            if os.path.isfile(self._store.full_path(name))
+        ]
+        for folder in (self.RECORDS_DIR_NAME, self.ARCHIVE_DIR_NAME):
+            for dirpath, _dirnames, filenames in os.walk(os.path.join(root, folder)):
+                files.extend(
+                    os.path.join(dirpath, name)
+                    for name in sorted(filenames)
+                    if name.lower().endswith(".json")
+                )
+        return files
+
+    def check_shared_files(self) -> list[tuple[str, str]]:
+        """Checked at start-up. Returns (filename, reason) for each shared file
+        that can't be decrypted; empty list if all OK."""
+        problems = []
+        for name in self.RESERVED_FILES:
+            path = self._store.full_path(name)
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, "rb") as file:
+                    self._store.cipher.decrypt(file.read())
+            except FileDecryptionError as err:
+                problems.append((name, err.reason))
+            except OSError:
+                problems.append((name, "io_error"))
+        return problems
+
+    def encrypt_existing_files(self) -> dict[str, list[str]]:
+        """Encrypts old plain JSON files once (--encrypt-existing-data).
+        Returns file paths grouped by: encrypted, already, unreadable,
+        invalid, failed. Only plain valid JSON files are changed."""
+        result: dict[str, list[str]] = {
+            "encrypted": [], "already": [], "unreadable": [], "invalid": [], "failed": [],
+        }
+        cipher = self._store.cipher
+        if not cipher.encrypts:
+            raise ValueError("No encryption key is in use, so nothing can be encrypted.")
+        for path in self._data_files():
+            shown = os.path.relpath(path, self._store.data_dir)
+            try:
+                with open(path, "rb") as file:
+                    stored = file.read()
+            except OSError as err:
+                logger.error("Could not read %s: %s", path, err)
+                result["failed"].append(shown)
+                continue
+            if cipher.is_encrypted(stored):
+                try:
+                    cipher.decrypt(stored)
+                    result["already"].append(shown)
+                except FileDecryptionError:
+                    result["unreadable"].append(shown)
+                continue
+            try:
+                json.loads(stored.decode("utf-8"))
+            except (ValueError, RecursionError):
+                result["invalid"].append(shown)
+                continue
+            if self._store.write_bytes(path, cipher.encrypt(stored)):
+                result["encrypted"].append(shown)
+            else:
+                result["failed"].append(shown)
+        return result
 
     # Filtering / querying
     @staticmethod
