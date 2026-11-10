@@ -207,15 +207,34 @@ def parse_application_form(form) -> tuple[dict, str | None]:
         "Sustainability Grant": grant,
         "Proposal Narrative": form.get("Proposal Narrative", "").strip(),
     }
-    try:
-        record["Company Total Revenue"] = float(form.get("Company Total Revenue", ""))
-        record["Total Employees"] = int(float(form.get("Total Employees", "")))
-        record["Local Equity"] = float(form.get("Local Equity", ""))
-        for key in OPTIONAL_NUMBERS:
-            record[key] = float(form.get(key) or 0)
-    except ValueError:
-        return record, "Revenue, employees, equity and costs must be numbers."
-    return record, None
+    error = read_numbers(form, record, record["Proposal Type"])
+    if error:
+        return record, error
+    return record, service.validate_application(record, strict_costs=True)
+
+
+def read_numbers(form, record: dict, proposal_type) -> str | None:
+    """Copies the number fields from `form` into `record` (finite numbers
+    only; Total Employees as a whole number). Money fields this kind of
+    proposal does not use are set to 0, as in the terminal."""
+    used_money = service.money_fields_for(proposal_type)
+    for key in NUMBER_FIELDS:
+        if key in OPTIONAL_NUMBERS and key not in used_money:
+            record[key] = 0.0
+            continue
+        text = form.get(key, "")
+        value = service.form_number(text)
+        if value is None:
+            if key in OPTIONAL_NUMBERS and not str(text).strip():
+                value = 0.0  # left blank: checked against the rules below
+            else:
+                return "Revenue, employees, equity and costs must be numbers."
+        record[key] = value
+    employees = record["Total Employees"]
+    if employees != int(employees):
+        return "Total Employees must be a whole number above 0"
+    record["Total Employees"] = int(employees)
+    return None
 
 
 @bp.route("/new", methods=["GET", "POST"])
@@ -369,14 +388,11 @@ def edit_record(index: int):
     updated = dict(current)
     for key in TEXT_FIELDS:
         updated[key] = request.form.get(key, "").strip()
-    try:
-        for key in NUMBER_FIELDS:
-            number = float(request.form.get(key, ""))
-            updated[key] = int(number) if key == "Total Employees" else number
-    except ValueError:
-        flash("Revenue, employees, equity and costs must be numbers.")
+    error = read_numbers(request.form, updated, updated.get("Proposal Type"))
+    if error:
+        flash(error)
         return form_page(request.form)
-    error = service.validate_application(updated)
+    error = service.validate_application(updated, strict_costs=True)
     if not error and not updated["Sustainability Grant"]:
         error = "Sustainability Grant is required"
     if error:

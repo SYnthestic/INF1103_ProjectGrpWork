@@ -235,6 +235,8 @@ Then open http://localhost:5000/. On Mac/Linux replace the `-v` path with `"$HOM
 | History | Lists your past audits with a coloured decision and the subsidy. Opening one shows the decision in plain English (green approved, amber review, red rejected) with the subsidy, matched schemes, reasons and recommendations, then the AI audit, the application and the thresholds it was decided with. Each can be downloaded as a PDF | Option 9 |
 | Log out | Warns if you have unsaved records and lets you save or leave without saving | Options 0 and 10 |
 
+The form checks numbers with the same limits as the terminal: revenue above 0, a whole number of employees above 0, local equity above 0 and at most 100, and for equipment proposals a baseline energy spend and retrofit cost above 0. Values the browser lets through, such as `1e309`, are refused by the server.
+
 Things that differ from the terminal app:
 
 - Records in memory are kept **per user, in the server process**. They are lost when the server restarts, so save to a file if you want to keep them.
@@ -250,7 +252,7 @@ The same audit logic is available without the pages. Log in first; the session c
 | `POST /api/register` | Body `{"username": "...", "password": "..."}`. 201 on success, 400 if the username or password breaks the account rules, 409 if taken |
 | `POST /api/login` | Same body. 200 on success, 401 otherwise |
 | `POST /api/logout` | Ends the session |
-| `POST /api/audits` | Body is one application record (same keys as the saved records). Returns the saved audit |
+| `POST /api/audits` | Body is one application record (same keys as the saved records). Numbers must be JSON numbers within the terminal's limits (revenue above 0, a whole number of employees above 0, local equity above 0 and at most 100, costs 0 or more); otherwise 400. Returns the saved audit |
 | `GET /api/audits` | Your audits |
 | `GET /api/audits/<id>` | One of your audits (404 for anyone else's) |
 
@@ -381,7 +383,7 @@ docker run --rm sme-grant-auditor python -m pytest
 python -m flask --app app run --debug
 ```
 
-The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, `test_rule_config.py` for the adjustable thresholds, `test_admin.py` for the admin console, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete), `test_pdf.py` (PDF download), `test_web_admin.py` (the web pages respect the admin name and the saved thresholds) and `test_web_security.py` (the terminal's account rules, no fixed secret key, debugger off by default) and `test_web_display.py` (how decisions are shown). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
+The tests live in `tests/`, one file per manager (`test_logic_manager.py`, `test_ai_manager.py`, `test_data_manager.py`, `test_io_manager.py`, `test_main_flows.py` for the controller) plus `test_password_hasher.py` for password hashing on its own, `test_rule_config.py` for the adjustable thresholds, `test_admin.py` for the admin console, and `test_architecture.py`. The web layer has its own files: `test_web.py` (health, accounts and the JSON API), `test_pages.py` (the HTML forms), `test_records.py` (records in memory, save, load, edit, delete), `test_pdf.py` (PDF download), `test_web_admin.py` (the web pages respect the admin name and the saved thresholds) and `test_web_security.py` (the terminal's account rules, no fixed secret key, debugger off by default) and `test_web_display.py` (how decisions are shown) and `test_web_numbers.py` (bad numbers such as `nan`, `inf` or `1e309` are refused on every page and the API). They use a temporary data folder and a fake AI, so they never call the AI or touch your real data.
 
 ---
 
