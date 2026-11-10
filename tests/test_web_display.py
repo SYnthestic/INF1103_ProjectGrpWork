@@ -4,7 +4,9 @@ lists, and the AI audit and thresholds as labelled tables."""
 
 import pytest
 
-from web import display
+from web.display import ResultPresenter
+
+display = ResultPresenter()
 
 USER = {"username": "tester", "password": "Test1234!"}
 RECORD = {
@@ -50,7 +52,7 @@ def audited(app, client):
     return client
 
 
-# ---- Helpers in web/display.py ------------------------------------------------
+# ---- ResultPresenter (web/display.py) ------------------------------------------------
 
 
 @pytest.mark.parametrize(

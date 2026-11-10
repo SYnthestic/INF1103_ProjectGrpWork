@@ -2,8 +2,10 @@
 cannot be registered there, and web decisions use the thresholds an
 administrator saved."""
 
+import logging
+
 from managers.logic_manager import LogicManager, RuleConfig
-from web import service
+from web.service import AuditService
 
 ADMIN = {"username": "boss", "password": "Test1234!"}
 
@@ -32,7 +34,7 @@ def test_web_decisions_use_the_saved_thresholds(app):
     data.save_rule_config(
         dict(RuleConfig().to_dict(), provisional_min_pct=12.0), changed_by="boss"
     )
-    service.use_saved_rules(logic, data)
+    AuditService(None, logic, data, logging.getLogger()).use_saved_rules()
     assert logic.rule_config.provisional_min_pct == 12.0
 
 
@@ -40,7 +42,7 @@ def test_unusable_saved_thresholds_fall_back_to_the_defaults(app):
     data = app.extensions["data"]
     logic = LogicManager(rule_config=RuleConfig().with_value("provisional_min_pct", 12))
     data.save_rule_config({"minimum_impact_pct": "ten"}, changed_by="boss")
-    service.use_saved_rules(logic, data)
+    AuditService(None, logic, data, logging.getLogger()).use_saved_rules()
     assert logic.rule_config == RuleConfig()
 
 

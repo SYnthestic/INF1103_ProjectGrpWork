@@ -8,8 +8,8 @@ The program is object-oriented. The four managers from Part 1 are still the four
 
 | File | Main classes | Role |
 |---|---|---|
-| `app.py` | `create_app()` | **Flask entry point.** Builds the web app and hands it the same AI, Logic and Data managers the terminal app uses |
-| `web/` | blueprints, `Workspaces`, `service` | **Web layer.** Routes (`pages.py` for HTML pages, `auth.py` and `audits.py` for the JSON API), the shared audit function, per-user in-memory records, `display.py` (how decisions, money and the AI audit are shown) and the templates in `web/templates/`. It contains no business logic, only calls into the managers |
+| `app.py` | `WebApplication`, `create_app()` | **Flask entry point.** `WebApplication` builds the web app and hands it the same AI, Logic and Data managers the terminal app uses. `create_app()` is the one-line factory function Flask and gunicorn require |
+| `web/` | `RouteGroup` (abstract), `PageRoutes`, `AuthApi`, `AuditApi`, `AuditService`, `AccountRules`, `ApplicationValidator`, `ResultPresenter`, `Workspaces` | **Web layer.** Each group of URLs is a `RouteGroup` subclass (`pages.py` for the HTML pages, `auth.py` and `audits.py` for the JSON API); the base class builds its blueprint and gives every route the same access to the managers and the logged-in user. `service.py` runs an audit through the managers and holds the terminal's account and input rules, `display.py` formats results for the templates, and `workspace.py` keeps each user's records in memory. It contains no business logic, only calls into the managers |
 | `main.py` | `Application` | The controller: runs the login screen and menu and passes data between the managers. The only file that knows about all four. Managers are handed to it, so tests can pass in doubles |
 | `session.py` | `Session` | What one logged-in user is working on (records in memory, the current file name, whether there are unsaved changes). Created at login and discarded at logout |
 | `managers/io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |

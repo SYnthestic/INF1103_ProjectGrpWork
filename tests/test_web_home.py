@@ -8,7 +8,7 @@ from managers.logic_manager import (
     RuleConfig,
     SrgScheme,
 )
-from web import display
+from web.display import ResultPresenter
 
 USER = {"username": "tester", "password": "Test1234!"}
 
@@ -57,7 +57,7 @@ def test_visitors_are_invited_to_log_in_and_users_to_start_an_audit(client):
 
 
 def test_grant_cards_are_built_from_the_scheme_classes():
-    cards = display.grant_cards(RuleConfig().with_value("eeg_advanced_min_tonnes", 500))
+    cards = ResultPresenter.grant_cards(RuleConfig().with_value("eeg_advanced_min_tonnes", 500))
     assert [c["name"] for c in cards] == [
         EegAdvancedScheme.name,
         EegBaseScheme.name,
