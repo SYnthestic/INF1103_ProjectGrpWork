@@ -4,23 +4,23 @@ A grant-eligibility auditor that takes an SME's details and a free-text upgrade 
 
 ## How it is organised
 
-The program is object-oriented. The four managers from Part 1 are still the four main classes; they live in the `managers/` folder, and `main.py` wires them together.
+The program is object-oriented, with **one class per file**. The four managers from Part 1 are still the four main classes; each is a folder in `managers/`, and `main.py` wires them together. Every folder's `__init__.py` lists its classes, so code can import from the folder (for example `from managers.logic_manager import RuleConfig`). Constants shared inside a folder are in its `constants.py` (`ai_config.py` for the AI manager).
 
-| File | Main classes | Role |
+| File or folder | Main classes | Role |
 |---|---|---|
 | `app.py` | `WebApplication`, `create_app()` | **Flask entry point.** `WebApplication` builds the web app and hands it the same AI, Logic and Data managers the terminal app uses. `create_app()` is the one-line factory function Flask and gunicorn require |
-| `web/` | `RouteGroup` (abstract), `PageRoutes`, `AuthApi`, `AuditApi`, `AuditService`, `AccountRules`, `ApplicationValidator`, `ResultPresenter`, `Workspaces` | **Web layer.** Each group of URLs is a `RouteGroup` subclass (`pages.py` for the HTML pages, `auth.py` and `audits.py` for the JSON API); the base class builds its blueprint and gives every route the same access to the managers and the logged-in user. `service.py` runs an audit through the managers and holds the terminal's account and input rules, `display.py` formats results for the templates, and `workspace.py` keeps each user's records in memory. It contains no business logic, only calls into the managers |
+| `web/` | `RouteGroup` (abstract), `PageRoutes`, `AuthApi`, `AuditApi`, `AuditService`, `AccountRules`, `ApplicationValidator`, `ResultPresenter`, `Workspaces` | **Web layer.** Each group of URLs is a `RouteGroup` subclass (`pages.py` for the HTML pages, `auth.py` and `audits.py` for the JSON API); the base class builds its blueprint and gives every route the same access to the managers and the logged-in user. `routes/` holds `Route` and `RouteGroup`, `service/` runs an audit through the managers and holds the terminal's account and input rules, `display.py` formats results for the templates, and `workspace/` keeps each user's records in memory. It contains no business logic, only calls into the managers |
 | `main.py` | `Application` | The controller: runs the login screen and menu and passes data between the managers. The only file that knows about all four. Managers are handed to it, so tests can pass in doubles |
 | `session.py` | `Session` | What one logged-in user is working on (records in memory, the current file name, whether there are unsaved changes). Created at login and discarded at logout |
-| `managers/io_manager.py` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
-| `managers/ai_manager.py` | `AIManager`, `AIClient` (abstract), `OpenRouterClient`, `AuditResponseParser` | **AI manager.** Sends the proposal to the AI API and returns a validated JSON result. Depends on the `AIClient` interface, so another provider (or a test fake) can be plugged in |
-| `managers/logic_manager.py` | `LogicManager`, `DecisionEngine`, `EligibilityRule` (abstract, 13 rules), `GrantScheme` (abstract, 4 schemes), `DecisionAdjuster`, `PasswordHasher`, `AesGcmCipher`, `RuleConfig`, `AccessPolicy` | **Logic manager.** Eligibility rules, grant matching, subsidy maths, password hashing, AES-256-GCM encryption of the data files and who may use the admin console (no AI). A new rule or scheme is a new subclass; the engine does not change. The thresholds the rules use are a `RuleConfig`, so changing them needs no code change |
-| `managers/data_manager.py` | `DataManager`, `JsonStore`, `FilenameRules` | **Data manager.** Saving and loading records, user accounts, audit history and the grant rule thresholds as JSON; archiving deleted accounts |
-| `report_exporter.py` | `ReportExporter` (abstract), `PdfReportExporter`, `ReportTheme`, `ReportContent` | PDF report drawing, kept separate from storage. The Data Manager only knows the `ReportExporter` interface |
-| `models.py` | `Proposal` (abstract), `EquipmentProposal`, `ReportingProposal`, `ApplicationRecord`, `RecordSections`, `PlaceholderKeywords`, `FileCipher` (interface), `PlainFileCipher` | Small shared domain classes with no I/O. Any manager may import them |
+| `managers/io_manager/` | `IOManager`, `Terminal`, `InputValidator`, `PaperPrinter` | **I/O manager.** All user input, validation and screen output |
+| `managers/ai/` | `AIManager`, `AIClient` (abstract), `OpenRouterClient`, `AuditResponseParser` | **AI manager.** Sends the proposal to the AI API and returns a validated JSON result. Depends on the `AIClient` interface, so another provider (or a test fake) can be plugged in |
+| `managers/logic_manager/` (with `rules/`, `schemes/`, `adjusters/`) | `LogicManager`, `DecisionEngine`, `EligibilityRule` (abstract, 13 rules in `rules/`), `GrantScheme` (abstract, 4 schemes in `schemes/`), `DecisionAdjuster` (2 in `adjusters/`), `PasswordHasher`, `AesGcmCipher`, `RuleConfig`, `AccessPolicy` | **Logic manager.** Eligibility rules, grant matching, subsidy maths, password hashing, AES-256-GCM encryption of the data files and who may use the admin console (no AI). A new rule or scheme is a new subclass; the engine does not change. The thresholds the rules use are a `RuleConfig`, so changing them needs no code change |
+| `managers/data_manager/` | `DataManager`, `JsonStore`, `FilenameRules` | **Data manager.** Saving and loading records, user accounts, audit history and the grant rule thresholds as JSON; archiving deleted accounts |
+| `report_exporter/` | `ReportExporter` (abstract), `PdfReportExporter`, `ReportTheme`, `ReportContent` | PDF report drawing, kept separate from storage. The Data Manager only knows the `ReportExporter` interface |
+| `models/` | `Proposal` (abstract), `EquipmentProposal`, `ReportingProposal`, `ApplicationRecord`, `RecordSections`, `PlaceholderKeywords`, `FileCipher` (interface), `PlainFileCipher` | Small shared domain classes with no I/O. Any manager may import them |
 | `sme_interface_stores/sme_interface_gui.py` | `InterfaceArt` | Screen art: menus, banners and the floppy-disk prompts. Used only by the I/O manager |
 | `sme_interface_stores/buttons.py` | `ButtonPanel` | The clickable buttons. Used only by the I/O manager |
-| `tests/` | | Automated tests, including ones that fail if a manager imports another manager or procedural code reappears |
+| `tests/` | | Automated tests, including ones that fail if a manager imports another manager, a file holds more than one class, or procedural code reappears |
 
 The managers never import each other and only the I/O manager prints or asks for input. Data flows one way: the I/O manager collects and checks the input, the AI manager turns the narrative into a JSON audit, the logic manager decides, then the result goes to the data manager to be stored and back to the I/O manager to be shown.
 
@@ -264,7 +264,7 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5000/api/register -ContentT
 
 ## How grant decisions are made
 
-The AI only classifies the proposal (scope, estimated energy reduction, any exclusion keywords). The decision and the subsidy come from fixed Python rules in `managers/logic_manager.py`. They are checked in this order, and the first one that applies decides:
+The AI only classifies the proposal (scope, estimated energy reduction, any exclusion keywords). The decision and the subsidy come from fixed Python rules in `managers/logic_manager/`. They are checked in this order, and the first one that applies decides:
 
 | # | Condition | Decision |
 |---|---|---|
@@ -284,7 +284,7 @@ The percentages and the 350-tonne limit above are the defaults. An administrator
 
 Equipment subsidies (rows 7 to 9) are never larger than the retrofit cost you entered. The grant you pick when entering the application does not change the decision; if the proposal matched a different scheme, a recommendation says so.
 
-In the code each condition is one small `EligibilityRule` subclass in `managers/logic_manager.py` (some rows above are split into two rules, for 13 in all). The `DecisionEngine` runs them in the order given by `DecisionEngine.with_default_rules()`, and the first rule that returns a decision wins. A new rule is a new subclass added to that list, with a matching test in `tests/test_logic_manager.py`; the engine itself does not change.
+In the code each condition is one small `EligibilityRule` subclass in its own file in `managers/logic_manager/rules/` (some rows above are split into two rules, for 13 in all). The `DecisionEngine` runs them in the order given by `DecisionEngine.with_default_rules()`, and the first rule that returns a decision wins. A new rule is a new subclass added to that list, with a matching test in `tests/test_logic_manager.py`; the engine itself does not change.
 
 ## Accounts and login
 
@@ -340,7 +340,7 @@ Every JSON data file the app saves is encrypted with **AES-256-GCM**: `users.jso
 
 - **Tests and CI** create a throwaway key for each test, so no secret is needed on GitHub.
 
-The encryption code is `AesGcmCipher` in `managers/logic_manager.py`, which implements the `FileCipher` interface in `models.py`. `main.py` passes it to the `DataManager`, whose `JsonStore` encrypts on every save and decrypts on every load without knowing which cipher it has.
+The encryption code is `AesGcmCipher` in `managers/logic_manager/aes_gcm_cipher.py`, which implements the `FileCipher` interface in `models/file_cipher.py`. `main.py` passes it to the `DataManager`, whose `JsonStore` encrypts on every save and decrypts on every load without knowing which cipher it has.
 
 ## Where saved files go
 
