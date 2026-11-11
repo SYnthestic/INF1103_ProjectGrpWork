@@ -1,9 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Register</h1>
-<form method="post">
-  <label>Username <input name="username" required></label>
-  <label>Password <input name="password" type="password" required></label>
-  <p><button>Register</button></p>
-</form>
+<div class="auth-card">
+  <h1>Create an account</h1>
+  <form method="post">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" placeholder="Choose a username"
+           required minlength="3" maxlength="20" autocomplete="username" autofocus>
+    <p class="hint muted small">3-20 letters, digits or _ (Not case-sensitive).</p>
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" placeholder="Choose a password"
+           required minlength="8" maxlength="64" autocomplete="new-password">
+    <p class="hint muted small">8-64 characters, with at least one letter and one digit.</p>
+
+    <label class="show-pw"><input type="checkbox" id="show-pw"> Show password</label>
+    <button type="submit">Register</button>
+  </form>
+  <p class="auth-alt muted">Already registered? <a href="{{ url_for('pages.login') }}">Log in</a></p>
+</div>
+<script>
+  document.getElementById("show-pw").addEventListener("change", function () {
+    document.getElementById("password").type = this.checked ? "text" : "password";
+  });
+</script>
 {% endblock %}

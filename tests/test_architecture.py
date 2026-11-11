@@ -44,6 +44,15 @@ MODULE_PATHS = {
     "managers.data_manager": "managers/data_manager.py",
     "sme_interface_stores.sme_interface_gui":
     "sme_interface_stores/sme_interface_gui.py",
+    "sme_interface_stores.buttons": "sme_interface_stores/buttons.py",
+    "app": "app.py",
+    "web.routes": "web/routes.py",
+    "web.pages": "web/pages.py",
+    "web.auth": "web/auth.py",
+    "web.audits": "web/audits.py",
+    "web.service": "web/service.py",
+    "web.display": "web/display.py",
+    "web.workspace": "web/workspace.py",
 }
 APPLICATION_MODULES = (
     "main",
@@ -58,6 +67,16 @@ APPLICATION_MODULES = (
     "managers.data_manager",
     "report_exporter",
     "sme_interface_stores.sme_interface_gui",
+    "sme_interface_stores.buttons",
+    "session",
+    "app",
+    "web.routes",
+    "web.pages",
+    "web.auth",
+    "web.audits",
+    "web.service",
+    "web.display",
+    "web.workspace",
 )
 
 # Shared support modules every manager may use. They hold no manager logic.
@@ -138,14 +157,24 @@ def test_importing_a_manager_prints_nothing():
     assert done.stdout == ""
 
 
+# Module-level functions that a framework requires, and why. Nothing else may
+# be a module-level function.
+REQUIRED_FUNCTIONS = {
+    # Flask's CLI (`flask --app app run`) only accepts a plain function named
+    # create_app as the app factory; it hands straight over to WebApplication.
+    ("app", "create_app"),
+}
+
+
 def test_no_procedural_code_is_left():
     """Application modules hold classes (and constants) only: no module-level
-    functions."""
+    functions, apart from the framework entry points listed above."""
     offenders = []
     for module_name in APPLICATION_MODULES:
         for node in parse(module_name).body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                offenders.append(f"{module_name}:{node.lineno} {node.name}")
+                if (module_name, node.name) not in REQUIRED_FUNCTIONS:
+                    offenders.append(f"{module_name}:{node.lineno} {node.name}")
     assert offenders == [], f"module-level functions found: {offenders}"
 
 
@@ -187,3 +216,20 @@ def test_the_four_managers_exist_as_classes():
     assert inspect.isclass(ai_manager.AIManager)
     assert inspect.isclass(logic_manager.LogicManager)
     assert inspect.isclass(data_manager.DataManager)
+
+
+def test_the_web_app_is_still_found_by_flask_and_gunicorn(tmp_path):
+    """create_app must stay a plain function, or `flask --app app run` cannot
+    find the app (it ignores a class method under that name)."""
+    import app
+
+    assert inspect.isfunction(app.create_app)
+    done = subprocess.run(
+        [sys.executable, "-m", "flask", "--app", "app", "routes"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "DATA_DIR": str(tmp_path)},
+    )
+    assert done.returncode == 0, done.stderr
+    assert "pages.home" in done.stdout and "audits.create_audit" in done.stdout

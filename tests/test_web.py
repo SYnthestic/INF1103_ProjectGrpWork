@@ -92,7 +92,7 @@ def test_users_cannot_see_each_others_audits(app):
     assert b.get("/api/audits").json == []
     assert b.get("/api/audits/1").status_code == 404
 
-def test_index_redirects_to_login(client):
+def test_index_is_the_grants_home_page(client):
     response = client.get("/")
-    assert response.status_code == 302
-    assert response.headers["Location"].endswith("/login")
+    assert response.status_code == 200
+    assert b"Available grants" in response.data

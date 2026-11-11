@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div class="hero-text">
+    <h1>Going GREEN? Check out your company's grant eligibility in minutes!</h1>
+    <p>Describe your energy or sustainability upgrade in your own words. The AI classifies it, then
+       the auditor applies the grant rules below and tells you which grant you match, how much
+       co-funding to expect, and why.</p>
+    <div class="actions">
+      {% if session.username %}
+        <a class="button" href="{{ url_for('pages.new_audit') }}">Start a new audit</a>
+        <a class="button secondary" href="{{ url_for('pages.history') }}">My past audits</a>
+      {% else %}
+        <a class="button" href="{{ url_for('pages.login') }}">Log in to start an audit</a>
+        <a class="button secondary" href="{{ url_for('pages.register') }}">Create an account</a>
+      {% endif %}
+    </div>
+  </div>
+  <img class="hero-img"
+       src="{{ url_for('static', filename='images/hero.png') }}"
+       alt="People tending a rooftop vegetable garden beside solar panels, with the Singapore skyline behind">
+</section>
+
+<h2 class="section-title">How it works</h2>
+<div class="steps">
+  <div class="step">
+    <span class="step-num" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" /><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" /><path d="M16 5l3 3" /></svg>
+    </span>
+    <div>
+      <strong>Describe your upgrade</strong>
+      <p class="muted small">Provide your company's details and a short proposal.</p>
+    </div>
+  </div>
+  <div class="step">
+    <span class="step-num" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2zm-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6z" /></svg>
+    </span>
+    <div>
+      <strong>AI classifies it</strong>
+      <p class="muted small">Emission scope, impact, and red flags like second-hand equipment.</p>
+    </div>
+  </div>
+  <div class="step">
+    <span class="step-num" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 12l2 2l4 -4" /></svg>
+    </span>
+    <div>
+      <strong>Get a decision</strong>
+      <p class="muted small">Matched grant, subsidy estimate, and reasons.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="section-title">Available grants</h2>
+<div class="grants">
+  {% for grant in grant_cards(config) %}
+  <article class="card grant">
+    <h3>{{ grant.name }}</h3>
+    <p class="muted">{{ grant.for }}</p>
+    <div class="facts">
+      <div><span>Co-funding</span><strong>{{ grant.funding }}</strong></div>
+      <div><span>Up to</span><strong>{{ grant.cap }}</strong></div>
+    </div>
+    <h4>You qualify when</h4>
+    <ul class="points">{% for c in grant.conditions %}<li>{{ c }}</li>{% endfor %}</ul>
+  </article>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>Who can apply</h2>
+  <ul class="points">{% for p in eligibility_points(config) %}<li>{{ p }}</li>{% endfor %}</ul>
+  <p class="muted small">These are the rules this auditor applies, with the thresholds currently set by an
+     administrator. They are a guide only: check each scheme's official terms before you apply.</p>
+</div>
+{% endblock %}

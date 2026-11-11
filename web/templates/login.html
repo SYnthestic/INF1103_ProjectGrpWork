@@ -1,9 +1,25 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Log in</h1>
-<form method="post">
-  <label>Username <input name="username" required></label>
-  <label>Password <input name="password" type="password" required></label>
-  <p><button>Log in</button></p>
-</form>
+<div class="auth-card">
+  <h1>Log in</h1>
+  <p class="muted">Log in to review your grant audits.</p>
+  <form method="post">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" placeholder="Your username"
+           autocomplete="username" autofocus required>
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" placeholder="Your password"
+           autocomplete="current-password" required>
+
+    <label class="show-pw"><input type="checkbox" id="show-pw"> Show password</label>
+    <button type="submit">Log in</button>
+  </form>
+  <p class="auth-alt muted">New here? <a href="{{ url_for('pages.register') }}">Create an account</a></p>
+</div>
+<script>
+  document.getElementById("show-pw").addEventListener("change", function () {
+    document.getElementById("password").type = this.checked ? "text" : "password";
+  });
+</script>
 {% endblock %}

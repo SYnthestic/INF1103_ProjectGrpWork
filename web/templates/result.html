@@ -1,7 +1,14 @@
 {% extends "base.html" %}
+{% from "_results.html" import decision_panel, rows_table %}
 {% block content %}
 <h1>{{ title }}</h1>
-<p>Latest record: {{ company }}</p>
-<pre>{{ data | tojson(indent=2) }}</pre>
-<a href="{{ url_for('pages.records_page') }}">Back to records</a>
+<p class="muted">Latest record: {{ company }}</p>
+<div class="card">
+  {% if kind == 'decision' %}
+    {{ decision_panel(data) }}
+  {% else %}
+    {{ rows_table(ai_rows(data)) }}
+  {% endif %}
+</div>
+<a class="button secondary" href="{{ url_for('pages.records_page') }}">Back to records</a>
 {% endblock %}
