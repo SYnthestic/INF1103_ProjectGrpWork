@@ -1,40 +1,14 @@
-"""The base for every group of web routes.
-
-Class overview
-    Route        one URL: its path, the method that answers it, the HTTP
-                 methods it accepts and whether it needs a logged-in user
-    RouteGroup   abstract: a set of related routes. Subclasses (PageRoutes,
-                 AuthApi, AuditApi) list their routes and say what happens when
-                 nobody is logged in; the base turns them into a Flask
-                 blueprint (template method) and gives every route the same
-                 access to the managers and the logged-in user.
-
-The app treats every group the same way (polymorphism): it asks each one for
-its blueprint and registers it, without knowing which kind it is.
-"""
+"""RouteGroup: a set of related routes, registered on the app as one
+blueprint."""
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass
+from flask import Blueprint, current_app, session as flask_session
 from functools import wraps
 from typing import Any
 
-from flask import Blueprint, current_app
-from flask import session as flask_session
-
 from web.service import AuditService
-
-
-@dataclass(frozen=True)
-class Route:
-    rule: str
-    view: Callable[..., Any]
-    methods: tuple[str, ...] = ("GET",)
-    login: bool = False
-
-    @property
-    def endpoint(self) -> str:
-        return self.view.__name__
+from .route import Route
 
 
 class RouteGroup(ABC):
