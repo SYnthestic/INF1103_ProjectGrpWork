@@ -3,8 +3,8 @@
 * The four managers must not import each other. Only main.py (the controller)
   may know about all of them.
 * Only the I/O Manager prints or asks for input.
-* No procedural code: application modules contain classes (and constants)
-  only.
+* One class per module, and no procedural code: application modules contain
+  classes (and constants) only.
 * Every abstraction the design relies on really is abstract and has concrete
   implementations.
 
@@ -102,6 +102,7 @@ def belongs_to(name, package):
 
 
 def test_every_application_module_is_found():
+    assert "managers.logic_manager.decision_engine" in FILES
     assert "managers.logic_manager" in FILES and "managers.data_manager" in FILES
     assert "web.pages" in FILES and "app" in FILES and "main" in FILES
 
@@ -146,6 +147,15 @@ def test_importing_a_manager_prints_nothing():
     done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True)
     assert done.returncode == 0, done.stderr
     assert done.stdout == ""
+
+
+def test_one_class_per_module():
+    crowded = {}
+    for module in FILES:
+        classes = [n.name for n in parse(module).body if isinstance(n, ast.ClassDef)]
+        if len(classes) > 1:
+            crowded[module] = classes
+    assert crowded == {}, f"more than one class in: {crowded}"
 
 
 def test_no_procedural_code_is_left():
