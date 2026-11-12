@@ -3,7 +3,7 @@
     WebApplication   builds the Flask app: the same AI, Logic and Data
                      managers the terminal app uses, the per-user records in
                      memory, and the route groups (pages, accounts API,
-                     audits API), each registered the same way.
+                     audits API, admin console), each registered the same way.
 
 `create_app` is the one module-level function left on purpose: Flask
 (`flask --app app run`) only accepts a plain function called create_app as the
@@ -20,6 +20,7 @@ from flask import session as flask_session
 
 from managers import DataManager, LogicManager
 from managers.ai.ai_manager import AIManager
+from web.admin import AdminRoutes
 from web.audits import AuditApi
 from web.auth import AuthApi
 from web.pages import PageRoutes
@@ -34,7 +35,7 @@ class WebApplication:
         self._app = Flask(__name__)
         self.configure(config)
         self.add_managers()
-        self.add_routes([AuthApi(), AuditApi(), PageRoutes()])
+        self.add_routes([AuthApi(), AuditApi(), PageRoutes(), AdminRoutes()])
 
     @classmethod
     def create(cls, config: dict[str, Any] | None = None) -> Flask:

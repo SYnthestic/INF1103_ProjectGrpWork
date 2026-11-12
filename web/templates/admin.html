@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Admin console - SME Green Grant Auditor{% endblock %}
+{% block content %}
+<h1>Admin console</h1>
+<p class="muted">Changes here affect every user, in the web version and the terminal app.</p>
+
+<section class="card" id="users">
+  <h2>Users</h2>
+  <div class="table-wrap">
+  <table>
+    <tr><th>Username</th><th>Role</th><th>Audits</th><th>Created</th><th></th></tr>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.username }}{% if u.is_you %} <span class="muted">(you)</span>{% endif %}</td>
+      <td><span class="badge {{ 'tone-approved' if u.role == 'admin' else 'tone-neutral' }}">{{ u.role }}</span>
+        {% if u.username == main_admin %}<span class="hint">main admin</span>{% endif %}</td>
+      <td>{{ u.audit_count }}</td>
+      <td class="nowrap">{{ (u.created_at or '-')[:10] }}</td>
+      <td>
+        <details class="manage">
+          <summary>Manage</summary>
+          <form method="post" action="{{ url_for('admin.change_role', username=u.username) }}">
+            <label>Role
+              <select name="role">{% for r in roles %}<option {{ 'selected' if r == u.role }}>{{ r }}</option>{% endfor %}</select>
+            </label>
+            <button class="secondary">Change role</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.reset_password', username=u.username) }}">
+            <label>New password <span class="hint">8-64 characters, a letter and a digit</span>
+              <input name="password" type="password" minlength="8" maxlength="64" autocomplete="new-password" required>
+            </label>
+            <button class="secondary">Reset password</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.delete_user', username=u.username) }}">
+            <label>Type <strong>{{ u.username }}</strong> to delete this account
+              <span class="hint">The login is removed; their audits and files are archived, not destroyed.</span>
+              <input name="confirm" autocomplete="off" required>
+            </label>
+            <button class="danger">Delete account</button>
+          </form>
+        </details>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Create a user</h2>
+  <form method="post" action="{{ url_for('admin.create_user') }}">
+    <div class="grid">
+      <label>Username <span class="hint">3-20 letters, digits or _</span>
+        <input name="username" required minlength="3" maxlength="20" autocomplete="off"></label>
+      <label>Password <span class="hint">8-64 characters, a letter and a digit</span>
+        <input name="password" type="password" required minlength="8" maxlength="64" autocomplete="new-password"></label>
+      <label>Role
+        <select name="role">{% for r in roles %}<option>{{ r }}</option>{% endfor %}</select></label>
+    </div>
+    <p><button>Create user</button></p>
+  </form>
+</section>
+
+<section class="card" id="thresholds">
+  <h2>Grant rule thresholds</h2>
+  <p class="muted">Every new decision uses these values. Percentages must be above 0 and at most 100,
+    and must not decrease from top to bottom of the first three.</p>
+  <form method="post" action="{{ url_for('admin.save_thresholds') }}">
+    <div class="grid">
+      {% for name, label, value, unit in thresholds %}
+      <label>{{ label }} ({{ unit }})
+        <input name="{{ name }}" type="number" step="any" min="0" value="{{ '%g' % value }}" required></label>
+      {% endfor %}
+    </div>
+    <div class="actions"><button>Save thresholds</button></div>
+  </form>
+  <form method="post" action="{{ url_for('admin.reset_thresholds') }}">
+    <button class="secondary">Reset to the defaults</button>
+  </form>
+</section>
+{% endblock %}

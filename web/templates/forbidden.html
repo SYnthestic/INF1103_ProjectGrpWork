@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Administrators only</h1>
+<div class="card">
+  <p>This page is for administrators. Ask an administrator if you need an account changed.</p>
+  <a class="button secondary" href="{{ url_for('pages.home') }}">Back to the home page</a>
+</div>
+{% endblock %}
