@@ -56,6 +56,12 @@
     .table-wrap { overflow-x: auto; }
     pre { background: #f4f4f4; padding: .8rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
     td.nowrap { white-space: nowrap; }
+    button.danger { background: var(--rejected); border-color: var(--rejected); }
+    button.danger:hover { background: #8c1d17; }
+    details.manage summary { color: var(--brand); font-weight: 600; }
+    details.manage form { margin: .5rem 0 .9rem; padding-top: .5rem; border-top: 1px solid var(--border); }
+    details.manage label { margin-top: .3rem; }
+    details.manage button { margin-top: .4rem; }
     .hint { font-weight: 400; font-size: .85rem; color: var(--muted); }
     .badge { display: inline-block; padding: .15rem .55rem; border-radius: 999px; font-size: .85rem;
              font-weight: 600; white-space: nowrap; }
@@ -114,6 +120,7 @@
           <a href="{{ url_for('pages.new_audit') }}">New audit</a>
           <a href="{{ url_for('pages.records_page') }}">Records</a>
           <a href="{{ url_for('pages.history') }}">History</a>
+          {% if is_admin %}<a href="{{ url_for('admin.console') }}">Admin</a>{% endif %}
           <form action="{{ url_for('pages.logout') }}" method="post">
             <button>Log out ({{ session.username }})</button>
           </form>

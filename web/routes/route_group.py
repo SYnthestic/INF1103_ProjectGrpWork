@@ -54,6 +54,11 @@ class RouteGroup(ABC):
         def checked(*args: Any, **kwargs: Any) -> Any:
             if self.username is None:
                 return self.not_logged_in()
+            if self.data.get_user(self.username) is None:
+                # The account was deleted (e.g. by an admin) while logged in.
+                self.workspaces.discard(self.username)
+                self.end_session()
+                return self.not_logged_in()
             return view(*args, **kwargs)
 
         return checked
