@@ -21,8 +21,12 @@ The program is object-oriented, with **one class per file**. The four managers f
 | `sme_interface_stores/sme_interface_gui.py` | `InterfaceArt` | Screen art: menus, banners and the floppy-disk prompts. Used only by the I/O manager |
 | `sme_interface_stores/buttons.py` | `ButtonPanel` | The clickable buttons. Used only by the I/O manager |
 | `tests/` | | Automated tests, including ones that fail if a manager imports another manager, a file holds more than one class, or procedural code reappears |
+| `docs/uml/` | | UML class and package diagrams, drawn from the code (see `docs/uml/README.md`) |
+| `tools/uml_diagrams.py` | `UmlDiagrams` | Redraws the diagrams in `docs/uml/` after a code change: `python tools/uml_diagrams.py` (needs Graphviz) |
 
 The managers never import each other and only the I/O manager prints or asks for input. Data flows one way: the I/O manager collects and checks the input, the AI manager turns the narrative into a JSON audit, the logic manager decides, then the result goes to the data manager to be stored and back to the I/O manager to be shown.
+
+The UML diagrams in [`docs/uml/`](docs/uml/README.md) show every class, its attributes and methods, and how the classes relate.
 
 ---
 
