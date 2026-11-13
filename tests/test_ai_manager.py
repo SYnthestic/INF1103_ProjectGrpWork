@@ -7,13 +7,13 @@ import logging
 import os
 from unittest import mock
 
-import managers.ai.ai_manager as ai
-from managers.ai.ai_client import AIClient
-from managers.ai.ai_config import DEFAULT_AI_AUDIT
-from managers.ai.ai_manager import AIManager
-from managers.ai import audit_response_parser
-from managers.ai.audit_response_parser import AuditResponseParser
-from managers.ai.openrouter_client import OpenRouterClient
+import managers.ai_manager.ai_manager as ai
+from managers.ai_manager.ai_client import AIClient
+from managers.ai_manager.ai_config import DEFAULT_AI_AUDIT
+from managers.ai_manager.ai_manager import AIManager
+from managers.ai_manager import audit_response_parser
+from managers.ai_manager.audit_response_parser import AuditResponseParser
+from managers.ai_manager.openrouter_client import OpenRouterClient
 from tests.helpers import raises
 
 

@@ -19,7 +19,7 @@ import subprocess
 import sys
 from abc import ABC
 
-import managers.ai as ai
+import managers.ai_manager as ai_manager
 import managers.data_manager as data_manager
 import managers.io_manager as io_manager
 import managers.logic_manager as logic_manager
@@ -142,7 +142,7 @@ def test_importing_a_manager_prints_nothing():
     code = (
         "import models, report_exporter, main; "
         "import managers.logic_manager, managers.data_manager, "
-        "managers.ai, managers.io_manager"
+        "managers.ai_manager, managers.io_manager"
     )
     done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True)
     assert done.returncode == 0, done.stderr
@@ -177,7 +177,7 @@ def test_the_controller_does_not_import_the_screen_art_directly():
 
 def concrete_subclasses(base):
     found = []
-    for module in (logic_manager, ai, report_exporter, models, data_manager,
+    for module in (logic_manager, ai_manager, report_exporter, models, data_manager,
                    web.pages, web.auth, web.audits):
         for _, candidate in inspect.getmembers(module, inspect.isclass):
             if (
@@ -196,7 +196,7 @@ def test_the_design_abstractions_are_real_abstract_classes():
         logic_manager.DecisionAdjuster,
         models.Proposal,
         models.FileCipher,
-        ai.AIClient,
+        ai_manager.AIClient,
         report_exporter.ReportExporter,
         web.routes.RouteGroup,
     )
@@ -208,7 +208,7 @@ def test_the_design_abstractions_are_real_abstract_classes():
 
 def test_the_four_managers_exist_as_classes():
     assert inspect.isclass(io_manager.IOManager)
-    assert inspect.isclass(ai.AIManager)
+    assert inspect.isclass(ai_manager.AIManager)
     assert inspect.isclass(logic_manager.LogicManager)
     assert inspect.isclass(data_manager.DataManager)
 

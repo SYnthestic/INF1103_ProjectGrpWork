@@ -21,3 +21,6 @@ app.log
 
 # Scratch save files from manual testing in the project root
 /*.json
+
+#.corrupt files
+*.corrupt

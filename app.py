@@ -19,7 +19,7 @@ from flask import Flask, request
 from flask import session as flask_session
 
 from managers import DataManager, LogicManager
-from managers.ai.ai_manager import AIManager
+from managers.ai_manager.ai_manager import AIManager
 from web.admin import AdminRoutes
 from web.audits import AuditApi
 from web.auth import AuthApi
