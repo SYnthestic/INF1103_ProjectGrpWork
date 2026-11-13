@@ -32,7 +32,7 @@ class WebApplication:
     """Owns one Flask app and everything it is set up with."""
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
-        self._app = Flask(__name__)
+        self._app = Flask(__name__, static_folder="web/static")
         self.configure(config)
         self.add_managers()
         self.add_routes([AuthApi(), AuditApi(), PageRoutes(), AdminRoutes()])
