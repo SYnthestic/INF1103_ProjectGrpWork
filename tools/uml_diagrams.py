@@ -30,7 +30,7 @@ class UmlDiagrams:
         ("2_controller", "Controller (main.py)", ["main", "session"], [], "TB"),
         ("3_io_manager", "I/O Manager", ["managers.io_manager", "sme_interface_stores"], [],
          "TB"),
-        ("4_ai_manager", "AI Manager", ["managers.ai"], [], "TB"),
+        ("4_ai_manager", "AI Manager", ["managers.ai_manager"], [], "TB"),
         ("5_logic_manager", "Logic Manager", ["managers.logic_manager"], LOGIC_PARTS, "TB"),
         ("5b_rules_schemes_adjusters",
          "Logic Manager: eligibility rules, grant schemes and decision adjusters",
@@ -45,7 +45,7 @@ class UmlDiagrams:
     PACKAGES = [
         ("main", "Controller"), ("session", "Controller"),
         ("managers.io_manager", "I/O Manager"), ("sme_interface_stores", "I/O Manager"),
-        ("managers.ai", "AI Manager"), ("managers.logic_manager", "Logic Manager"),
+        ("managers.ai_manager", "AI Manager"), ("managers.logic_manager", "Logic Manager"),
         ("managers.data_manager", "Data Manager"), ("report_exporter", "Data Manager"),
         ("models", "Shared models"), ("app", "Web version"), ("web", "Web version"),
     ]
@@ -499,7 +499,7 @@ class UmlDiagrams:
                     'margin="0.2,0.1"];')
         for package, area in self.PACKAGES:
             lines.append(f'  "{package}" [fillcolor="{self.COLOURS[area]}"];')
-        lines.append('  { rank=same; "managers.io_manager"; "managers.ai"; '
+        lines.append('  { rank=same; "managers.io_manager"; "managers.ai_manager"; '
                      '"managers.logic_manager"; "managers.data_manager"; }')
         edges = set()
         for module in self.raw_imports:

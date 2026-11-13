@@ -37,7 +37,7 @@ SKIPPED_FOLDERS = {"tests", "__pycache__", ".git", ".venv", "venv", "env", "stat
 # local (another manager, main, session, web, app) is forbidden.
 MANAGER_ALLOWED = {
     "managers.io_manager": {"models", "sme_interface_stores"},
-    "managers.ai": {"models"},
+    "managers.ai_manager": {"models"},
     "managers.logic_manager": {"models"},
     "managers.data_manager": {"models", "report_exporter"},
 }
